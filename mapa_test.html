@@ -261,36 +261,35 @@ function mailTemplates(rec){
   const nazwa  = rec.nazwa || "";
   const miasto = (rec.miejscowosc || "").trim();
   let   adres  = (rec.adres_pelny || "").trim();
+  const tel    = rec.telefon || "";
+  const email  = rec.email || "";
 
   // 1) Normalizacja "ul." i białych znaków
   adres = adres.replace(/\s+/g, " ");
-  // jeśli adres zaczyna się od "ul. ul." lub "UL ul" -> zrób jedną "ul. "
-  adres = adres.replace(/^\s*(ul\.?\s*){2,}/i, "ul. ");
-  // ujednolić początek: "ul" / "UL" -> "ul. "
-  adres = adres.replace(/^\s*ul\b\.?/i, "ul. ");
+  adres = adres.replace(/^\s*(ul\.?\s*){2,}/i, "ul. "); // "ul. ul." -> "ul. "
+  adres = adres.replace(/^\s*ul\b\.?/i, "ul. ");        // "ul" / "UL" -> "ul. "
 
-// 2) Jeśli miasto już jest na końcu adresu – wykryj to
+  // 2) Czy miasto jest już na końcu adresu?
   const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const reCityAtEnd = miasto ? new RegExp(`(?:,\\s*)?\\b${reEsc(miasto)}\\b$`, "i") : null;
   const hasCityAtEnd = miasto && reCityAtEnd.test(adres);
 
-  // Adres bez miasta (do wiersza "Adres:" w treści)
+  // 3) Wersje adresu
   const adresBezMiasta = hasCityAtEnd
     ? adres.replace(reCityAtEnd, "").replace(/,\s*$/,"").trim()
     : adres;
 
-  // Adres z miastem (do tematów i akapitów opisowych)
   const adresZMiastem = hasCityAtEnd
     ? adres
     : (miasto ? `${adres}, ${miasto}` : adres);
 
-  // Tematy – zawsze pokazujemy adres razem z miastem (tylko raz)
+  // 4) Tematy
   const subj_inv = `Zapytanie o wycenę - ${adresZMiastem} - SIDUSIS`;
   const subj_cli = `Internet światłowodowy - The Network - ${adresZMiastem}`;
   const subj_std = subj_cli;
   const subj_dev = subj_cli;
 
-  // Treści (w tekście informacyjnym używamy adresu z miastem, w polu "Adres:" bez miasta)
+  // 5) Treści
   const body_inv =
 `Proszę o wycenę podłączenia klienta:
 Nazwa: ${nazwa}
@@ -305,7 +304,7 @@ E-mail: ${email}
 
 Serdecznie dziękujemy za przesłanie zgłoszenia za pośrednictwem platformy SIDUSIS.
 
-Informujemy, że zapytanie dotyczące możliwości podłączenia Internetu w lokalizacji ${adresBezMiasta}${cityPartForSubject} zostało przekazane do Działu Inwestycji celem przygotowania indywidualnej wyceny.
+Informujemy, że zapytanie dotyczące możliwości podłączenia Internetu w lokalizacji ${adresZMiastem} zostało przekazane do Działu Inwestycji celem przygotowania indywidualnej wyceny.
 
 Odpowiedź prześlę nie później niż w ciągu 3 dni roboczych.
 
@@ -398,9 +397,9 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
 
   return {
     INV: { to: "inwestycje@internetunion.pl", subject: subj_inv, body: body_inv },
-    CLI: { to: rec.email || "", subject: subj_cli, body: body_cli },
-    STD: { to: rec.email || "", subject: subj_std, body: body_std },
-    DEV: { to: rec.email || "", subject: subj_dev, body: body_dev }
+    CLI: { to: email, subject: subj_cli, body: body_cli },
+    STD: { to: email, subject: subj_std, body: body_std },
+    DEV: { to: email, subject: subj_dev, body: body_dev }
   };
 }
 
