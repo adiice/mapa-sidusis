@@ -155,11 +155,14 @@
   <input id="mfSearch" placeholder="np. Poznań lub Piłsudskiego" />
   </div>
   <div class="f">
-    <label>&nbsp;</label>
-    <label style="display:flex;gap:6px;align-items:center">
-      <input type="checkbox" id="mfToday"> Tylko dzisiaj
-    </label>
+	<label>Zakres od</label>
+	<input type="date" id="mfFrom">
   </div>
+  <div class="f">
+	<label>…do</label>
+	<input type="date" id="mfTo">
+  </div>
+
   <div class="f">
     <button id="mfApply">Filtruj</button>
   </div>
@@ -191,10 +194,10 @@
 
   /* =========================== UI/MAPA =========================== */
   const PH_LIST = ["Adrian Daniel","Robert Kaźmierczak","Mariusz Kielczyk","Inga Kaźmierczak","Jacek Trybuchowski","Tomasz Józefowicz","Duplikat","MOICO","SEEV"];
-  const STATUS_LIST = ["Zapytanie o wycenę","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO","Duplikat","MOICO","SEEV"];
+  const STATUS_LIST = ["Wycena Inwestycji","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO","Duplikat","MOICO","SEEV"];
   const PH_COLORS = ["#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2","#7f7f7f","#bcbd22","#17becf"];
   const PH_COLOR_MAP = Object.fromEntries(PH_LIST.map((ph,i)=>[ph,PH_COLORS[i%PH_COLORS.length]]));
-  const STATUS_COLOR_MAP = {"Zapytanie o wycenę":"#607D8B","Oferta wysłana":"#2196F3","Odmowa klienta":"#F44336","Akceptacja klienta":"#4CAF50","Poza Zasięgiem":"#000000","KPO":"#FF9800"};
+  const STATUS_COLOR_MAP = {"Wycena Inwestycji":"#607D8B","Oferta wysłana":"#2196F3","Odmowa klienta":"#F44336","Akceptacja klienta":"#4CAF50","Poza Zasięgiem":"#000000","KPO":"#FF9800"};
   const REJECTION_REASONS = [
     "Zbyt droga instalacja",
     "Drogi abonament",
@@ -215,7 +218,19 @@
   const statusbar=$("#statusbar"); const who=$("#who"); const errorBar=$("#errorBar");
 
   const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  function setStatus(lines){ statusbar.textContent = Array.isArray(lines) ? lines.join("\n") : String(lines||""); }
+  const DEFAULT_STATUS = "Kliknij „Zaloguj”, a potem „Odśwież dane z Excelem”.";
+  function setStatus(msg, opts={}){
+	const { append = false, autoClearMs = 0 } = opts;
+	if(append){
+		const sep = statusbar.textContent ? "\n" : "";
+		statusbar.textContent = statusbar.textContent + sep + (Array.isArray(msg)? msg.join("\n") : String(msg||""));
+	}else{
+		statusbar.textContent = Array.isArray(msg)? msg.join("\n") : String(msg||"");
+	}
+	if(autoClearMs>0){
+		setTimeout(()=>{ statusbar.textContent = ""; }, autoClearMs);
+	}
+  }
   function showError(msg){ errorBar.textContent = msg; errorBar.style.display='block'; setTimeout(()=>{ errorBar.style.display='none'; }, 7000); }
   function toNum(v){ if(v==null) return NaN; const s=String(v).replace(",", ".").replace(/[^\d\.\-+Ee]/g,"").trim(); return parseFloat(s); }
   function colLetter(n){ let s="",x=n; while(x>0){x--; s=String.fromCharCode(65+(x%26))+s; x=Math.floor(x/26);} return s; }
@@ -398,7 +413,7 @@ map.addLayer(cluster);
           m.setIcon(makeIcon(rec));
           m.setPopupContent(buildPopup(rec));
           m.openPopup();
-          setStatus("Zapisano.");
+          setStatus("Zapisano.", { autoClearMs: 2500 });
         }catch(err){
           console.error(err);
           showError("Błąd zapisu: " + err.message);
@@ -456,8 +471,10 @@ map.addLayer(cluster);
     });
     fitToData(frows);
     const sample = frows.slice(0,2).map(r=>`(${r.lat.toFixed(5)}, ${r.lon.toFixed(5)})`).join(" ; ");
-    const txt=statusbar.textContent + `\nWidocznych na mapie: ${placed}\nPrzykładowe współrzędne: ${sample||"—"}`;
-    setStatus(txt);
+    setStatus([
+	`Widocznych na mapie: ${placed}`,
+	`Przykładowe współrzędne: ${sample||"—"}`
+	]);
   }
 
   /* ==================== MAIL – formatowanie + szablony ==================== */
@@ -647,6 +664,23 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     }
     return resp.status===204 ? null : resp.json();
   }
+  async function gBatch(requests){
+  const token = await getToken();
+  const resp = await fetch("https://graph.microsoft.com/v1.0/$batch", {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({ requests })
+  });
+  const js = await resp.json();
+  if (!resp.ok) {
+    const msg = (js && js.error && js.error.message) ? js.error.message : JSON.stringify(js);
+    throw new Error("Batch error: " + msg);
+  }
+  // kontrola sub-odpowiedzi
+  const bad = (js.responses || []).find(r => r.status < 200 || r.status >= 300);
+  if (bad) throw new Error("Batch subrequest failed: " + bad.status + " " + JSON.stringify(bad.body||{}));
+  return js;
+}
   async function getSiteId(){
     if(siteId) return siteId;
     const url = `https://graph.microsoft.com/v1.0/sites/${CONFIG.spHost}:/sites/${CONFIG.spSitePath}`;
@@ -752,16 +786,17 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
         adr = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
       }
       return {
-        createdAt: toDate(get(r,H.created)),
-        lat, lon, adres_pelny: adr||"",
-        PH: String(get(r,H.ph)||""),
-        Status: String(get(r,H.st)||""),
-        telefon: String(get(r,H.tel)||""),
-        email: String(get(r,H.mail)||""),
-        nazwa: String(get(r,H.nazwa)||""),
-        miejscowosc: String(get(r,H.msc)||""),
-        PowodOdmowy: String(get(r,H.powod)||"")
-      };
+		_row1: idx + 2, // numer wiersza w Excelu (1-based, z nagłówkiem)
+		createdAt: toDate(get(r,H.created)),
+		lat, lon, adres_pelny: adr||"",
+		PH: String(get(r,H.ph)||""),
+		Status: String(get(r,H.st)||""),
+		telefon: String(get(r,H.tel)||""),
+		email: String(get(r,H.mail)||""),
+		nazwa: String(get(r,H.nazwa)||""),
+		miejscowosc: String(get(r,H.msc)||""),
+		PowodOdmowy: String(get(r,H.powod)||"")
+		};
     });
 
     const validLat=v=>isFinite(v)&&v>=-90&&v<=90;
@@ -817,49 +852,104 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
       else idxRS = headers.indexOf(H.reason);
     }
 
-    // dopasowanie wiersza
-    const wantAddr = normAddr(rec.adres_pelny||"");
-    let row1=-1, oldPH="", oldST="";
-    for(let r=0; r<body.length; r++){
-      const row = body[r]||[];
-      let adrRow = "";
-      if(H.adresPelny){
-        const i = headers.indexOf(H.adresPelny);
-        adrRow = String(row[i]||"");
-      }else{
-        const u = H.ulica ? String(row[headers.indexOf(H.ulica)]||"").trim() : "";
-        const n = H.nr    ? String(row[headers.indexOf(H.nr)]||"").trim()    : "";
-        const m = H.msc   ? String(row[headers.indexOf(H.msc)]||"").trim()   : "";
-        adrRow = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
-      }
-
-      if(wantAddr && normAddr(adrRow) === wantAddr){
-        row1 = r+2;
-      } else if(H.lat && H.lon && isFinite(rec.lat) && isFinite(rec.lon)){
-        const iLat = headers.indexOf(H.lat);
-        const iLon = headers.indexOf(H.lon);
-        const latR = toNum(row[iLat]); const lonR = toNum(row[iLon]);
-        if(near(latR, rec.lat) && near(lonR, rec.lon)){ row1 = r+2; }
-      }
-
-      if(row1>0){
-        oldPH = idxPH>=0 ? String(row[idxPH]||"") : "";
-        oldST = idxST>=0 ? String(row[idxST]||"") : "";
-        break;
-      }
+    // dopasowanie wiersza – najpierw użyj znanego numeru, fallback jeśli brak
+let row1 = Number(rec._row1) || -1, oldPH="", oldST="";
+if(row1>0){
+  const row = body[row1-2] || [];
+  oldPH = idxPH>=0 ? String(row[idxPH]||"") : "";
+  oldST = idxST>=0 ? String(row[idxST]||"") : "";
+}else{
+  const wantAddr = normAddr(rec.adres_pelny||"");
+  for(let r=0; r<body.length; r++){
+    const row = body[r]||[];
+    let adrRow = "";
+    if(H.adresPelny){
+      const i = headers.indexOf(H.adresPelny);
+      adrRow = String(row[i]||"");
+    }else{
+      const u = H.ulica ? String(row[headers.indexOf(H.ulica)]||"").trim() : "";
+      const n = H.nr    ? String(row[headers.indexOf(H.nr)]||"").trim()    : "";
+      const m = H.msc   ? String(row[headers.indexOf(H.msc)]||"").trim()   : "";
+      adrRow = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
     }
-    if(row1<0) throw new Error("Nie znaleziono pozycji w Excelu (dopasowanie po adresie i/lub współrzędnych).");
+    if(wantAddr && normAddr(adrRow) === wantAddr){
+      row1 = r+2;
+    } else if(H.lat && H.lon && isFinite(rec.lat) && isFinite(rec.lon)){
+      const iLat = headers.indexOf(H.lat);
+      const iLon = headers.indexOf(H.lon);
+      const latR = toNum(row[iLat]); const lonR = toNum(row[iLon]);
+      if(near(latR, rec.lat) && near(lonR, rec.lon)){ row1 = r+2; }
+    }
+    if(row1>0){
+      oldPH = idxPH>=0 ? String(row[idxPH]||"") : "";
+      oldST = idxST>=0 ? String(row[idxST]||"") : "";
+      break;
+    }
+  }
+  if(row1<0) throw new Error("Nie znaleziono pozycji w Excelu (dopasowanie po adresie i/lub współrzędnych).");
+  // zapisz numer na przyszłość
+  rec._row1 = row1;
+}
 
     // zapis
-    await writeCell(CONFIG.dataSheet, row1, idxPH+1, newPH||"");
-    await writeCell(CONFIG.dataSheet, row1, idxST+1, newStatus||"");
-    if(idxRS>=0){ await writeCell(CONFIG.dataSheet, row1, idxRS+1, newReason||""); }
+    // --- [BATCH] zapis PH, Status, (opcjonalnie) Powód + dopis do loga w jednym żądaniu ---
+const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
+const wsqData = CONFIG.dataSheet.replace(/'/g,"''");
 
-    // log
-    const now = new Date().toISOString();
-    const upn = (account && (account.username||account.homeAccountId)) || "";
-    await appendLog([ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}|${newReason||""}`, "" ]);
+// adresy komórek (A1-notation)
+const a1PH     = `${colLetter(idxPH+1)}${row1}`;
+const a1ST     = `${colLetter(idxST+1)}${row1}`;
+const a1REASON = (idxRS>=0) ? `${colLetter(idxRS+1)}${row1}` : null;
+
+// przygotuj log (potrzebny numer następnego wiersza)
+await ensureAuditHeaders();
+const nextLog = await getNextLogRow();
+const logA1   = `A${nextLog}:${colLetter(AUDIT_HEADERS.length)}${nextLog}`;
+const now     = new Date().toISOString();
+const upn     = (account && (account.username||account.homeAccountId)) || "";
+const logRow  = [ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}|${newReason||""}`, "" ];
+
+// budujemy tablicę żądań do $batch
+const requests = [
+  {
+    id: "ph",
+    method: "PATCH",
+    url: `/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1PH}')`,
+    headers: { "Content-Type": "application/json" },
+    body: { values: [[ newPH || "" ]] }
+  },
+  {
+    id: "st",
+    method: "PATCH",
+    url: `/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1ST}')`,
+    headers: { "Content-Type": "application/json" },
+    body: { values: [[ newStatus || "" ]] }
   }
+];
+
+if (a1REASON){
+  requests.push({
+    id: "reason",
+    method: "PATCH",
+    url: `/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1REASON}')`,
+    headers: { "Content-Type": "application/json" },
+    body: { values: [[ newReason || "" ]] }
+  });
+}
+
+// dopis do AuditLog w tym samym batchu
+const wsqLog = CONFIG.logSheet.replace(/'/g,"''");
+requests.push({
+  id: "log",
+  method: "PATCH",
+  url: `/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqLog}')/range(address='${logA1}')`,
+  headers: { "Content-Type": "application/json" },
+  body: { values: [ logRow ] }
+});
+
+// wyślij jedno żądanie
+await gBatch(requests);
+
 
   /* =========================== MINI-FILTRY + MASÓWKA =========================== */
   function fillMiniFilters(){
@@ -873,25 +963,24 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
   const wantPH = $("#mfPH").value.trim();
   const wantST = $("#mfStatus").value.trim();
   const query  = ($("#mfSearch").value || "").trim().toLowerCase();
-  const onlyToday = $("#mfToday").checked;
+  const dFrom  = $("#mfFrom").value ? new Date($("#mfFrom").value+"T00:00:00") : null;
+  const dTo    = $("#mfTo").value   ? new Date($("#mfTo").value  +"T23:59:59") : null;
 
   frows = rows.filter(r=>{
     if(wantPH && (r.PH||"").trim() !== wantPH) return false;
     if(wantST && (r.Status||"").trim() !== wantST) return false;
 
     if(query){
-      const inCity  = String(r.miejscowosc||"").toLowerCase().includes(query);
-      const inAddr  = String(r.adres_pelny ||"").toLowerCase().includes(query);
+      const inCity = String(r.miejscowosc||"").toLowerCase().includes(query);
+      const inAddr = String(r.adres_pelny||"").toLowerCase().includes(query);
       if(!inCity && !inAddr) return false;
     }
 
-    if(onlyToday){
+    if (dFrom || dTo){
       if(!r.createdAt) return false;
-      const t=new Date();
-      const sameDay = r.createdAt.getFullYear()===t.getFullYear() &&
-                      r.createdAt.getMonth()===t.getMonth() &&
-                      r.createdAt.getDate()===t.getDate();
-      if(!sameDay) return false;
+      const t = r.createdAt;
+      if(dFrom && t < dFrom) return false;
+      if(dTo   && t > dTo)   return false;
     }
     return true;
   });
@@ -936,6 +1025,7 @@ attachToggle("toolbarBox","tgToolbar","toolbar");
 attachToggle("filtersBox","tgFilters","filters");
 attachToggle("legend","tgLegend","legend");
 setStatus("Kliknij „Zaloguj”, a potem „Odśwież dane z Excelem”.");
+setStatus(DEFAULT_STATUS);
 msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e));
 })();
 </script>
