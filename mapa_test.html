@@ -41,6 +41,83 @@
 <!-- Biblioteki -->
 <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  // 1) Konfiguracja MSAL dla Twojej aplikacji
+  const msalConfig = {
+    auth: {
+      clientId: '2c5a0274-30c0-4efa-b13c-7ce1e0768cf9',
+      authority: 'https://login.microsoftonline.com/e44d0310-65ed-4096-a024-dac77110765a',
+      // MUSI być dokładnie ten sam adres, z którego otwierasz stronę (z nazwą pliku)
+      redirectUri: window.location.origin + window.location.pathname
+    },
+    cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false }
+  };
+
+  const graphScopes = [
+    'openid','profile','offline_access',
+    'Files.ReadWrite.All','Sites.Read.All'
+  ];
+
+  // 2) Uruchom MSAL
+  if (typeof msal === 'undefined' || !msal.PublicClientApplication) {
+    alert('Nie załadował się msal-browser. Sprawdź połączenie do https://alcdn.msauth.net');
+    return;
+  }
+  const app = new msal.PublicClientApplication(msalConfig);
+  let account = null;
+  const $ = s => document.querySelector(s);
+  const statusBox = $('#status');
+
+  function setStatus(t){ if(statusBox) statusBox.textContent = t; console.log('[MSAL]', t); }
+
+  // 3) Logowanie + token
+  async function ensureLogin() {
+    const accs = app.getAllAccounts();
+    if (accs.length) { account = accs[0]; setStatus('Zalogowano: ' + (account.username||'')); return account; }
+    try {
+      const r = await app.loginPopup({ scopes: graphScopes });
+      account = r.account;
+      setStatus('Zalogowano: ' + (account.username||'')); 
+      return account;
+    } catch (e) {
+      console.error(e);
+      // jeśli popup zablokowany – MSAL zgłasza interaction_in_progress / popup_window_error
+      alert('Logowanie nieudane: ' + (e.errorMessage || e.message || e));
+      throw e;
+    }
+  }
+
+  async function getToken() {
+    await ensureLogin();
+    try {
+      const r = await app.acquireTokenSilent({ scopes: graphScopes, account });
+      return r.accessToken;
+    } catch {
+      const r = await app.acquireTokenPopup({ scopes: graphScopes });
+      return r.accessToken;
+    }
+  }
+
+  // 4) Wylogowanie
+  async function doLogout(){
+    try { await app.logoutPopup({ account }); } finally {
+      account=null; setStatus('Nie zalogowano.');
+    }
+  }
+
+  // 5) Udostępnij funkcje reszcie kodu (np. do Graph)
+  window.msAuth = { ensureLogin, getToken, logout: doLogout };
+
+  // 6) Podepnij przyciski
+  $('#btnLogin')  ?.addEventListener('click', () => ensureLogin());
+  $('#btnLogout') ?.addEventListener('click', () => doLogout());
+
+  // 7) Obsłuż ewentualne powroty z redirectu (MSAL wymaga)
+  app.handleRedirectPromise().catch(e => console.warn('MSAL redirect:', e));
+})();
+</script>
+
 </head>
 <body>
 <div id="map"></div>
