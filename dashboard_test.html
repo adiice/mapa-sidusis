@@ -24,11 +24,17 @@
   .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
   .status{margin-top:12px;font-size:12px;color:var(--muted)}
   .error{position:fixed;left:0;right:0;top:0;background:#fff3f3;border-bottom:1px solid #f0caca;color:#8b0000;padding:10px 14px;display:none;z-index:9999}
+  .tablewrap{margin-top:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right}
+  th:first-child,td:first-child{text-align:left}
+  tfoot td{font-weight:700;background:#f8fafc}
+  .chip{display:inline-block;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:2px 8px;font-size:12px}
   @media (max-width:960px){ .grid{grid-template-columns:repeat(2,1fr)} .charts{grid-template-columns:1fr} }
   @media (max-width:640px){ .grid{grid-template-columns:1fr} }
 </style>
 
-<!-- MSAL z fallbackiem (3 CDN) -->
+<!-- MSAL (3 CDN fallbacki) -->
 <script>
   function loadScriptSequential(urls){
     return new Promise((res,rej)=>{
@@ -76,11 +82,12 @@
       </div>
       <div class="f">
         <label>PH</label>
-        <select id="fPH" multiple size="3" style="min-width:180px"></select>
+        <select id="fPH" multiple size="4" style="min-width:220px"></select>
+        <span class="l" style="margin-top:4px;color:#64748b">Wskazówka: Ctrl/⌘ aby zaznaczać wiele</span>
       </div>
       <div class="f">
         <label>Status</label>
-        <select id="fStatus" multiple size="3" style="min-width:220px"></select>
+        <select id="fStatus" multiple size="4" style="min-width:220px"></select>
       </div>
       <div class="f">
         <button id="btnApply">Zastosuj filtry</button>
@@ -94,7 +101,7 @@
 
   <div class="grid">
     <div class="tile"><div class="l">Nowe leady</div><div class="k" id="kLeads">–</div></div>
-    <div class="tile"><div class="l">Przypisane PH</div><div class="k" id="kPH">–</div></div>
+    <div class="tile"><div class="l">Przypisane PH</div><div class="k"><span id="kPH">–</span> <span class="l">/ nieprzypisane: <span class="chip" id="kUnassigned">–</span></span></div></div>
     <div class="tile"><div class="l">Oferta wysłana (leady z okresu)</div><div class="k" id="kOffers">–</div></div>
     <div class="tile"><div class="l">Akceptacje (konwersja)</div><div class="k" id="kAcc">–</div></div>
     <div class="tile"><div class="l">Śr. czas: Lead → Oferta</div><div class="k" id="kT1">–</div></div>
@@ -105,24 +112,34 @@
     <div class="tile"><canvas id="chTrend" height="140"></canvas></div>
     <div class="tile"><canvas id="chPH" height="140"></canvas></div>
   </div>
+
+  <div class="tablewrap">
+    <div class="tile">
+      <h3 style="margin:0 0 10px 0">Leady wg PH i Statusu</h3>
+      <div style="overflow:auto">
+        <table id="tblPH"></table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
 (async function main(){
 /* =========================== KONFIG (skopiuj z mapy) =========================== */
 const CONFIG = {
-  clientId: "2c5a0274-30c0-4efa-b13c-7ce1e0768cf9",      // ⬅️ ten sam co w mapie
-  tenantId: "e44d0310-65ed-4096-a024-dac77110765a",      // ⬅️ ten sam
-  spHost:   "internetunion.sharepoint.com",              // ⬅️ ten sam
-  spSitePath: "PHTheNetwork",                            // ⬅️ ten sam (bez /sites/)
-  // dokładnie ten sam path jak w mapie (root-relative w bibliotece „Dokumenty” / Shared Documents)
+  clientId: "2c5a0274-30c0-4efa-b13c-7ce1e0768cf9",
+  tenantId: "e44d0310-65ed-4096-a024-dac77110765a",
+  spHost:   "internetunion.sharepoint.com",
+  spSitePath: "PHTheNetwork",
   filePath: "/General/Kopia pliku Lista - SIDUSIS - PEŁNA - od 08-2025 - kopia do mapy.xlsx",
   dataSheet: "Dane",
   logSheet:  "AuditLog",
 };
 
-// Statusy (dokładnie takie stringi jak w pliku)
+// Statusy (stringi jak w Excelu)
 const STATUS_LIST = ["Zapytanie o wycenę","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO"];
+const PH_ALL = "(Wszyscy PH)";
+const PH_NONE = "(Brak PH)";
 
 /* =========================== UTYLITY/UI =========================== */
 const $ = s => document.querySelector(s);
@@ -131,15 +148,9 @@ const who = $("#who"); const errorBar=$("#errorBar");
 function setStatus(t){ statusBox.textContent = t; }
 function showError(t){ errorBar.textContent=t; errorBar.style.display='block'; setTimeout(()=>errorBar.style.display='none',7000); }
 function toDate(v){
-  // próba parsowania: ISO, Excel serial, dd.mm.yyyy etc.
   if(v==null || v==="") return null;
-  if(typeof v==="number"){ // excel serial days
-    const d = new Date(Date.UTC(1899,11,30)); d.setUTCDate(d.getUTCDate()+Math.floor(v));
-    return d;
-  }
-  const s=String(v).trim();
-  const d1 = new Date(s);
-  if(!isNaN(d1)) return d1;
+  if(typeof v==="number"){ const d = new Date(Date.UTC(1899,11,30)); d.setUTCDate(d.getUTCDate()+Math.floor(v)); return d; }
+  const s=String(v).trim(); const d1 = new Date(s); if(!isNaN(d1)) return d1;
   const m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
   if(m){ const [_,dd,mm,yy]=m; return new Date(Number(yy.length===2?("20"+yy):yy), Number(mm)-1, Number(dd)); }
   return null;
@@ -201,39 +212,53 @@ async function usedRange(wsName){
 }
 
 /* =========================== DANE: pobranie i parsowanie =========================== */
-let ROWS=[], LOGS=[];          // surowe
-let PH_LIST=[];                // do filtra PH (z danych)
+let ROWS=[], LOGS=[]; // surowe
+let PH_LIST=[];       // do filtra
+
 function pickHeader(headers, tokens){
   const lc=headers.map(h=>String(h||"").toLowerCase());
   for(const t of tokens){ const i=lc.findIndex(n=>n.includes(t)); if(i>=0) return headers[i]; }
   return null;
 }
+
 function parseDane(values){
   if(!values || !values.length) return [];
   const H = values[0].map(h=>String(h||"").trim());
   const body = values.slice(1);
   const COL = {
-    created: H[0], // kolumna A = Data zgłoszenia (Twoja uwaga)
+    created: H[0], // A: Data zgłoszenia
     ph:      pickHeader(H,["ph"]),
     status:  pickHeader(H,["status"]),
     addr:    pickHeader(H,["adres_pelny","adres pełny","adres pelny"]),
+    ulica:   pickHeader(H,["ulica","adres"]),
+    nr:      pickHeader(H,["nr budynku","numer","nr","nr domu"]),
     msc:     pickHeader(H,["miejscowość","miejscowosc","miasto"])
   };
+
   const out = body.map(r=>{
-    const obj = {
-      createdAt: toDate(r[H.indexOf(COL.created)]),
-      PH: String(r[H.indexOf(COL.ph)]||""),
-      Status: String(r[H.indexOf(COL.status)]||""),
-      adres_pelny: String(r[H.indexOf(COL.addr)]||""),
-      miejscowosc: String(r[H.indexOf(COL.msc)]||""),
-      key: normAddr(String(r[H.indexOf(COL.addr)]||""))
+    const idx = name => H.indexOf(name);
+    let adres = COL.addr ? String(r[idx(COL.addr)]||"") : "";
+    if(!adres){
+      const u = COL.ulica ? String(r[idx(COL.ulica)]||"").trim() : "";
+      const n = COL.nr    ? String(r[idx(COL.nr)]||"").trim()    : "";
+      const m = COL.msc   ? String(r[idx(COL.msc)]||"").trim()   : "";
+      adres = (u&&n&&m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
+    }
+    return {
+      createdAt: toDate(r[idx(COL.created)]),
+      PH: String(COL.ph ? (r[idx(COL.ph)]||"") : ""),
+      Status: String(COL.status ? (r[idx(COL.status)]||"") : ""),
+      adres_pelny: adres,
+      key: normAddr(adres)
     };
-    return obj;
   }).filter(o=>o.adres_pelny);
-  // PH list
-  PH_LIST = [...new Set(out.map(o=>o.PH).filter(Boolean))].sort();
+
+  // PH list (zawiera też "(Brak PH)")
+  PH_LIST = [...new Set(out.map(o=>(o.PH||"")))].sort();
+  if(!PH_LIST.includes("")) PH_LIST.unshift("");
   return out;
 }
+
 function parseLog(values){
   if(!values || !values.length) return [];
   const H = values[0].map(h=>String(h||"").trim());
@@ -258,10 +283,16 @@ function parseLog(values){
 /* =========================== KPI liczenie =========================== */
 function applyFilters(allRows, from, to, selPH, selST){
   const inRange = r => (!from || r.createdAt>=from) && (!to || r.createdAt<=to);
-  const phOk = r => !selPH.length || selPH.includes(r.PH||"");
+  const phOk = r => {
+    if(!selPH.length) return true;                        // (Wszyscy PH)
+    // Zamieniamy "(Brak PH)" na pusty string gdy filtrujemy
+    const wanted = selPH.map(x=> x===PH_NONE ? "" : x);
+    return wanted.includes(r.PH||"");
+  };
   const stOk = r => !selST.length || selST.includes(r.Status||"");
   return allRows.filter(r=>inRange(r)&&phOk(r)&&stOk(r));
 }
+
 function firstStatusTsByAddr(logs, status){
   const map=new Map();
   const target = (s)=> (String(s||"").toLowerCase().trim()===status.toLowerCase());
@@ -269,7 +300,7 @@ function firstStatusTsByAddr(logs, status){
   for(const e of sorted){
     if(target(e.newStatus) && !map.has(e.addr)) map.set(e.addr, e.ts);
   }
-  return map; // addr -> first ts
+  return map;
 }
 function weeklyKey(d){
   const dt=new Date(d.getFullYear(),d.getMonth(),d.getDate());
@@ -277,22 +308,22 @@ function weeklyKey(d){
   const w=Math.ceil((((dt-onejan)/86400000)+onejan.getDay()+1)/7);
   return `${dt.getFullYear()}-W${String(w).padStart(2,'0')}`;
 }
+
 function computeKPI(rows, logs, from, to, selPH, selST){
   const filtered = applyFilters(rows, from, to, selPH, selST);
 
-  // mapy wydarzeń (pierwsze wystąpienia)
   const firstOffer = firstStatusTsByAddr(logs,"Oferta wysłana");
   const firstAccept= firstStatusTsByAddr(logs,"Akceptacja klienta");
 
-  const byAddr=new Map(rows.map(r=>[normAddr(r.adres_pelny), r]));
-
   let nLeads=filtered.length;
-  let nPH=filtered.filter(r=> (r.PH||"").trim()).length;
+  let nPHassigned=filtered.filter(r=> (r.PH||"").trim()).length;
+  let nUnassigned = nLeads - nPHassigned;
+
   let nOffer=0, nAcc=0;
   let tLeadOffer=[], tOfferAcc=[];
 
   for(const r of filtered){
-    const key=normAddr(r.adres_pelny);
+    const key=r.key;
     const tsOffer = firstOffer.get(key)||null;
     const tsAcc   = firstAccept.get(key)||null;
 
@@ -317,29 +348,31 @@ function computeKPI(rows, logs, from, to, selPH, selST){
     trend[k]=(trend[k]||{leads:0,offers:0,acc:0});
     trend[k].leads++;
   }
-  // oferty/akceptacje – liczymy jeśli lead należy do zakresu (createdAt w oknie)
   for(const r of filtered){
-    const key=normAddr(r.adres_pelny);
     const k = r.createdAt ? weeklyKey(r.createdAt) : null;
     if(!k) continue;
-    if(firstOffer.get(key)) trend[k].offers++;
-    if(firstAccept.get(key)) trend[k].acc++;
+    if(firstOffer.get(r.key)) trend[k].offers++;
+    if(firstAccept.get(r.key)) trend[k].acc++;
   }
 
-  // statusy per PH (stan bieżący z arkusza)
-  const phCats = [...new Set(filtered.map(r=>r.PH||"(brak)"))].sort();
+  // macierz PH x Status (stan bieżący)
+  const phCatsRaw = [...new Set(filtered.map(r=> (r.PH||"") ))].sort();
+  const phCats = phCatsRaw.map(x=> x||PH_NONE); // puste -> "(Brak PH)"
   const stCats = STATUS_LIST;
-  const phMatrix = phCats.map(()=> stCats.map(()=>0));
+  const phMatrix = phCatsRaw.map(()=> stCats.map(()=>0));
+  const phTotals = phCatsRaw.map(()=>0);
+
   for(const r of filtered){
-    const pi = phCats.indexOf(r.PH||"(brak)");
+    const pi = phCatsRaw.indexOf(r.PH||"");
     const si = stCats.indexOf(r.Status||"");
-    if(pi>=0 && si>=0) phMatrix[pi][si]++;
+    if(pi>=0){ phTotals[pi]++; if(si>=0) phMatrix[pi][si]++; }
   }
 
   return {
     counts:{
       leads:nLeads,
-      phPct: nLeads? Math.round(nPH/nLeads*100):0,
+      phPct: nLeads? Math.round(nPHassigned/nLeads*100):0,
+      unassigned: nUnassigned,
       offers:nOffer,
       acc: nAcc,
       convPct: nLeads? Math.round(nAcc/nLeads*100):0,
@@ -347,14 +380,13 @@ function computeKPI(rows, logs, from, to, selPH, selST){
       tOfferAcc:  avg(tOfferAcc),
     },
     trend,
-    phCats, stCats, phMatrix
+    phCats, stCats, phMatrix, phTotals
   };
 }
 
-/* =========================== WYKRESY =========================== */
+/* =========================== WYKRESY/TABLE =========================== */
 let chartTrend=null, chartPH=null;
 function renderCharts(kpi){
-  // Trend
   const keys = Object.keys(kpi.trend).sort();
   const leads = keys.map(k=>kpi.trend[k].leads);
   const offers= keys.map(k=>kpi.trend[k].offers);
@@ -370,7 +402,6 @@ function renderCharts(kpi){
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
   });
 
-  // PH x Status
   if(chartPH) chartPH.destroy();
   chartPH = new Chart($("#chPH"),{
     type:'bar',
@@ -386,18 +417,44 @@ function renderCharts(kpi){
   });
 }
 
+function renderTable(kpi){
+  const tbl=$("#tblPH");
+  const head = `<tr>
+    <th>PH</th>
+    <th>Razem</th>
+    ${kpi.stCats.map(s=>`<th>${s}</th>`).join("")}
+  </tr>`;
+  const rows = kpi.phCats.map((phDisp, i)=>{
+    const total = kpi.phTotals[i];
+    const cells = kpi.stCats.map((_,j)=> `<td>${kpi.phMatrix[i][j]}</td>`).join("");
+    return `<tr><td>${phDisp}</td><td>${total}</td>${cells}</tr>`;
+  }).join("");
+  const totalRow = (()=> {
+    const colTotals = kpi.stCats.map((_,j)=> kpi.phMatrix.reduce((a,row)=>a+row[j],0));
+    const all = kpi.phTotals.reduce((a,b)=>a+b,0);
+    return `<tr><td><b>Suma</b></td><td><b>${all}</b></td>${colTotals.map(n=>`<td><b>${n}</b></td>`).join("")}</tr>`;
+  })();
+  tbl.innerHTML = `<thead>${head}</thead><tbody>${rows}</tbody><tfoot>${totalRow}</tfoot>`;
+}
+
 /* =========================== UI / LOGIKA =========================== */
 let FROM=null, TO=null, SEL_PH=[], SEL_ST=[];
 
 function fillFilters(){
-  // PH
+  // PH: najpierw (Wszyscy), potem lista PH, na końcu (Brak PH)
   const phSel=$("#fPH"); phSel.innerHTML="";
-  for(const ph of PH_LIST){ const opt=document.createElement('option'); opt.value=ph; opt.textContent=ph; phSel.appendChild(opt); }
+  const mk = (v,t)=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; return o; };
+  phSel.appendChild(mk(PH_ALL, PH_ALL));
+  for(const ph of PH_LIST.filter(x=>x)){ phSel.appendChild(mk(ph, ph)); }
+  phSel.appendChild(mk(PH_NONE, PH_NONE));
+  // domyślnie zaznaczamy (Wszyscy PH)
+  phSel.options[0].selected = true;
+
   // Status
   const stSel=$("#fStatus"); stSel.innerHTML="";
   for(const st of STATUS_LIST){ const opt=document.createElement('option'); opt.value=st; opt.textContent=st; stSel.appendChild(opt); }
 
-  // domyślny zakres: ostatnie 30 dni
+  // domyślny zakres: ostatnie 30 dni (z możliwością poszerzenia)
   const today=new Date(); const from=new Date(today); from.setDate(today.getDate()-30);
   $("#fFrom").value = from.toISOString().slice(0,10);
   $("#fTo").value   = today.toISOString().slice(0,10);
@@ -405,12 +462,15 @@ function fillFilters(){
 function readFilters(){
   FROM = $("#fFrom").value ? new Date($("#fFrom").value+"T00:00:00") : null;
   TO   = $("#fTo").value   ? new Date($("#fTo").value+"T23:59:59") : null;
-  SEL_PH = [...$("#fPH").selectedOptions].map(o=>o.value);
+  const sel = [...$("#fPH").selectedOptions].map(o=>o.value);
+  // jeśli wybrano "(Wszyscy PH)" albo nic – traktuj jak brak filtru
+  SEL_PH = (!sel.length || sel.includes(PH_ALL)) ? [] : sel;
   SEL_ST = [...$("#fStatus").selectedOptions].map(o=>o.value);
 }
 function renderTiles(kpi){
   $("#kLeads").textContent = kpi.counts.leads;
   $("#kPH").textContent    = `${kpi.counts.phPct}%`;
+  $("#kUnassigned").textContent = kpi.counts.unassigned;
   $("#kOffers").textContent= kpi.counts.offers;
   $("#kAcc").textContent   = `${kpi.counts.acc} (${kpi.counts.convPct}%)`;
   $("#kT1").textContent    = fmtDays(kpi.counts.tLeadOffer);
@@ -429,6 +489,7 @@ async function loadAll(){
     const kpi = computeKPI(ROWS, LOGS, FROM, TO, SEL_PH, SEL_ST);
     renderTiles(kpi);
     renderCharts(kpi);
+    renderTable(kpi);
     setStatus(`Wiersze: Dane=${ROWS.length}, AuditLog=${LOGS.length}. Filtry aktywne.`);
   }catch(err){ console.error(err); showError(err.message); }
 }
@@ -442,7 +503,7 @@ $("#btnReload").addEventListener('click', loadAll);
 $("#btnApply").addEventListener('click', ()=>{
   readFilters();
   const kpi = computeKPI(ROWS, LOGS, FROM, TO, SEL_PH, SEL_ST);
-  renderTiles(kpi); renderCharts(kpi);
+  renderTiles(kpi); renderCharts(kpi); renderTable(kpi);
 });
 
 msalApp.handleRedirectPromise().catch(()=>{});
