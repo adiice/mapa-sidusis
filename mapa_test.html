@@ -5,18 +5,24 @@
 <title>SIDUSIS – mapa leadów (ONLINE: MSAL + Graph + Excel na SharePoint)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<!-- MarkerCluster (klasteryzacja) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+
 <style>
   html, body { height:100%; margin:0; font-family:system-ui, Segoe UI, Roboto, Arial; }
   #map { height:100%; }
   .toolbar {
     position: fixed; top: 12px; right: 12px; z-index: 10000;
     background:#fff; border:1px solid #ddd; border-radius:12px; padding:10px 12px; box-shadow:0 4px 20px rgba(0,0,0,.08);
-    max-width: 640px;
+    max-width: 680px;
   }
   .toolbar .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .toolbar button { font:13px/1.2 inherit; padding:8px 10px; border-radius:10px; border:1px solid #ccc; background:#f7f7f7; cursor:pointer; }
   .toolbar .hint, .toolbar .small { font-size:12px; color:#666; }
   .statusbar { margin-top:8px; padding:8px; background:#f9fafb; border:1px dashed #cbd5e1; border-radius:10px; font-size:12px; white-space:pre-wrap; }
+
   .legend {
     position: fixed; left: 12px; bottom: 16px; z-index: 10000;
     background:#fff; border:1px solid #ddd; border-radius:12px; padding:10px 12px; box-shadow:0 4px 20px rgba(0,0,0,.08);
@@ -25,20 +31,48 @@
   .legend .title { font-weight:700; margin:4px 0; }
   .pill { display:inline-block; width:10px; height:10px; vertical-align:middle; margin-right:6px; border:1px solid #999; }
   .status-pill { border-radius:50%; }
+
   .popup h4 { margin:0 0 6px; font-size:14px; }
   .popup .row { display:flex; gap:6px; align-items:center; margin:8px 0; flex-wrap:wrap; }
   .popup select { border:1px solid #ccc; border-radius:8px; padding:6px 8px; font-size:13px; }
   .popup button { border:1px solid #bbb; border-radius:8px; padding:6px 10px; background:#f6f6f6; cursor:pointer; font-size:13px; }
   .popup .meta { font-size:12px; color:#555; margin:6px 0; }
   .popup .actions a { display:block; margin:4px 0; text-decoration:none; }
+
   .error {
     position: fixed; inset: 0 0 auto 0; top:0; background:#fff3f3; border-bottom:1px solid #e99; color:#900; padding:10px 12px; z-index: 11000;
     font-size:13px; display:none;
   }
+
+  /* Mini-filtry (pływający panel) */
+  .mini-filter{
+    position: fixed; left:12px; top:12px; z-index:10001;
+    display:flex; gap:6px; align-items:end; flex-wrap:wrap;
+    background:#fff; border:1px solid #ddd; border-radius:12px; padding:10px 12px; box-shadow:0 4px 20px rgba(0,0,0,.08);
+    font-size:13px;
+  }
+  .mini-filter .f{ display:flex; flex-direction:column; }
+  .mini-filter input,.mini-filter select{ padding:6px 8px; border:1px solid #d1d5db; border-radius:8px; font:inherit; }
+  .mini-filter button{ padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#eef2ff; cursor:pointer; }
+  .mini-filter label{ font-size:12px; color:#64748b; margin-bottom:4px; }
+
+  /* Ikony znaczników (DivIcon) */
+  .dot{
+    width:18px; height:18px; border-radius:50%;
+    border:3px solid #999; box-sizing:border-box;
+    background:#777;
+  }
+  .dot.badge::after{
+    content:"!"; position:absolute; top:-6px; right:-6px;
+    width:14px; height:14px; font-size:10px; color:#fff; background:#ef4444;
+    border-radius:50%; display:flex; align-items:center; justify-content:center;
+    border:1px solid rgba(0,0,0,.2);
+  }
 </style>
 
-<!-- Leaflet (mapa) -->
+<!-- Leaflet + MarkerCluster -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
 <!-- Loader z fallbackiem dla MSAL -->
 <script>
@@ -67,6 +101,7 @@
 <body>
 <div id="map"></div>
 
+<!-- Panel narzędziowy (jak było) -->
 <div class="toolbar">
   <div class="row">
     <strong>SIDUSIS – Mapa leadów (ONLINE)</strong>
@@ -81,6 +116,38 @@
   <div class="statusbar" id="statusbar">Nie zalogowano.</div>
 </div>
 
+<!-- Mini-filtry (PH/Status/Miasto/Dziś + masowe działanie) -->
+<div class="mini-filter">
+  <div class="f">
+    <label>PH</label>
+    <select id="mfPH">
+      <option value="">(wszyscy)</option>
+    </select>
+  </div>
+  <div class="f">
+    <label>Status</label>
+    <select id="mfStatus">
+      <option value="">(wszystkie)</option>
+    </select>
+  </div>
+  <div class="f">
+    <label>Miasto (zawiera)</label>
+    <input id="mfCity" placeholder="np. Poznań" />
+  </div>
+  <div class="f">
+    <label>&nbsp;</label>
+    <label style="display:flex;gap:6px;align-items:center">
+      <input type="checkbox" id="mfToday"> Tylko dzisiaj
+    </label>
+  </div>
+  <div class="f">
+    <button id="mfApply">Filtruj</button>
+  </div>
+  <div class="f" style="margin-left:auto">
+    <button id="mfMassAssign">Masowo: Ustaw PH na mnie</button>
+  </div>
+</div>
+
 <div class="legend" id="legend"></div>
 <div class="error" id="errorBar"></div>
 
@@ -93,7 +160,6 @@
 
     spHost: "internetunion.sharepoint.com",
     spSitePath: "PHTheNetwork", // bez /sites/
-    // <<— ŚCIEŻKA DO PLIKU (potwierdzona w testach) —>>
     filePath: "/General/Kopia pliku Lista - SIDUSIS - PEŁNA - od 08-2025 - kopia do mapy.xlsx",
 
     dataSheet: "Dane",
@@ -106,11 +172,21 @@
   const PH_COLORS = ["#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2","#7f7f7f","#bcbd22","#17becf"];
   const PH_COLOR_MAP = Object.fromEntries(PH_LIST.map((ph,i)=>[ph,PH_COLORS[i%PH_COLORS.length]]));
   const STATUS_COLOR_MAP = {"Zapytanie o wycenę":"#607D8B","Oferta wysłana":"#2196F3","Odmowa klienta":"#F44336","Akceptacja klienta":"#4CAF50","Poza Zasięgiem":"#000000","KPO":"#FF9800"};
+  const REJECTION_REASONS = [
+    "Cena zbyt wysoka",
+    "Brak zapotrzebowania",
+    "Konkurencyjna oferta",
+    "Brak możliwości technicznych",
+    "Nieaktualny kontakt",
+    "Inne"
+  ];
   const DEFAULT_PH_COLOR="#455A64", DEFAULT_STATUS_COLOR="#9E9E9E";
 
   /* =========================== STAN/UTIL =========================== */
   let account=null, siteId=null, fileId=null;
-  let rows=[]; let map, layer, renderer;
+  let rows=[];     // pełne dane
+  let frows=[];    // dane po filtrze
+  let map, cluster; // warstwa klastrów
 
   const $ = s=>document.querySelector(s);
   const statusbar=$("#statusbar"); const who=$("#who"); const errorBar=$("#errorBar");
@@ -124,19 +200,32 @@
   const normAddr = s => normStr(s).replace(/^\s*(ul\.?\s*){2,}/i,"ul. ").replace(/^\s*ul\b\.?/i,"ul. ");
   const near = (a,b,eps=0.0005)=> isFinite(a)&&isFinite(b)&&Math.abs(a-b)<=eps;
 
+  // pomocnicze: daty (kol. A „Data zgłoszenia” – używamy tylko do filtra „Tylko dziś”)
+  function toDate(v){
+    if(v==null || v==="") return null;
+    if(typeof v==="number"){ const d = new Date(Date.UTC(1899,11,30)); d.setUTCDate(d.getUTCDate()+Math.floor(v)); return d; }
+    const s=String(v).trim(); const d1 = new Date(s); if(!isNaN(d1)) return d1;
+    const m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+    if(m){ const [_,dd,mm,yy]=m; return new Date(Number(yy.length===2?("20"+yy):yy), Number(mm)-1, Number(dd)); }
+    return null;
+  }
+  function isToday(d){
+    if(!d) return false;
+    const t=new Date(); return d.getFullYear()===t.getFullYear() && d.getMonth()===t.getMonth() && d.getDate()===t.getDate();
+  }
+
   /* =========================== MAPA =========================== */
   function initMap(){
     if(map) map.remove();
     map=L.map('map');
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
-    map.createPane('points'); map.getPane('points').style.zIndex = 650;
-    renderer = L.canvas({ padding:0.5 });
-    layer=L.layerGroup([], {pane:'points'}).addTo(map);
+    cluster = L.markerClusterGroup();
+    map.addLayer(cluster);
   }
-  function fitToData(){
-    const pts=rows.filter(r=>isFinite(r.lat)&&isFinite(r.lon));
+  function fitToData(arr){
+    const pts=arr.filter(r=>isFinite(r.lat)&&isFinite(r.lon));
     if(!pts.length){ map.setView([52,19],6); return; }
-    const fg=L.featureGroup(pts.map(p=>L.circleMarker([p.lat,p.lon])));
+    const fg=L.featureGroup(pts.map(p=>L.marker([p.lat,p.lon])));
     map.fitBounds(fg.getBounds().pad(0.2));
   }
   function renderLegend(){
@@ -149,18 +238,35 @@
     box.innerHTML=html;
   }
 
+  function makeIcon(rec){
+    const fill = PH_COLOR_MAP[(rec.PH||"").trim()] || DEFAULT_PH_COLOR;
+    const stroke = STATUS_COLOR_MAP[(rec.Status||"").trim()] || DEFAULT_STATUS_COLOR;
+    const needsBadge = !(rec.PH||"").trim() || !(rec.Status||"").trim();
+    const html = `<div class="dot ${needsBadge?'badge':''}" style="background:${fill};border-color:${stroke}"></div>`;
+    return L.divIcon({ className:'', html, iconSize:[18,18], iconAnchor:[9,9] });
+  }
+
   function buildPopup(rec){
-    const phOpts = ['<option value="">(brak)</option>'].concat(PH_LIST.map(ph=>`<option ${ph===rec.PH?'selected':''}>${esc(ph)}</option>`)).join("");
-    const stOpts = ['<option value="">(brak)</option>'].concat(STATUS_LIST.map(st=>`<option ${st===rec.Status?'selected':''}>${esc(st)}</option>`)).join("");
+    const phOpts = ['<option value="">(brak)</option>']
+      .concat(PH_LIST.map(ph=>`<option ${ph===rec.PH?'selected':''}>${esc(ph)}</option>`)).join("");
+    const stOpts = ['<option value="">(brak)</option>']
+      .concat(STATUS_LIST.map(st=>`<option ${st===rec.Status?'selected':''}>${esc(st)}</option>`)).join("");
+    const reasonOpts = ['<option value="">(wybierz powód)</option>']
+      .concat(REJECTION_REASONS.map(r=>`<option ${r===(rec.PowodOdmowy||'')?'selected':''}>${esc(r)}</option>`)).join("");
 
     const actions=`
       <div class="actions" style="margin-top:8px">
+        <a href="#" data-quick="me">👤 Przypisz mnie</a>
+        <a href="#" data-quick="offer">📨 Ustaw „Oferta wysłana”</a>
+        <a href="#" data-quick="reject">🛑 Odmowa (wybierz powód)</a>
         <a href="#" data-mail="INV">📩 Wyślij prośbę o wycenę (Inwestycje)</a>
         <a href="#" data-mail="CLI">✉️ Wyślij wiadomość do klienta</a>
         <a href="#" data-mail="STD">📄 Wyślij standardową ofertę</a>
         <a href="#" data-mail="DEV">🏗️ Wyślij ofertę deweloperską</a>
         <a href="tel:${encodeURIComponent(rec.telefon||'')}">📞 Zadzwoń do klienta</a>
       </div>`;
+
+    const showReason = (rec.Status||"").trim()==="Odmowa klienta";
 
     return `<div class="popup">
       <h4>${esc(rec.nazwa||'')}</h4>
@@ -175,37 +281,48 @@
         <button id="savePHST">Zapisz</button>
       </div>
 
-      <div class="meta"><b>Aktualnie:</b> PH = <b>${esc(rec.PH||'-')}</b>, Status = <b>${esc(rec.Status||'-')}</b></div>
+      <div class="row" id="reasonRow" style="display:${showReason?'flex':'none'}">
+        <label>Powód odmowy:</label>
+        <select id="reasonSel" style="min-width:240px">${reasonOpts}</select>
+      </div>
+
+      <div class="meta"><b>Aktualnie:</b> PH = <b>${esc(rec.PH||'-')}</b>, Status = <b>${esc(rec.Status||'-')}</b>${rec.PowodOdmowy ? `, Powód = <b>${esc(rec.PowodOdmowy)}</b>` : ''}</div>
       ${actions}
     </div>`;
   }
 
-  function addOnePoint(rec){
-    const marker = L.circleMarker([rec.lat,rec.lon],{
-      renderer, pane:'points', radius:9,
-      color: STATUS_COLOR_MAP[(rec.Status||"").trim()] || DEFAULT_STATUS_COLOR,
-      weight:3, fill:true,
-      fillColor: PH_COLOR_MAP[(rec.PH||"").trim()] || DEFAULT_PH_COLOR, fillOpacity:1
-    });
+  function addOneMarker(rec){
+    const m = L.marker([rec.lat,rec.lon],{ icon: makeIcon(rec) });
 
-    marker.bindPopup(buildPopup(rec));
-    marker.on('popupopen', e=>{
+    m.bindPopup(buildPopup(rec));
+    m.on('popupopen', e=>{
       const el=e.popup.getElement()?.querySelector('.leaflet-popup-content');
       if(!el) return;
 
+      // Pokaż/ukryj „Powód odmowy” live
+      const stSel = el.querySelector('#stSel');
+      const reasonRow = el.querySelector('#reasonRow');
+      stSel?.addEventListener('change', ()=>{
+        const st = stSel.value.trim();
+        reasonRow.style.display = (st==="Odmowa klienta") ? 'flex' : 'none';
+      });
+
+      // Zapis
       el.querySelector('#savePHST')?.addEventListener('click', async ()=>{
         const ph = el.querySelector('#phSel')?.value || "";
         const st = el.querySelector('#stSel')?.value || "";
+        const reason = (st==="Odmowa klienta") ? (el.querySelector('#reasonSel')?.value||"") : "";
+        if(st==="Odmowa klienta" && !reason){
+          alert("Wybierz Powód odmowy.");
+          return;
+        }
         try{
           setStatus("Zapis do Excela…");
-          await savePhStatus(rec, ph, st);
-          rec.PH = ph; rec.Status = st;
-          marker.setStyle({
-            fillColor: PH_COLOR_MAP[(rec.PH||"").trim()] || DEFAULT_PH_COLOR,
-            color: STATUS_COLOR_MAP[(rec.Status||"").trim()] || DEFAULT_STATUS_COLOR
-          });
-          marker.setPopupContent(buildPopup(rec));
-          marker.openPopup();
+          await savePhStatus(rec, ph, st, reason);
+          rec.PH = ph; rec.Status = st; rec.PowodOdmowy = reason;
+          m.setIcon(makeIcon(rec));
+          m.setPopupContent(buildPopup(rec));
+          m.openPopup();
           setStatus("Zapisano.");
         }catch(err){
           console.error(err);
@@ -214,6 +331,33 @@
         }
       });
 
+      // Szybkie akcje
+      el.querySelectorAll('a[data-quick]').forEach(a=>{
+        a.addEventListener('click', async ev=>{
+          ev.preventDefault();
+          const kind = a.getAttribute('data-quick');
+          const phSel = el.querySelector('#phSel');
+          const stSel = el.querySelector('#stSel');
+          const reasonSel = el.querySelector('#reasonSel');
+
+          if(kind==="me"){
+            const me = (account && (account.name||"")) || "";
+            if(me && PH_LIST.includes(me)) phSel.value = me;
+            else if(PH_LIST.length){ phSel.value = PH_LIST[0]; } // fallback
+          }
+          if(kind==="offer"){
+            stSel.value = "Oferta wysłana";
+            el.querySelector('#reasonRow').style.display = 'none';
+          }
+          if(kind==="reject"){
+            stSel.value = "Odmowa klienta";
+            el.querySelector('#reasonRow').style.display = 'flex';
+            if(!reasonSel.value) reasonSel.value = REJECTION_REASONS[0];
+          }
+        });
+      });
+
+      // Maile
       el.querySelectorAll('a[data-mail]').forEach(a=>{
         a.addEventListener('click', ev=>{
           ev.preventDefault();
@@ -224,19 +368,20 @@
       });
     });
 
-    layer.addLayer(marker);
+    cluster.addLayer(m);
   }
 
   function rebuild(){
-    initMap(); renderLegend();
+    // zbuduj klastr na podstawie frows
+    cluster.clearLayers();
     let placed=0;
-    rows.forEach(rec=>{
+    frows.forEach(rec=>{
       if(!isFinite(rec.lat)||!isFinite(rec.lon)) return;
-      try{ addOnePoint(rec); placed++; }catch(err){ console.error("Render error for",rec,err); }
+      try{ addOneMarker(rec); placed++; }catch(err){ console.error("Render error for",rec,err); }
     });
-    fitToData();
-    const sample = rows.slice(0,2).map(r=>`(${r.lat.toFixed(5)}, ${r.lon.toFixed(5)})`).join(" ; ");
-    const txt=statusbar.textContent + `\nUmieszczono na mapie: ${placed}\nPrzykładowe współrzędne: ${sample||"—"}`;
+    fitToData(frows);
+    const sample = frows.slice(0,2).map(r=>`(${r.lat.toFixed(5)}, ${r.lon.toFixed(5)})`).join(" ; ");
+    const txt=statusbar.textContent + `\nWidocznych na mapie: ${placed}\nPrzykładowe współrzędne: ${sample||"—"}`;
     setStatus(txt);
   }
 
@@ -454,7 +599,7 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     const a1 = colLetter(col1) + row1; return patchRange(wsName, a1, [[ value ]]);
   }
 
-  /* ===== AuditLog – wersja bez tabel (stabilna) ===== */
+  /* ===== AuditLog – stabilny dopis (bez tabel) ===== */
   const AUDIT_HEADERS = ["ts","user","action","itemId","adres_pelny","old","new","note"];
 
   async function ensureAuditHeaders(){
@@ -506,6 +651,7 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     const headers = (values[0]||[]).map(h=>String(h||"").trim());
     const body = values.slice(1);
     const H = {
+      created: headers[0], // kol. A – Data zgłoszenia
       lat:  pickHeader(headers,["lat","latitude","szerokość","szerokosc"]),
       lon:  pickHeader(headers,["lon","longitude","długość","dlugosc"]),
       tel:  pickHeader(headers,["telefon","tel"]),
@@ -517,6 +663,7 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
       msc:  pickHeader(headers,["miejscowość","miejscowosc","miasto"]),
       nazwa:pickHeader(headers,["zgłaszający","zglaszajacy","nazwa","imię","imie","nazwisko","klient","firma"]),
       adresPelny: pickHeader(headers,["adres_pelny","adres pełny","adres pelny"]),
+      powod: pickHeader(headers,["powód","powod","reason","powód odmowy","powod odmowy"])
     };
     const get = (r, col) => { const idx=headers.indexOf(col); return idx>=0 ? r[idx] : ""; };
 
@@ -530,6 +677,7 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
         adr = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
       }
       return {
+        createdAt: toDate(get(r,H.created)),
         lat, lon, adres_pelny: adr||"",
         PH: String(get(r,H.ph)||""),
         Status: String(get(r,H.st)||""),
@@ -537,6 +685,7 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
         email: String(get(r,H.mail)||""),
         nazwa: String(get(r,H.nazwa)||""),
         miejscowosc: String(get(r,H.msc)||""),
+        PowodOdmowy: String(get(r,H.powod)||"")
       };
     });
 
@@ -553,12 +702,17 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     setStatus("Ładowanie danych z Excela (Graph)…");
     const used = await usedRange(CONFIG.dataSheet);
     const values = used.values || [];
-    if(!values.length){ setStatus("Arkusz pusty."); rows=[]; return; }
+    if(!values.length){ setStatus("Arkusz pusty."); rows=[]; frows=[]; return; }
     rows = parseRows(values);
+    // uzupełnij filtry mini-panelu
+    fillMiniFilters();
+    // start: bez filtrów
+    frows = rows.slice();
     setStatus(`Załadowano ${rows.length} wierszy z arkusza „${CONFIG.dataSheet}”.`);
   }
 
-  async function savePhStatus(rec, newPH, newStatus){
+  // zapis zmian (PH/Status + ewentualnie Powód odmowy)
+  async function savePhStatus(rec, newPH, newStatus, newReason){
     const used = await usedRange(CONFIG.dataSheet);
     const vals = used.values || [];
     if(!vals.length) throw new Error("Arkusz pusty.");
@@ -573,17 +727,24 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
       lat:        pickHeader(headers,["lat","latitude","szerokość","szerokosc","punkt (y)","y"]),
       lon:        pickHeader(headers,["lon","longitude","długość","dlugosc","punkt (x)","x"]),
       ph:         pickHeader(headers,["ph"]),
-      st:         pickHeader(headers,["status"])
+      st:         pickHeader(headers,["status"]),
+      reason:     pickHeader(headers,["powód","powod","reason","powód odmowy","powod odmowy"])
     };
 
+    // zapewnij PH/Status, a dla odmowy – kolumnę powodu
     let idxPH = headers.findIndex(h=>String(h).toLowerCase().trim()==="ph");
     if(idxPH<0){ idxPH = headers.length; headers.push("PH"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
     let idxST = headers.findIndex(h=>String(h).toLowerCase().trim()==="status");
     if(idxST<0){ idxST = headers.length; headers.push("Status"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+    let idxRS = -1;
+    if(newStatus==="Odmowa klienta"){
+      if(!H.reason){ H.reason="Powód odmowy"; headers.push(H.reason); idxRS = headers.length-1; await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+      else idxRS = headers.indexOf(H.reason);
+    }
 
+    // dopasowanie wiersza
     const wantAddr = normAddr(rec.adres_pelny||"");
     let row1=-1, oldPH="", oldST="";
-
     for(let r=0; r<body.length; r++){
       const row = body[r]||[];
       let adrRow = "";
@@ -612,15 +773,57 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
         break;
       }
     }
-
     if(row1<0) throw new Error("Nie znaleziono pozycji w Excelu (dopasowanie po adresie i/lub współrzędnych).");
 
+    // zapis
     await writeCell(CONFIG.dataSheet, row1, idxPH+1, newPH||"");
     await writeCell(CONFIG.dataSheet, row1, idxST+1, newStatus||"");
+    if(idxRS>=0){ await writeCell(CONFIG.dataSheet, row1, idxRS+1, newReason||""); }
 
+    // log
     const now = new Date().toISOString();
     const upn = (account && (account.username||account.homeAccountId)) || "";
-    await appendLog([ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}`, "" ]);
+    await appendLog([ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}|${newReason||""}`, "" ]);
+  }
+
+  /* =========================== MINI-FILTRY + MASÓWKA =========================== */
+  function fillMiniFilters(){
+    const phSel=$("#mfPH"); const stSel=$("#mfStatus");
+    // PH
+    phSel.innerHTML = `<option value="">(wszyscy)</option>` + PH_LIST.map(ph=>`<option>${esc(ph)}</option>`).join("");
+    // Status
+    stSel.innerHTML = `<option value="">(wszystkie)</option>` + STATUS_LIST.map(st=>`<option>${esc(st)}</option>`).join("");
+  }
+  function applyMiniFilters(){
+    const wantPH = $("#mfPH").value.trim();
+    const wantST = $("#mfStatus").value.trim();
+    const city   = $("#mfCity").value.trim().toLowerCase();
+    const onlyToday = $("#mfToday").checked;
+
+    frows = rows.filter(r=>{
+      if(wantPH && (r.PH||"").trim() !== wantPH) return false;
+      if(wantST && (r.Status||"").trim() !== wantST) return false;
+      if(city && !String(r.miejscowosc||"").toLowerCase().includes(city)) return false;
+      if(onlyToday && !isToday(r.createdAt)) return false;
+      return true;
+    });
+  }
+  async function massAssignToMe(){
+    const me = (account && (account.name||"")) || "";
+    const targetPH = (me && PH_LIST.includes(me)) ? me : (PH_LIST[0]||"");
+    if(!targetPH){ alert("Brak listy PH do przypisania."); return; }
+    if(!frows.length){ alert("Brak pozycji w bieżącym filtrze."); return; }
+    if(!confirm(`Ustawić PH="${targetPH}" dla ${frows.length} widocznych pozycji?\nOperacja sekwencyjna zajmie chwilę.`)) return;
+    let ok=0, fail=0;
+    for(const rec of frows){
+      try{
+        await savePhStatus(rec, targetPH, rec.Status||"", rec.PowodOdmowy||"");
+        rec.PH = targetPH;
+        ok++;
+      }catch{ fail++; }
+    }
+    alert(`Zakończono: OK=${ok}, błędy=${fail}`);
+    rebuild();
   }
 
   /* =========================== UI =========================== */
@@ -630,9 +833,12 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
       account=null; who.textContent=""; setStatus("Wylogowano."); }catch(err){ showError("Wylogowanie nieudane: " + err.message); }
   });
   $("#btnReload").addEventListener('click', async ()=>{
-    try{ await ensureLogin(); await getSiteId(); await getFileItemId(); await loadDataFromExcel(); rebuild(); }
+    try{ await ensureLogin(); await getSiteId(); await getFileItemId(); await loadDataFromExcel(); applyMiniFilters(); rebuild(); }
     catch(err){ console.error(err); showError(err.message); }
   });
+
+  $("#mfApply").addEventListener('click', ()=>{ applyMiniFilters(); rebuild(); });
+  $("#mfMassAssign").addEventListener('click', ()=>{ massAssignToMe(); });
 
   /* =========================== START =========================== */
   initMap(); renderLegend(); setStatus("Kliknij „Zaloguj”, a potem „Odśwież dane z Excelem”.");

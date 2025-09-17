@@ -22,6 +22,7 @@
   .tile .k{font-size:28px;font-weight:700;margin-top:6px}
   .tile .l{font-size:12px;color:var(--muted)}
   .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  .charts3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px}
   .status{margin-top:12px;font-size:12px;color:var(--muted)}
   .error{position:fixed;left:0;right:0;top:0;background:#fff3f3;border-bottom:1px solid #f0caca;color:#8b0000;padding:10px 14px;display:none;z-index:9999}
   .tablewrap{margin-top:12px}
@@ -30,7 +31,8 @@
   th:first-child,td:first-child{text-align:left}
   tfoot td{font-weight:700;background:#f8fafc}
   .chip{display:inline-block;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:2px 8px;font-size:12px}
-  @media (max-width:960px){ .grid{grid-template-columns:repeat(2,1fr)} .charts{grid-template-columns:1fr} }
+  @media (max-width:1200px){ .charts3{grid-template-columns:1fr 1fr} }
+  @media (max-width:960px){ .grid{grid-template-columns:repeat(2,1fr)} .charts{grid-template-columns:1fr} .charts3{grid-template-columns:1fr} }
   @media (max-width:640px){ .grid{grid-template-columns:1fr} }
 </style>
 
@@ -108,9 +110,10 @@
     <div class="tile"><div class="l">Śr. czas: Oferta → Akceptacja</div><div class="k" id="kT2">–</div></div>
   </div>
 
-  <div class="charts">
+  <div class="charts3">
     <div class="tile"><canvas id="chTrend" height="140"></canvas></div>
     <div class="tile"><canvas id="chPH" height="140"></canvas></div>
+    <div class="tile"><canvas id="chReasons" height="140"></canvas></div>
   </div>
 
   <div class="tablewrap">
@@ -125,7 +128,7 @@
 
 <script>
 (async function main(){
-/* =========================== KONFIG (skopiuj z mapy) =========================== */
+/* =========================== KONFIG (jak w mapie) =========================== */
 const CONFIG = {
   clientId: "2c5a0274-30c0-4efa-b13c-7ce1e0768cf9",
   tenantId: "e44d0310-65ed-4096-a024-dac77110765a",
@@ -232,7 +235,8 @@ function parseDane(values){
     addr:    pickHeader(H,["adres_pelny","adres pełny","adres pelny"]),
     ulica:   pickHeader(H,["ulica","adres"]),
     nr:      pickHeader(H,["nr budynku","numer","nr","nr domu"]),
-    msc:     pickHeader(H,["miejscowość","miejscowosc","miasto"])
+    msc:     pickHeader(H,["miejscowość","miejscowosc","miasto"]),
+    reason:  pickHeader(H,["powód","powod","reason","powód odmowy","powod odmowy"])
   };
 
   const out = body.map(r=>{
@@ -248,12 +252,13 @@ function parseDane(values){
       createdAt: toDate(r[idx(COL.created)]),
       PH: String(COL.ph ? (r[idx(COL.ph)]||"") : ""),
       Status: String(COL.status ? (r[idx(COL.status)]||"") : ""),
+      PowodOdmowy: String(COL.reason ? (r[idx(COL.reason)]||"") : ""),
       adres_pelny: adres,
       key: normAddr(adres)
     };
   }).filter(o=>o.adres_pelny);
 
-  // PH list (zawiera też "(Brak PH)")
+  // PH list (zawiera też pusty -> pokażemy "(Brak PH)")
   PH_LIST = [...new Set(out.map(o=>(o.PH||"")))].sort();
   if(!PH_LIST.includes("")) PH_LIST.unshift("");
   return out;
@@ -274,8 +279,8 @@ function parseLog(values){
     const addr = normAddr(String(r[idxAddr]||""));
     const old = String(r[idxOld]||"");
     const nw  = String(r[idxNew]||"");
-    const oldStatus = old.split("|")[1]||"";
-    const newStatus = nw.split("|")[1]||"";
+    const oldStatus = (old.split("|")[1]||"").trim();
+    const newStatus = (nw.split("|")[1]||"").trim();
     return { ts, addr, action:String(r[idxAct]||""), oldStatus, newStatus };
   }).filter(x=>x.addr && !isNaN(x.ts));
 }
@@ -284,8 +289,7 @@ function parseLog(values){
 function applyFilters(allRows, from, to, selPH, selST){
   const inRange = r => (!from || r.createdAt>=from) && (!to || r.createdAt<=to);
   const phOk = r => {
-    if(!selPH.length) return true;                        // (Wszyscy PH)
-    // Zamieniamy "(Brak PH)" na pusty string gdy filtrujemy
+    if(!selPH.length) return true;
     const wanted = selPH.map(x=> x===PH_NONE ? "" : x);
     return wanted.includes(r.PH||"");
   };
@@ -322,6 +326,10 @@ function computeKPI(rows, logs, from, to, selPH, selST){
   let nOffer=0, nAcc=0;
   let tLeadOffer=[], tOfferAcc=[];
 
+  // powody odmowy
+  const reasonMap = new Map(); // reason -> count
+  function addReason(r){ reasonMap.set(r,(reasonMap.get(r)||0)+1); }
+
   for(const r of filtered){
     const key=r.key;
     const tsOffer = firstOffer.get(key)||null;
@@ -335,6 +343,11 @@ function computeKPI(rows, logs, from, to, selPH, selST){
     }
     if(tsOffer && tsAcc && tsAcc>=tsOffer){
       tOfferAcc.push(diffDays(tsOffer, tsAcc));
+    }
+
+    if((r.Status||"").trim()==="Odmowa klienta"){
+      const rr = (r.PowodOdmowy||"").trim() || "(Nie podano)";
+      addReason(rr);
     }
   }
 
@@ -357,7 +370,7 @@ function computeKPI(rows, logs, from, to, selPH, selST){
 
   // macierz PH x Status (stan bieżący)
   const phCatsRaw = [...new Set(filtered.map(r=> (r.PH||"") ))].sort();
-  const phCats = phCatsRaw.map(x=> x||PH_NONE); // puste -> "(Brak PH)"
+  const phCats = phCatsRaw.map(x=> x||PH_NONE);
   const stCats = STATUS_LIST;
   const phMatrix = phCatsRaw.map(()=> stCats.map(()=>0));
   const phTotals = phCatsRaw.map(()=>0);
@@ -367,6 +380,10 @@ function computeKPI(rows, logs, from, to, selPH, selST){
     const si = stCats.indexOf(r.Status||"");
     if(pi>=0){ phTotals[pi]++; if(si>=0) phMatrix[pi][si]++; }
   }
+
+  // powody odmowy -> tablice do wykresu
+  const reasonsLabels = [...reasonMap.keys()];
+  const reasonsData   = reasonsLabels.map(k=>reasonMap.get(k));
 
   return {
     counts:{
@@ -380,12 +397,13 @@ function computeKPI(rows, logs, from, to, selPH, selST){
       tOfferAcc:  avg(tOfferAcc),
     },
     trend,
-    phCats, stCats, phMatrix, phTotals
+    phCats, stCats, phMatrix, phTotals,
+    reasonsLabels, reasonsData
   };
 }
 
-/* =========================== WYKRESY/TABLE =========================== */
-let chartTrend=null, chartPH=null;
+/* =========================== WYKRESy/TABLE =========================== */
+let chartTrend=null, chartPH=null, chartReasons=null;
 function renderCharts(kpi){
   const keys = Object.keys(kpi.trend).sort();
   const leads = keys.map(k=>kpi.trend[k].leads);
@@ -414,6 +432,16 @@ function renderCharts(kpi){
       }))
     },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}, scales:{x:{stacked:true}, y:{stacked:true}} }
+  });
+
+  if(chartReasons) chartReasons.destroy();
+  chartReasons = new Chart($("#chReasons"),{
+    type:'bar',
+    data:{
+      labels: kpi.reasonsLabels,
+      datasets:[{ label:"Powody odmowy", data:kpi.reasonsData }]
+    },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}} }
   });
 }
 
@@ -454,7 +482,7 @@ function fillFilters(){
   const stSel=$("#fStatus"); stSel.innerHTML="";
   for(const st of STATUS_LIST){ const opt=document.createElement('option'); opt.value=st; opt.textContent=st; stSel.appendChild(opt); }
 
-  // domyślny zakres: ostatnie 30 dni (z możliwością poszerzenia)
+  // domyślny zakres: ostatnie 30 dni
   const today=new Date(); const from=new Date(today); from.setDate(today.getDate()-30);
   $("#fFrom").value = from.toISOString().slice(0,10);
   $("#fTo").value   = today.toISOString().slice(0,10);
@@ -463,7 +491,6 @@ function readFilters(){
   FROM = $("#fFrom").value ? new Date($("#fFrom").value+"T00:00:00") : null;
   TO   = $("#fTo").value   ? new Date($("#fTo").value+"T23:59:59") : null;
   const sel = [...$("#fPH").selectedOptions].map(o=>o.value);
-  // jeśli wybrano "(Wszyscy PH)" albo nic – traktuj jak brak filtru
   SEL_PH = (!sel.length || sel.includes(PH_ALL)) ? [] : sel;
   SEL_ST = [...$("#fStatus").selectedOptions].map(o=>o.value);
 }
