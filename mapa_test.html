@@ -5,7 +5,6 @@
 <title>SIDUSIS – mapa leadów (ONLINE: MSAL + Graph + Excel na SharePoint)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
 <style>
   html, body { height:100%; margin:0; font-family:system-ui, Segoe UI, Roboto, Arial; }
   #map { height:100%; }
@@ -49,8 +48,7 @@
       const tryNext = () => {
         if (i >= urls.length) return reject(new Error('Nie udało się załadować msal-browser z żadnego CDN.'));
         const s = document.createElement('script');
-        s.src = urls[i++];
-        s.async = true;
+        s.src = urls[i++]; s.async = true;
         s.onload = () => resolve();
         s.onerror = () => tryNext();
         document.head.appendChild(s);
@@ -58,8 +56,6 @@
       tryNext();
     });
   }
-
-  // 3 źródła MSAL – jeśli korporacyjnie blokuje alcdn, wejdzie jsDelivr / unpkg
   const MSAL_CDNS = [
     'https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js',
     'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js',
@@ -90,24 +86,21 @@
 
 <script>
 (async function main(){
-/* =========================== KONFIG (Twoje dane) =========================== */
-const CONFIG = {
-  // Entra ID (Azure AD)
-  clientId: "2c5a0274-30c0-4efa-b13c-7ce1e0768cf9",
-  tenantId: "e44d0310-65ed-4096-a024-dac77110765a",
+  /* =========================== KONFIG =========================== */
+  const CONFIG = {
+    clientId: "2c5a0274-30c0-4efa-b13c-7ce1e0768cf9",
+    tenantId: "e44d0310-65ed-4096-a024-dac77110765a",
 
-  // SharePoint + Excel
-  spHost: "internetunion.sharepoint.com",
-  spSitePath: "PHTheNetwork", // bez "/sites/"
-  filePath: "/General/Kopia pliku Lista - SIDUSIS - PEŁNA - od 08-2025 - kopia do mapy.xlsx",
+    spHost: "internetunion.sharepoint.com",
+    spSitePath: "PHTheNetwork", // bez /sites/
+    // <<— ŚCIEŻKA DO PLIKU (potwierdzona w testach) —>>
+    filePath: "/General/Kopia pliku Lista - SIDUSIS - PEŁNA - od 08-2025 - kopia do mapy.xlsx",
 
-  // Arkusze w skoroszycie
-  dataSheet: "Dane",
-  logSheet: "AuditLog",
-};
+    dataSheet: "Dane",
+    logSheet: "AuditLog"
+  };
 
-
-  /* =========================== USTAWIENIA UI/MAPY =========================== */
+  /* =========================== UI/MAPA =========================== */
   const PH_LIST = ["Adrian Daniel","Robert Kaźmierczak","Mariusz Kielczyk","Inga Kaźmierczak","Jacek Trybuchowski","Tomasz Józefowicz"];
   const STATUS_LIST = ["Zapytanie o wycenę","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO"];
   const PH_COLORS = ["#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2","#7f7f7f","#bcbd22","#17becf"];
@@ -115,34 +108,21 @@ const CONFIG = {
   const STATUS_COLOR_MAP = {"Zapytanie o wycenę":"#607D8B","Oferta wysłana":"#2196F3","Odmowa klienta":"#F44336","Akceptacja klienta":"#4CAF50","Poza Zasięgiem":"#000000","KPO":"#FF9800"};
   const DEFAULT_PH_COLOR="#455A64", DEFAULT_STATUS_COLOR="#9E9E9E";
 
-  /* =========================== STAN / UTYLITY =========================== */
+  /* =========================== STAN/UTIL =========================== */
   let account=null, siteId=null, fileId=null;
-  let rows=[]; // dane z Excela
-  let map, layer, renderer;
+  let rows=[]; let map, layer, renderer;
 
   const $ = s=>document.querySelector(s);
-  const statusbar=$("#statusbar");
-  const who=$("#who");
-  const errorBar=$("#errorBar");
+  const statusbar=$("#statusbar"); const who=$("#who"); const errorBar=$("#errorBar");
 
   const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function setStatus(lines){ statusbar.textContent = Array.isArray(lines) ? lines.join("\n") : String(lines||""); }
   function showError(msg){ errorBar.textContent = msg; errorBar.style.display='block'; setTimeout(()=>{ errorBar.style.display='none'; }, 7000); }
   function toNum(v){ if(v==null) return NaN; const s=String(v).replace(",", ".").replace(/[^\d\.\-+Ee]/g,"").trim(); return parseFloat(s); }
-  // --- dopasowanie adresów i tolerancja współrzędnych ---
-function normAddr(s){
-  return String(s||"")
-    .normalize('NFD').replace(/\p{Diacritic}/gu,'')   // bez ogonków
-    .toLowerCase()
-    .replace(/\bul\.?\s*/g,'')                        // usuń "ul." / "ul "
-    .replace(/[.,]/g,' ')                             // przecinki/kropki -> spacja
-    .replace(/\s+/g,' ')                              // wielokrotne spacje
-    .trim();
-}
-const near = (a,b,tol=1e-5) => isFinite(a)&&isFinite(b)&&Math.abs(a-b)<=tol;
-
   function colLetter(n){ let s="",x=n; while(x>0){x--; s=String.fromCharCode(65+(x%26))+s; x=Math.floor(x/26);} return s; }
-  function findIdx(headers, name){ const lc=headers.map(v=>String(v||"").trim().toLowerCase()); return lc.indexOf(String(name).toLowerCase()); }
+  const normStr = s => String(s||"").toLowerCase().replace(/\s+/g," ").trim();
+  const normAddr = s => normStr(s).replace(/^\s*(ul\.?\s*){2,}/i,"ul. ").replace(/^\s*ul\b\.?/i,"ul. ");
+  const near = (a,b,eps=0.0005)=> isFinite(a)&&isFinite(b)&&Math.abs(a-b)<=eps;
 
   /* =========================== MAPA =========================== */
   function initMap(){
@@ -168,6 +148,7 @@ const near = (a,b,tol=1e-5) => isFinite(a)&&isFinite(b)&&Math.abs(a-b)<=tol;
     for(const [st,col] of Object.entries(STATUS_COLOR_MAP)){ html+=`<div><span class="pill status-pill" style="background:${col};border-color:${col}"></span>${esc(st)}</div>`; }
     box.innerHTML=html;
   }
+
   function buildPopup(rec){
     const phOpts = ['<option value="">(brak)</option>'].concat(PH_LIST.map(ph=>`<option ${ph===rec.PH?'selected':''}>${esc(ph)}</option>`)).join("");
     const stOpts = ['<option value="">(brak)</option>'].concat(STATUS_LIST.map(st=>`<option ${st===rec.Status?'selected':''}>${esc(st)}</option>`)).join("");
@@ -198,11 +179,13 @@ const near = (a,b,tol=1e-5) => isFinite(a)&&isFinite(b)&&Math.abs(a-b)<=tol;
       ${actions}
     </div>`;
   }
+
   function addOnePoint(rec){
     const marker = L.circleMarker([rec.lat,rec.lon],{
-      renderer, pane:'points',
-      radius:9, color: STATUS_COLOR_MAP[(rec.Status||"").trim()] || DEFAULT_STATUS_COLOR,
-      weight:3, fill:true, fillColor: PH_COLOR_MAP[(rec.PH||"").trim()] || DEFAULT_PH_COLOR, fillOpacity:1
+      renderer, pane:'points', radius:9,
+      color: STATUS_COLOR_MAP[(rec.Status||"").trim()] || DEFAULT_STATUS_COLOR,
+      weight:3, fill:true,
+      fillColor: PH_COLOR_MAP[(rec.PH||"").trim()] || DEFAULT_PH_COLOR, fillOpacity:1
     });
 
     marker.bindPopup(buildPopup(rec));
@@ -243,6 +226,7 @@ const near = (a,b,tol=1e-5) => isFinite(a)&&isFinite(b)&&Math.abs(a-b)<=tol;
 
     layer.addLayer(marker);
   }
+
   function rebuild(){
     initMap(); renderLegend();
     let placed=0;
@@ -256,41 +240,31 @@ const near = (a,b,tol=1e-5) => isFinite(a)&&isFinite(b)&&Math.abs(a-b)<=tol;
     setStatus(txt);
   }
 
-// ==================== MAIL – formatowanie + szablony ====================
-function mailTemplates(rec){
-  const nazwa  = rec.nazwa || "";
-  const miasto = (rec.miejscowosc || "").trim();
-  let   adres  = (rec.adres_pelny || "").trim();
-  const tel    = rec.telefon || "";
-  const email  = rec.email || "";
+  /* ==================== MAIL – formatowanie + szablony ==================== */
+  function mailTemplates(rec){
+    const nazwa  = rec.nazwa || "";
+    const miasto = (rec.miejscowosc || "").trim();
+    let   adres  = (rec.adres_pelny || "").trim();
+    const tel    = rec.telefon || "";
+    const email  = rec.email || "";
 
-  // 1) Normalizacja "ul." i białych znaków
-  adres = adres.replace(/\s+/g, " ");
-  adres = adres.replace(/^\s*(ul\.?\s*){2,}/i, "ul. "); // "ul. ul." -> "ul. "
-  adres = adres.replace(/^\s*ul\b\.?/i, "ul. ");        // "ul" / "UL" -> "ul. "
+    // normalizacja "ul." i białych znaków
+    adres = adres.replace(/\s+/g, " ").replace(/^\s*(ul\.?\s*){2,}/i, "ul. ").replace(/^\s*ul\b\.?/i, "ul. ");
 
-  // 2) Czy miasto jest już na końcu adresu?
-  const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const reCityAtEnd = miasto ? new RegExp(`(?:,\\s*)?\\b${reEsc(miasto)}\\b$`, "i") : null;
-  const hasCityAtEnd = miasto && reCityAtEnd.test(adres);
+    const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const reCityAtEnd = miasto ? new RegExp(`(?:,\\s*)?\\b${reEsc(miasto)}\\b$`, "i") : null;
+    const hasCityAtEnd = miasto && reCityAtEnd.test(adres);
 
-  // 3) Wersje adresu
-  const adresBezMiasta = hasCityAtEnd
-    ? adres.replace(reCityAtEnd, "").replace(/,\s*$/,"").trim()
-    : adres;
+    const adresBezMiasta = hasCityAtEnd ? adres.replace(reCityAtEnd,"").replace(/,\s*$/,"").trim() : adres;
+    const adresZMiastem  = hasCityAtEnd ? adres : (miasto ? `${adres}, ${miasto}` : adres);
+    const cityPartForSubject = miasto ? `, ${miasto}` : "";
 
-  const adresZMiastem = hasCityAtEnd
-    ? adres
-    : (miasto ? `${adres}, ${miasto}` : adres);
+    const subj_inv = `Zapytanie o wycenę - ${adresZMiastem} - SIDUSIS`;
+    const subj_cli = `Internet światłowodowy - The Network - ${adresZMiastem}`;
+    const subj_std = subj_cli;
+    const subj_dev = subj_cli;
 
-  // 4) Tematy
-  const subj_inv = `Zapytanie o wycenę - ${adresZMiastem} - SIDUSIS`;
-  const subj_cli = `Internet światłowodowy - The Network - ${adresZMiastem}`;
-  const subj_std = subj_cli;
-  const subj_dev = subj_cli;
-
-  // 5) Treści
-  const body_inv =
+    const body_inv =
 `Proszę o wycenę podłączenia klienta:
 Nazwa: ${nazwa}
 Miasto: ${miasto}
@@ -299,12 +273,12 @@ Telefon: ${tel}
 E-mail: ${email}
 `;
 
-  const body_cli =
+    const body_cli =
 `Dzień dobry ${nazwa},
 
 Serdecznie dziękujemy za przesłanie zgłoszenia za pośrednictwem platformy SIDUSIS.
 
-Informujemy, że zapytanie dotyczące możliwości podłączenia Internetu w lokalizacji ${adresZMiastem} zostało przekazane do Działu Inwestycji celem przygotowania indywidualnej wyceny.
+Informujemy, że zapytanie dotyczące możliwości podłączenia Internetu w lokalizacji ${adresBezMiasta}${cityPartForSubject} zostało przekazane do Działu Inwestycji celem przygotowania indywidualnej wyceny.
 
 Odpowiedź prześlę nie później niż w ciągu 3 dni roboczych.
 
@@ -313,7 +287,7 @@ W przypadku jakichkolwiek pytań – pozostaję do dyspozycji.
 Z wyrazami szacunku,
 `;
 
-  const body_std =
+    const body_std =
 `Dzień dobry,
 
 W odpowiedzi na przesłane zapytanie poniżej przesyłam ofertę na podłączenie Prywatnego Światłowodu The Network:
@@ -355,7 +329,7 @@ Po tej wizycie w Panelu Klienta pojawi się pierwsza faktura.
 W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
 `;
 
-  const body_dev =
+    const body_dev =
 `Dzień dobry,
 
 W odpowiedzi na przesłane zapytanie poniżej przesyłam ofertę na podłączenie Prywatnego Światłowodu The Network:
@@ -395,13 +369,13 @@ Po tej wizycie w Panelu Klienta pojawi się pierwsza faktura.
 W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
 `;
 
-  return {
-    INV: { to: "inwestycje@internetunion.pl", subject: subj_inv, body: body_inv },
-    CLI: { to: email, subject: subj_cli, body: body_cli },
-    STD: { to: email, subject: subj_std, body: body_std },
-    DEV: { to: email, subject: subj_dev, body: body_dev }
-  };
-}
+    return {
+      INV: { to: "inwestycje@internetunion.pl", subject: subj_inv, body: body_inv },
+      CLI: { to: email, subject: subj_cli, body: body_cli },
+      STD: { to: email, subject: subj_std, body: body_std },
+      DEV: { to: email, subject: subj_dev, body: body_dev }
+    };
+  }
 
   function composeAndSend(to, subject, body){
     const base = "mailto:"+encodeURIComponent(to||"")+"?subject="+encodeURIComponent(subject||"");
@@ -416,27 +390,15 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     }
   }
 
-  /* =========================== ZAŁADUJ MSAL (z fallbackiem) =========================== */
-  try {
-    await loadScriptSequential(MSAL_CDNS);
-  } catch (e) {
-    alert('Nie udało się załadować msal-browser (alcdn/jsDelivr/unpkg). Skontaktuj się z DT, aby odblokować co najmniej jedno z tych CDN.');
-    console.error(e);
-    return;
-  }
-  if (typeof msal === 'undefined' || !msal.PublicClientApplication) {
-    alert('MSAL nie jest dostępny w przeglądarce.');
-    return;
-  }
+  /* =========================== ZAŁADUJ MSAL =========================== */
+  try { await loadScriptSequential(MSAL_CDNS); }
+  catch(e){ alert('Nie udało się załadować msal-browser (alcdn/jsDelivr/unpkg).'); console.error(e); return; }
+  if (typeof msal === 'undefined' || !msal.PublicClientApplication){ alert('MSAL nie jest dostępny.'); return; }
 
   /* =========================== MSAL / GRAPH =========================== */
   const msalApp = new msal.PublicClientApplication({
-    auth: {
-      clientId: CONFIG.clientId,
-      authority: "https://login.microsoftonline.com/" + CONFIG.tenantId,
-      // Uwaga: to *musi* dokładnie odpowiadać wpisowi w Entra ID (Redirect URIs dla SPA)
-      redirectUri: window.location.origin + window.location.pathname
-    },
+    auth: { clientId: CONFIG.clientId, authority: "https://login.microsoftonline.com/" + CONFIG.tenantId,
+            redirectUri: window.location.origin + window.location.pathname },
     cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false }
   });
   const graphScopes = ["openid","profile","offline_access","Files.ReadWrite.All","Sites.Read.All"];
@@ -449,23 +411,14 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
   }
   async function getToken(){
     await ensureLogin();
-    try{
-      const r=await msalApp.acquireTokenSilent({ scopes: graphScopes, account });
-      return r.accessToken;
-    }catch{
-      const r=await msalApp.acquireTokenPopup({ scopes: graphScopes });
-      return r.accessToken;
-    }
+    try{ const r=await msalApp.acquireTokenSilent({ scopes: graphScopes, account }); return r.accessToken; }
+    catch{ const r=await msalApp.acquireTokenPopup({ scopes: graphScopes }); return r.accessToken; }
   }
   async function gfetch(method, url, body){
     const token = await getToken();
     const resp = await fetch(url, {
       method,
-      headers: {
-        "Authorization":"Bearer " + token,
-        "Accept":"application/json",
-        "Content-Type":"application/json"
-      },
+      headers: { "Authorization":"Bearer " + token, "Accept":"application/json", "Content-Type":"application/json" },
       body: body ? JSON.stringify(body) : undefined
     });
     if(!resp.ok){
@@ -477,98 +430,81 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
   async function getSiteId(){
     if(siteId) return siteId;
     const url = `https://graph.microsoft.com/v1.0/sites/${CONFIG.spHost}:/sites/${CONFIG.spSitePath}`;
-    const js = await gfetch("GET", url);
-    siteId = js.id; return siteId;
+    const js = await gfetch("GET", url); siteId = js.id; return siteId;
   }
   async function getFileItemId(){
     if(fileId) return fileId;
     const sid = await getSiteId();
     const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/root:${encodeURI(CONFIG.filePath)}`;
-    const js = await gfetch("GET", url);
-    fileId = js.id; return fileId;
+    const js = await gfetch("GET", url); fileId = js.id; return fileId;
   }
-async function usedRange(wsName){
-  const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
-  const wsq = wsName.replace(/'/g,"''");
-  const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/usedRange(valuesOnly=true)`;
-  return gfetch("GET", url);
-}
-
-async function patchRange(wsName, a1, values2d){
-  const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
-  const wsq = wsName.replace(/'/g,"''");
-  const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='${a1}')`;
-  return gfetch("PATCH", url, { values: values2d });
-}
+  async function usedRange(wsName){
+    const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
+    const wsq = wsName.replace(/'/g,"''");
+    const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/usedRange(valuesOnly=true)`;
+    return gfetch("GET", url);
+  }
+  async function patchRange(wsName, a1, values2d){
+    const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
+    const wsq = wsName.replace(/'/g,"''");
+    const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='${a1}')`;
+    return gfetch("PATCH", url, { values: values2d });
+  }
   async function writeCell(wsName, row1, col1, value){
-    const a1 = colLetter(col1) + row1;
-    return patchRange(wsName, a1, [[ value ]]);
+    const a1 = colLetter(col1) + row1; return patchRange(wsName, a1, [[ value ]]);
   }
-  
+
+  /* ===== AuditLog – wersja bez tabel (stabilna) ===== */
   const AUDIT_HEADERS = ["ts","user","action","itemId","adres_pelny","old","new","note"];
-  const AUDIT_TABLE_NAME = "AuditLogTbl";
 
-async function ensureAuditHeaders(){
-  // dopisz nagłówki jeśli puste lub brakujące
-  const used = await usedRange(CONFIG.logSheet);
-  const have = (used.values && used.values[0]) ? used.values[0] : [];
-  const needHeaders = AUDIT_HEADERS.some((h,i)=> (have[i]||"").toString().trim() !== h);
-  if (needHeaders){
-    const a1 = `A1:${colLetter(AUDIT_HEADERS.length)}1`;
-    await patchRange(CONFIG.logSheet, a1, [AUDIT_HEADERS]);
-  }
-}
-
-async function ensureAuditTable(){
-  const id = await getFileItemId();
-
-  // czy jest już jakaś tabela o tej nazwie?
-  const list = await gfetch("GET", `https://graph.microsoft.com/v1.0/drive/items/${id}/workbook/tables?$select=id,name`);
-  let tbl = (list.value||[]).find(t => (t.name||"") === AUDIT_TABLE_NAME);
-
-  if (!tbl){
-    await ensureAuditHeaders();
-    // utwórz tabelę na nagłówkach (A1:H1) – Excel sam rozszerzy na kolejne wiersze
-    const created = await gfetch("POST",
-      `https://graph.microsoft.com/v1.0/drive/items/${id}/workbook/tables/add`,
-      { address: `${CONFIG.logSheet}!A1:${colLetter(AUDIT_HEADERS.length)}1`, hasHeaders: true }
-    );
-    // nazwa tabeli (łatwo znaleźć później)
-    try {
-      await gfetch("PATCH",
-        `https://graph.microsoft.com/v1.0/drive/items/${id}/workbook/tables/${created.id}`,
-        { name: AUDIT_TABLE_NAME }
-      );
-      tbl = { id: created.id, name: AUDIT_TABLE_NAME };
-    } catch {
-      tbl = created; // nawet jeśli nie da się zmienić nazwy, mamy id
+  async function ensureAuditHeaders(){
+    const used = await usedRange(CONFIG.logSheet);
+    const have = (used.values && used.values[0]) ? used.values[0].map(v=>String(v||"").trim()) : [];
+    const need = AUDIT_HEADERS.some((h,i)=> (have[i]||"") !== h);
+    if (need){
+      const a1 = `A1:${colLetter(AUDIT_HEADERS.length)}1`;
+      await patchRange(CONFIG.logSheet, a1, [AUDIT_HEADERS]);
     }
   }
-  return tbl.id;
-}
-
+  async function getNextLogRow(){
+    const used = await usedRange(CONFIG.logSheet);
+    const values = used.values || [];
+    let next = Math.max(2, values.length + 1);
+    try{
+      const id  = await getFileItemId();
+      const wsq = CONFIG.logSheet.replace(/'/g,"''");
+      const probe = await gfetch("GET",
+        `https://graph.microsoft.com/v1.0/drive/items/${id}/workbook/worksheets('${wsq}')/range(address='A${next-1}')?$select=values`
+      );
+      const prevVal = (((probe||{}).values||[])[0]||[])[0];
+      if (prevVal && String(prevVal).trim() !== ""){
+        const scan = await gfetch("GET",
+          `https://graph.microsoft.com/v1.0/drive/items/${id}/workbook/worksheets('${wsq}')/range(address='A1:A50000')?$select=values`
+        );
+        const col = (scan.values||[]).map(r => String((r||[])[0] ?? "").trim());
+        let last = 1; for (let i=col.length-1;i>=0;i--){ if(col[i] !== ""){ last = i+1; break; } }
+        next = Math.max(2, last + 1);
+      }
+    }catch(_){}
+    return next;
+  }
   async function appendLog(row){
-  // row: [ts, user, action, itemId, adres_pelny, old, new, note]
-  const tblId = await ensureAuditTable();
-  await gfetch("POST",
-    `https://graph.microsoft.com/v1.0/drive/items/${await getFileItemId()}/workbook/tables/${tblId}/rows/add`,
-    { values: [row] }
-  );
-}
+    await ensureAuditHeaders();
+    const next = await getNextLogRow();
+    const a1 = `A${next}:${colLetter(AUDIT_HEADERS.length)}${next}`;
+    await patchRange(CONFIG.logSheet, a1, [row]);
+  }
 
+  /* =========================== DANE z Excela =========================== */
   function pickHeader(headers, tokens){
     const lc=headers.map(h=>String(h||"").toLowerCase());
-    for(const t of tokens){
-      const i = lc.findIndex(n=>n.includes(t));
-      if(i>=0) return headers[i];
-    }
+    for(const t of tokens){ const i = lc.findIndex(n=>n.includes(t)); if(i>=0) return headers[i]; }
     return null;
   }
   function parseRows(values){
     if(!values || !values.length) return [];
     const headers = (values[0]||[]).map(h=>String(h||"").trim());
     const body = values.slice(1);
-
     const H = {
       lat:  pickHeader(headers,["lat","latitude","szerokość","szerokosc"]),
       lon:  pickHeader(headers,["lon","longitude","długość","dlugosc"]),
@@ -585,8 +521,7 @@ async function ensureAuditTable(){
     const get = (r, col) => { const idx=headers.indexOf(col); return idx>=0 ? r[idx] : ""; };
 
     let out = body.map(r=>{
-      let lat = toNum(get(r,H.lat));
-      let lon = toNum(get(r,H.lon));
+      let lat = toNum(get(r,H.lat)); let lon = toNum(get(r,H.lon));
       let adr = get(r,H.adresPelny) || "";
       if(!adr){
         const u=String(get(r,H.ulica)||"").trim();
@@ -613,6 +548,7 @@ async function ensureAuditTable(){
     out = out.filter(o=>validLat(o.lat)&&validLon(o.lon));
     return out;
   }
+
   async function loadDataFromExcel(){
     setStatus("Ładowanie danych z Excela (Graph)…");
     const used = await usedRange(CONFIG.dataSheet);
@@ -621,114 +557,81 @@ async function ensureAuditTable(){
     rows = parseRows(values);
     setStatus(`Załadowano ${rows.length} wierszy z arkusza „${CONFIG.dataSheet}”.`);
   }
+
   async function savePhStatus(rec, newPH, newStatus){
-  // 1) Pobierz zakres arkusza
-  const used = await usedRange(CONFIG.dataSheet);
-  const vals = used.values || [];
-  if(!vals.length) throw new Error("Arkusz pusty.");
-  const headers = (vals[0]||[]).map(h=>String(h||"").trim());
-  const body = vals.slice(1);
+    const used = await usedRange(CONFIG.dataSheet);
+    const vals = used.values || [];
+    if(!vals.length) throw new Error("Arkusz pusty.");
+    const headers = (vals[0]||[]).map(h=>String(h||"").trim());
+    const body = vals.slice(1);
 
-  // 2) Ustal kolumny (adres/ulica/nr/miasto/lat/lon + PH/Status)
-  function pickHeader(headers, tokens){
-    const lc=headers.map(h=>String(h||"").toLowerCase());
-    for(const t of tokens){
-      const i=lc.findIndex(n=>n.includes(t));
-      if(i>=0) return headers[i];
-    }
-    return null;
-  }
-  const H = {
-    adresPelny: pickHeader(headers,["adres_pelny","adres pełny","adres pelny"]),
-    ulica:      pickHeader(headers,["ulica","adres"]),
-    nr:         pickHeader(headers,["nr budynku","numer","nr","nr domu"]),
-    msc:        pickHeader(headers,["miejscowość","miejscowosc","miasto"]),
-    lat:        pickHeader(headers,["lat","latitude","szerokość","szerokosc","punkt (y)","y"]),
-    lon:        pickHeader(headers,["lon","longitude","długość","dlugosc","punkt (x)","x"]),
-    ph:         pickHeader(headers,["ph"]),
-    st:         pickHeader(headers,["status"])
-  };
+    const H = {
+      adresPelny: pickHeader(headers,["adres_pelny","adres pełny","adres pelny"]),
+      ulica:      pickHeader(headers,["ulica","adres"]),
+      nr:         pickHeader(headers,["nr budynku","numer","nr","nr domu"]),
+      msc:        pickHeader(headers,["miejscowość","miejscowosc","miasto"]),
+      lat:        pickHeader(headers,["lat","latitude","szerokość","szerokosc","punkt (y)","y"]),
+      lon:        pickHeader(headers,["lon","longitude","długość","dlugosc","punkt (x)","x"]),
+      ph:         pickHeader(headers,["ph"]),
+      st:         pickHeader(headers,["status"])
+    };
 
-  // 3) Upewnij się, że są kolumny PH/Status (dodaj główki jeśli brak)
-  let idxPH = headers.findIndex(h=>String(h).toLowerCase().trim()==="ph");
-  if(idxPH<0){ idxPH = headers.length; headers.push("PH");
-    await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]);
-  }
-  let idxST = headers.findIndex(h=>String(h).toLowerCase().trim()==="status");
-  if(idxST<0){ idxST = headers.length; headers.push("Status");
-    await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]);
-  }
+    let idxPH = headers.findIndex(h=>String(h).toLowerCase().trim()==="ph");
+    if(idxPH<0){ idxPH = headers.length; headers.push("PH"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+    let idxST = headers.findIndex(h=>String(h).toLowerCase().trim()==="status");
+    if(idxST<0){ idxST = headers.length; headers.push("Status"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
 
-  // 4) Znajdź wiersz (najpierw po znormalizowanym adresie, potem fallback po lat/lon)
-  const wantAddr = normAddr(rec.adres_pelny||"");
-  let row1=-1, oldPH="", oldST="";
+    const wantAddr = normAddr(rec.adres_pelny||"");
+    let row1=-1, oldPH="", oldST="";
 
-  for(let r=0; r<body.length; r++){
-    const row = body[r]||[];
+    for(let r=0; r<body.length; r++){
+      const row = body[r]||[];
+      let adrRow = "";
+      if(H.adresPelny){
+        const i = headers.indexOf(H.adresPelny);
+        adrRow = String(row[i]||"");
+      }else{
+        const u = H.ulica ? String(row[headers.indexOf(H.ulica)]||"").trim() : "";
+        const n = H.nr    ? String(row[headers.indexOf(H.nr)]||"").trim()    : "";
+        const m = H.msc   ? String(row[headers.indexOf(H.msc)]||"").trim()   : "";
+        adrRow = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
+      }
 
-    // a) adres w wierszu
-    let adrRow = "";
-    if(H.adresPelny){
-      const i = headers.indexOf(H.adresPelny);
-      adrRow = String(row[i]||"");
-    }else{
-      const u = H.ulica ? String(row[headers.indexOf(H.ulica)]||"").trim() : "";
-      const n = H.nr    ? String(row[headers.indexOf(H.nr)]||"").trim()    : "";
-      const m = H.msc   ? String(row[headers.indexOf(H.msc)]||"").trim()   : "";
-      adrRow = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
-    }
-
-    if(wantAddr && normAddr(adrRow) === wantAddr){
-      row1 = r+2;  // +1 nagłówek, +1 1-based
-    } else if(H.lat && H.lon && isFinite(rec.lat) && isFinite(rec.lon)){
-      const iLat = headers.indexOf(H.lat);
-      const iLon = headers.indexOf(H.lon);
-      const latR = toNum(row[iLat]); const lonR = toNum(row[iLon]);
-      if(near(latR, rec.lat) && near(lonR, rec.lon)){
+      if(wantAddr && normAddr(adrRow) === wantAddr){
         row1 = r+2;
+      } else if(H.lat && H.lon && isFinite(rec.lat) && isFinite(rec.lon)){
+        const iLat = headers.indexOf(H.lat);
+        const iLon = headers.indexOf(H.lon);
+        const latR = toNum(row[iLat]); const lonR = toNum(row[iLon]);
+        if(near(latR, rec.lat) && near(lonR, rec.lon)){ row1 = r+2; }
+      }
+
+      if(row1>0){
+        oldPH = idxPH>=0 ? String(row[idxPH]||"") : "";
+        oldST = idxST>=0 ? String(row[idxST]||"") : "";
+        break;
       }
     }
 
-    if(row1>0){
-      oldPH = idxPH>=0 ? String(row[idxPH]||"") : "";
-      oldST = idxST>=0 ? String(row[idxST]||"") : "";
-      break;
-    }
+    if(row1<0) throw new Error("Nie znaleziono pozycji w Excelu (dopasowanie po adresie i/lub współrzędnych).");
+
+    await writeCell(CONFIG.dataSheet, row1, idxPH+1, newPH||"");
+    await writeCell(CONFIG.dataSheet, row1, idxST+1, newStatus||"");
+
+    const now = new Date().toISOString();
+    const upn = (account && (account.username||account.homeAccountId)) || "";
+    await appendLog([ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}`, "" ]);
   }
 
-  if(row1<0){
-    throw new Error("Nie znaleziono pozycji w Excelu (dopasowanie po adresie i/lub współrzędnych).");
-  }
-
-  // 5) Zapis i log
-  await writeCell(CONFIG.dataSheet, row1, idxPH+1, newPH||"");
-  await writeCell(CONFIG.dataSheet, row1, idxST+1, newStatus||"");
-
-  const now = new Date().toISOString();
-  const upn = (account && (account.username||account.homeAccountId)) || "";
-  await appendLog([ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}`, "" ]);
-}
-
-
-  /* =========================== UI: przyciski =========================== */
-  $("#btnLogin").addEventListener('click', async ()=>{
-    try{ await ensureLogin(); setStatus("Zalogowano."); }catch(err){ showError("Logowanie nieudane: " + err.message); }
-  });
+  /* =========================== UI =========================== */
+  $("#btnLogin").addEventListener('click', async ()=>{ try{ await ensureLogin(); setStatus("Zalogowano."); }catch(err){ showError("Logowanie nieudane: " + err.message); } });
   $("#btnLogout").addEventListener('click', async ()=>{
-    try{
-      const acc = msalApp.getAllAccounts()[0];
-      if(acc){ await msalApp.logoutPopup({ account: acc }); }
-      account=null; who.textContent=""; setStatus("Wylogowano.");
-    }catch(err){ showError("Wylogowanie nieudane: " + err.message); }
+    try{ const acc = msalApp.getAllAccounts()[0]; if(acc){ await msalApp.logoutPopup({ account: acc }); }
+      account=null; who.textContent=""; setStatus("Wylogowano."); }catch(err){ showError("Wylogowanie nieudane: " + err.message); }
   });
   $("#btnReload").addEventListener('click', async ()=>{
-    try{
-      await ensureLogin();
-      await getSiteId();
-      await getFileItemId();
-      await loadDataFromExcel();
-      rebuild();
-    }catch(err){ console.error(err); showError(err.message); }
+    try{ await ensureLogin(); await getSiteId(); await getFileItemId(); await loadDataFromExcel(); rebuild(); }
+    catch(err){ console.error(err); showError(err.message); }
   });
 
   /* =========================== START =========================== */
