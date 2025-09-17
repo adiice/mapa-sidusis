@@ -38,87 +38,36 @@
   }
 </style>
 
-<!-- Biblioteki -->
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<!-- Leaflet (mapa) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Loader z fallbackiem dla MSAL -->
 <script>
-(function () {
-  // 1) Konfiguracja MSAL dla Twojej aplikacji
-  const msalConfig = {
-    auth: {
-      clientId: '2c5a0274-30c0-4efa-b13c-7ce1e0768cf9',
-      authority: 'https://login.microsoftonline.com/e44d0310-65ed-4096-a024-dac77110765a',
-      // MUSI być dokładnie ten sam adres, z którego otwierasz stronę (z nazwą pliku)
-      redirectUri: window.location.origin + window.location.pathname
-    },
-    cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false }
-  };
+  function loadScriptSequential(urls) {
+    return new Promise((resolve, reject) => {
+      let i = 0;
+      const tryNext = () => {
+        if (i >= urls.length) return reject(new Error('Nie udało się załadować msal-browser z żadnego CDN.'));
+        const s = document.createElement('script');
+        s.src = urls[i++];
+        s.async = true;
+        s.onload = () => resolve();
+        s.onerror = () => tryNext();
+        document.head.appendChild(s);
+      };
+      tryNext();
+    });
+  }
 
-  const graphScopes = [
-    'openid','profile','offline_access',
-    'Files.ReadWrite.All','Sites.Read.All'
+  // 3 źródła MSAL – jeśli korporacyjnie blokuje alcdn, wejdzie jsDelivr / unpkg
+  const MSAL_CDNS = [
+    'https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js',
+    'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js',
+    'https://unpkg.com/@azure/msal-browser@2.38.3/lib/msal-browser.min.js'
   ];
-
-  // 2) Uruchom MSAL
-  if (typeof msal === 'undefined' || !msal.PublicClientApplication) {
-    alert('Nie załadował się msal-browser. Sprawdź połączenie do https://alcdn.msauth.net');
-    return;
-  }
-  const app = new msal.PublicClientApplication(msalConfig);
-  let account = null;
-  const $ = s => document.querySelector(s);
-  const statusBox = $('#status');
-
-  function setStatus(t){ if(statusBox) statusBox.textContent = t; console.log('[MSAL]', t); }
-
-  // 3) Logowanie + token
-  async function ensureLogin() {
-    const accs = app.getAllAccounts();
-    if (accs.length) { account = accs[0]; setStatus('Zalogowano: ' + (account.username||'')); return account; }
-    try {
-      const r = await app.loginPopup({ scopes: graphScopes });
-      account = r.account;
-      setStatus('Zalogowano: ' + (account.username||'')); 
-      return account;
-    } catch (e) {
-      console.error(e);
-      // jeśli popup zablokowany – MSAL zgłasza interaction_in_progress / popup_window_error
-      alert('Logowanie nieudane: ' + (e.errorMessage || e.message || e));
-      throw e;
-    }
-  }
-
-  async function getToken() {
-    await ensureLogin();
-    try {
-      const r = await app.acquireTokenSilent({ scopes: graphScopes, account });
-      return r.accessToken;
-    } catch {
-      const r = await app.acquireTokenPopup({ scopes: graphScopes });
-      return r.accessToken;
-    }
-  }
-
-  // 4) Wylogowanie
-  async function doLogout(){
-    try { await app.logoutPopup({ account }); } finally {
-      account=null; setStatus('Nie zalogowano.');
-    }
-  }
-
-  // 5) Udostępnij funkcje reszcie kodu (np. do Graph)
-  window.msAuth = { ensureLogin, getToken, logout: doLogout };
-
-  // 6) Podepnij przyciski
-  $('#btnLogin')  ?.addEventListener('click', () => ensureLogin());
-  $('#btnLogout') ?.addEventListener('click', () => doLogout());
-
-  // 7) Obsłuż ewentualne powroty z redirectu (MSAL wymaga)
-  app.handleRedirectPromise().catch(e => console.warn('MSAL redirect:', e));
-})();
 </script>
-
 </head>
+
 <body>
 <div id="map"></div>
 
@@ -130,9 +79,9 @@
   <div class="row">
     <button id="btnLogin">Zaloguj</button>
     <button id="btnLogout">Wyloguj</button>
-    <button id="btnReload">Odśwież dane z Excela</button>
+    <button id="btnReload">Odśwież dane z Excelem</button>
   </div>
-  <div class="hint">Po zalogowaniu: klikaj pinezki → wybierz PH/Status → „Zapisz” (zapis do Excela na SharePoint) • Poniżej status.</div>
+  <div class="hint">Po zalogowaniu: kliknij pinezkę → wybierz PH/Status → „Zapisz” (zapis do Excela na SharePoint) • Poniżej status.</div>
   <div class="statusbar" id="statusbar">Nie zalogowano.</div>
 </div>
 
@@ -140,528 +89,409 @@
 <div class="error" id="errorBar"></div>
 
 <script>
-/* =========================== KONFIG (Twoje dane) =========================== */
-const CONFIG = {
-  // Entra ID (Azure AD)
-  clientId: "2c5a0274-30c0-4efa-b13c-7ce1e0768cf9",
-  tenantId: "e44d0310-65ed-4096-a024-dac77110765a",
+(async function main(){
+  /* =========================== KONFIG (Twoje dane) =========================== */
+  const CONFIG = {
+    // Entra ID (Azure AD)
+    clientId: "2c5a0274-30c0-4efa-b13c-7ce1e0768cf9",
+    tenantId: "e44d0310-65ed-4096-a024-dac77110765a",
 
-  // SharePoint + Excel
-  spHost: "internetunion.sharepoint.com",
-  spSitePath: "PHTheNetwork", // bez /sites/
-  filePath: "/PH TheNetwork - General/Lista - SIDUSIS - PEŁNA - od 08-2025.xlsx",
+    // SharePoint + Excel
+    spHost: "internetunion.sharepoint.com",
+    spSitePath: "PHTheNetwork", // bez /sites/
+    filePath: "/PH TheNetwork - General/Lista - SIDUSIS - PEŁNA - od 08-2025.xlsx",
 
-  // Arkusze
-  dataSheet: "Dane",
-  logSheet: "AuditLog",
-};
-
-/* =========================== USTAWIENIA UI/MAPY =========================== */
-const PH_LIST = ["Adrian Daniel","Robert Kaźmierczak","Mariusz Kielczyk","Inga Kaźmierczak","Jacek Trybuchowski","Tomasz Józefowicz"];
-const STATUS_LIST = ["Zapytanie o wycenę","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO"];
-const PH_COLORS = ["#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2","#7f7f7f","#bcbd22","#17becf"];
-const PH_COLOR_MAP = Object.fromEntries(PH_LIST.map((ph,i)=>[ph,PH_COLORS[i%PH_COLORS.length]]));
-const STATUS_COLOR_MAP = {"Zapytanie o wycenę":"#607D8B","Oferta wysłana":"#2196F3","Odmowa klienta":"#F44336","Akceptacja klienta":"#4CAF50","Poza Zasięgiem":"#000000","KPO":"#FF9800"};
-const DEFAULT_PH_COLOR="#455A64", DEFAULT_STATUS_COLOR="#9E9E9E";
-
-/* =========================== STAN =========================== */
-let account=null, siteId=null, fileId=null;
-let rows=[]; // dane z Excela
-let map, layer, renderer;
-const $ = s=>document.querySelector(s);
-const statusbar=$("#statusbar");
-const who=$("#who");
-const errorBar=$("#errorBar");
-
-/* =========================== UTYLITY =========================== */
-const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function setStatus(lines){ statusbar.textContent = Array.isArray(lines) ? lines.join("\n") : String(lines||""); }
-function showError(msg){ errorBar.textContent = msg; errorBar.style.display='block'; setTimeout(()=>{ errorBar.style.display='none'; }, 7000); }
-function toNum(v){ if(v==null) return NaN; const s=String(v).replace(",", ".").replace(/[^\d\.\-+Ee]/g,"").trim(); return parseFloat(s); }
-
-/* =========================== MSAL / GRAPH =========================== */
-const msalApp = new msal.PublicClientApplication({
-  auth: {
-    clientId: CONFIG.clientId,
-    authority: "https://login.microsoftonline.com/" + CONFIG.tenantId,
-    // Bardzo ważne: Redirect URI MUSI być dopisany w Entra ID dokładnie jak poniżej:
-    redirectUri: window.location.origin + window.location.pathname
-  },
-  cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false }
-});
-const graphScopes = ["openid","profile","offline_access","Files.ReadWrite.All","Sites.Read.All"];
-
-async function ensureLogin(){
-  const accs = msalApp.getAllAccounts();
-  if(accs.length){ account=accs[0]; who.textContent = "Zalogowano: " + (account.username||account.homeAccountId); return; }
-  const r = await msalApp.loginPopup({ scopes: graphScopes });
-  account = r.account;
-  who.textContent = "Zalogowano: " + (account.username||account.homeAccountId);
-}
-async function getToken(){
-  await ensureLogin();
-  try{
-    const r=await msalApp.acquireTokenSilent({ scopes: graphScopes, account });
-    return r.accessToken;
-  }catch{
-    const r=await msalApp.acquireTokenPopup({ scopes: graphScopes });
-    return r.accessToken;
-  }
-}
-async function gfetch(method, url, body){
-  const token = await getToken();
-  const resp = await fetch(url, {
-    method,
-    headers: {
-      "Authorization":"Bearer " + token,
-      "Accept":"application/json",
-      "Content-Type":"application/json"
-    },
-    body: body ? JSON.stringify(body) : undefined
-  });
-  if(!resp.ok){
-    const txt=await resp.text().catch(()=>String(resp.status));
-    throw new Error(`${method} ${url} -> ${resp.status} ${txt}`);
-  }
-  return resp.status===204 ? null : resp.json();
-}
-function colLetter(n){ let s="",x=n; while(x>0){x--; s=String.fromCharCode(65+(x%26))+s; x=Math.floor(x/26);} return s; }
-
-async function getSiteId(){
-  if(siteId) return siteId;
-  const url = `https://graph.microsoft.com/v1.0/sites/${CONFIG.spHost}:/sites/${CONFIG.spSitePath}`;
-  const js = await gfetch("GET", url);
-  siteId = js.id; return siteId;
-}
-async function getFileItemId(){
-  if(fileId) return fileId;
-  const sid = await getSiteId();
-  const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/root:${encodeURI(CONFIG.filePath)}`;
-  const js = await gfetch("GET", url);
-  fileId = js.id; return fileId;
-}
-async function usedRange(wsName){
-  const id = await getFileItemId();
-  const wsq = wsName.replace(/'/g,"''");
-  const url = `https://graph.microsoft.com/v1.0/drive/items/${id}/workbook/worksheets('${wsq}')/usedRange(valuesOnly=true)`;
-  return gfetch("GET", url);
-}
-async function patchRange(wsName, a1, values2d){
-  const id = await getFileItemId();
-  const wsq = wsName.replace(/'/g,"''");
-  const url = `https://graph.microsoft.com/v1.0/drive/items/${id}/workbook/worksheets('${wsq}')/range(address='${a1}')`;
-  return gfetch("PATCH", url, { values: values2d });
-}
-async function writeCell(wsName, row1, col1, value){
-  const a1 = colLetter(col1) + row1;
-  return patchRange(wsName, a1, [[ value ]]);
-}
-async function appendLog(row){
-  const used = await usedRange(CONFIG.logSheet);
-  const rowsV = used.values || [];
-  const next = rowsV.length + 1;
-  const cols = Math.max(row.length, (rowsV[0]||[]).length || row.length);
-  const a1 = `A${next}:${colLetter(cols)}${next}`;
-  return patchRange(CONFIG.logSheet, a1, [row]);
-}
-
-/* =========================== DANE: pobranie, normalizacja =========================== */
-function findIdx(headers, name){
-  const lc=headers.map(v=>String(v||"").trim().toLowerCase());
-  return lc.indexOf(String(name).toLowerCase());
-}
-function pickHeader(headers, tokens){
-  const lc=headers.map(h=>String(h||"").toLowerCase());
-  for(const t of tokens){
-    const i = lc.findIndex(n=>n.includes(t));
-    if(i>=0) return headers[i];
-  }
-  return null;
-}
-
-function parseRows(values){
-  // values: 2D array (row-major), row 0 = headers
-  if(!values || !values.length) return [];
-  const headers = (values[0]||[]).map(h=>String(h||"").trim());
-  const body = values.slice(1);
-
-  const H = {
-    lat:  pickHeader(headers,["lat","latitude","szerokość","szerokosc"]),
-    lon:  pickHeader(headers,["lon","longitude","długość","dlugosc"]),
-    tel:  pickHeader(headers,["telefon","tel"]),
-    mail: pickHeader(headers,["email","e-mail","mail"]),
-    ph:   pickHeader(headers,["ph"]),
-    st:   pickHeader(headers,["status"]),
-    ulica:pickHeader(headers,["ulica","adres"]),
-    nr:   pickHeader(headers,["nr budynku","numer","nr","nr domu"]),
-    msc:  pickHeader(headers,["miejscowość","miejscowosc","miasto"]),
-    nazwa:pickHeader(headers,["zgłaszający","zglaszajacy","nazwa","imię","imie","nazwisko","klient","firma"]),
-    adresPelny: pickHeader(headers,["adres_pelny","adres pełny","adres pelny"]),
+    // Arkusze
+    dataSheet: "Dane",
+    logSheet: "AuditLog",
   };
 
-  function get(r, col){ const idx=headers.indexOf(col); return idx>=0 ? r[idx] : ""; }
+  /* =========================== USTAWIENIA UI/MAPY =========================== */
+  const PH_LIST = ["Adrian Daniel","Robert Kaźmierczak","Mariusz Kielczyk","Inga Kaźmierczak","Jacek Trybuchowski","Tomasz Józefowicz"];
+  const STATUS_LIST = ["Zapytanie o wycenę","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO"];
+  const PH_COLORS = ["#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2","#7f7f7f","#bcbd22","#17becf"];
+  const PH_COLOR_MAP = Object.fromEntries(PH_LIST.map((ph,i)=>[ph,PH_COLORS[i%PH_COLORS.length]]));
+  const STATUS_COLOR_MAP = {"Zapytanie o wycenę":"#607D8B","Oferta wysłana":"#2196F3","Odmowa klienta":"#F44336","Akceptacja klienta":"#4CAF50","Poza Zasięgiem":"#000000","KPO":"#FF9800"};
+  const DEFAULT_PH_COLOR="#455A64", DEFAULT_STATUS_COLOR="#9E9E9E";
 
-  let out = body.map(r=>{
-    let lat = toNum(get(r,H.lat));
-    let lon = toNum(get(r,H.lon));
-    let adr = get(r,H.adresPelny) || "";
-    if(!adr){
-      const u=String(get(r,H.ulica)||"").trim();
-      const n=String(get(r,H.nr)||"").trim();
-      const m=String(get(r,H.msc)||"").trim();
-      adr = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
-    }
-    return {
-      lat, lon, adres_pelny: adr||"",
-      PH: String(get(r,H.ph)||""),
-      Status: String(get(r,H.st)||""),
-      telefon: String(get(r,H.tel)||""),
-      email: String(get(r,H.mail)||""),
-      nazwa: String(get(r,H.nazwa)||""),
-      miejscowosc: String(get(r,H.msc)||""),
-    };
-  });
+  /* =========================== STAN / UTYLITY =========================== */
+  let account=null, siteId=null, fileId=null;
+  let rows=[]; // dane z Excela
+  let map, layer, renderer;
 
-  const validLat=v=>isFinite(v)&&v>=-90&&v<=90;
-  const validLon=v=>isFinite(v)&&v>=-180&&v<=180;
-  const okNormal = out.filter(o=>validLat(o.lat)&&validLon(o.lon)).length;
-  const okSwapped= out.filter(o=>validLat(o.lon)&&validLon(o.lat)).length;
-  if(okSwapped>okNormal){
-    out = out.map(o=>({ ...o, lat:o.lon, lon:o.lat }));
+  const $ = s=>document.querySelector(s);
+  const statusbar=$("#statusbar");
+  const who=$("#who");
+  const errorBar=$("#errorBar");
+
+  const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function setStatus(lines){ statusbar.textContent = Array.isArray(lines) ? lines.join("\n") : String(lines||""); }
+  function showError(msg){ errorBar.textContent = msg; errorBar.style.display='block'; setTimeout(()=>{ errorBar.style.display='none'; }, 7000); }
+  function toNum(v){ if(v==null) return NaN; const s=String(v).replace(",", ".").replace(/[^\d\.\-+Ee]/g,"").trim(); return parseFloat(s); }
+  function colLetter(n){ let s="",x=n; while(x>0){x--; s=String.fromCharCode(65+(x%26))+s; x=Math.floor(x/26);} return s; }
+  function findIdx(headers, name){ const lc=headers.map(v=>String(v||"").trim().toLowerCase()); return lc.indexOf(String(name).toLowerCase()); }
+
+  /* =========================== MAPA =========================== */
+  function initMap(){
+    if(map) map.remove();
+    map=L.map('map');
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
+    map.createPane('points'); map.getPane('points').style.zIndex = 650;
+    renderer = L.canvas({ padding:0.5 });
+    layer=L.layerGroup([], {pane:'points'}).addTo(map);
   }
-  out = out.filter(o=>validLat(o.lat)&&validLon(o.lon));
-  return out;
-}
-
-async function loadDataFromExcel(){
-  setStatus("Ładowanie danych z Excela (Graph)…");
-  const used = await usedRange(CONFIG.dataSheet);
-  const values = used.values || [];
-  if(!values.length){ setStatus("Arkusz pusty."); rows=[]; return; }
-  rows = parseRows(values);
-  setStatus(`Załadowano ${rows.length} wierszy z arkusza „${CONFIG.dataSheet}”.`);
-}
-
-/* =========================== MAILE =========================== */
-function mailTemplates(rec){
-  const nazwa = rec.nazwa||"";
-  const miasto = rec.miejscowosc||"";
-  const adres = rec.adres_pelny||"";
-  const tel  = rec.telefon||"";
-  const email = rec.email||"";
-  const subj_cli = `Internet światłowodowy - The Network - ${adres}, ${miasto}`;
-  return {
-    INV: {
-      to: "inwestycje@internetunion.pl",
-      subject: `Zapytanie o wycenę - ${miasto} - ${adres} - SIDUSIS`,
-      body:
-`Proszę o wycenę podłączenia klienta:
-Nazwa: ${nazwa}
-Miasto: ${miasto}
-Adres: ${adres}
-Telefon: ${tel}
-E-mail: ${email}
-`
-    },
-    CLI: {
-      to: email,
-      subject: subj_cli,
-      body:
-`Dzień dobry ${nazwa},
-
-Serdecznie dziękujemy za przesłanie zgłoszenia za pośrednictwem platformy SIDUSIS.
-
-Informujemy, że zapytanie dotyczące możliwości podłączenia Internetu w lokalizacji ${adres} zostało przekazane do Działu Inwestycji celem przygotowania indywidualnej wyceny.
-
-Odpowiedź prześlę nie później niż w ciągu 3 dni roboczych.
-
-W przypadku jakichkolwiek pytań – pozostaję do dyspozycji.
-
-Z wyrazami szacunku,
-`
-    },
-    STD: {
-      to: email,
-      subject: subj_cli,
-      body:
-`Dzień dobry,
-
-W odpowiedzi na przesłane zapytanie poniżej przesyłam ofertę na podłączenie Prywatnego Światłowodu The Network:
-
-Jednorazowy koszt instalacji wynosi 2500 zł (możliwość rozłożenia na 10 równych płatności po 250 zł)
-- Płatność po uruchomieniu usługi - Brak zaliczki / przedpłaty.
-
-Abonament miesięczny zależny jest od prędkości łącza:
-300/300Mbs - 125 zł
-1000/1000Mbs - 150 zł
-TV 82 - 10 zł (Telewizja po łączu internetowym)
-TV 177 – 69 zł (Telewizja po łączu internetowym)
-lista kanałów: https://thenetwork.pl/telewizja/
-
-- Światłowód wprowadzany jest do pierwszego możliwego punktu w domu,
-- W miejscu, do którego zostanie doprowadzony światłowód niezbędne jest zasilanie dla urządzenia optycznego ONU.
-- Infrastruktura wewnętrzna / w tym urządzenie Wi-Fi / pozostaje w gestii właściciela posesji.
-Umowa zawierana jest na 24 miesiące.
-
-W przypadku akceptacji warunków proszę o uzupełnienie poniższych danych celem przygotowania umowy.
-
-Nazwisko i Imię: ..............................
-Adres: ...........................
-PESEL: .................
-E-mail: ......................
-Tel.: ........................
-Pakiet TV: ...................
-Prędkość: ...................
-
-Jakie są następne kroki?
-
-Po otrzymaniu danych przygotujemy umowę on-line, która zostanie wysłana w oddzielnej wiadomości.
-Następnie po zaakceptowaniu umowy Zostaną Państwo wpisani na listę do realizacji dla wykonawcy. 
-Po wykonaniu przyłącza domowego oraz połączeniu go z główną magistralą Biuro Obsługi Klienta kontaktuje się z Państwem celem ustalenia dogodnego terminu uruchomienia usługi.
-
-Ostatni etap to wizyta technika, podczas której zostaje uruchomiona usługa. 
-Po tej wizycie w Panelu Klienta pojawi się pierwsza faktura.
-
-W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
-`
-    },
-    DEV: {
-      to: email,
-      subject: subj_cli,
-      body:
-`Dzień dobry,
-
-W odpowiedzi na przesłane zapytanie poniżej przesyłam ofertę na podłączenie Prywatnego Światłowodu The Network:
-
-Jednorazowy koszt instalacji wynosi 1 zł
-
-Abonament miesięczny zależny jest od prędkości łącza:
-300/300Mbs - 89 zł
-1000/1000Mbs - 114 zł
-TV 82 - 10 zł (Telewizja po łączu internetowym)
-TV 177 – 69 zł (Telewizja po łączu internetowym)
-lista kanałów: https://thenetwork.pl/telewizja/
-
-- Światłowód wprowadzany jest do pierwszego możliwego punktu w domu,
-- W miejscu, do którego zostanie doprowadzony światłowód niezbędne jest zasilanie dla urządzenia optycznego ONU.
-- Infrastruktura wewnętrzna / w tym urządzenie Wi-Fi / pozostaje w gestii właściciela posesji.
-Umowa zawierana jest na 24 miesiące.
-
-W przypadku akceptacji warunków proszę o uzupełnienie poniższych danych celem przygotowania umowy.
-
-Nazwisko i Imię: ..............................
-Adres: ...........................
-PESEL: .................
-E-mail: ......................
-Tel.: ........................
-Pakiet TV: ...................
-Prędkość: ...................
-
-Jakie są następne kroki?
-
-Biuro Obsługi Klienta przygotowuje umowę on-line, która zostanie wysłana w oddzielnej wiadomości.
-Następnie po zaakceptowaniu umowy Biuro Obsługi Klienta kontaktuje się z Państwem celem ustalenia dogodnego terminu uruchomienia usługi.
-
-Ostatni etap to wizyta technika, podczas której zostaje uruchomiona usługa. 
-Po tej wizycie w Panelu Klienta pojawi się pierwsza faktura.
-
-W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
-`
-    }
-  };
-}
-function composeAndSend(to, subject, body){
-  const base = "mailto:"+encodeURIComponent(to||"")+"?subject="+encodeURIComponent(subject||"");
-  const full = base + "&body=" + encodeURIComponent(body||"");
-  if(full.length <= 1500){
-    window.location.href = full;
-  } else if(navigator.clipboard?.writeText){
-    navigator.clipboard.writeText(body||"").then(()=>{ window.location.href = base; alert("Treść zbyt długa – skopiowano do schowka. Wklej w oknie poczty (Ctrl+V)."); });
-  } else {
-    window.location.href = base;
-    alert("Treść zbyt długa – wklej ręcznie.");
+  function fitToData(){
+    const pts=rows.filter(r=>isFinite(r.lat)&&isFinite(r.lon));
+    if(!pts.length){ map.setView([52,19],6); return; }
+    const fg=L.featureGroup(pts.map(p=>L.circleMarker([p.lat,p.lon])));
+    map.fitBounds(fg.getBounds().pad(0.2));
   }
-}
+  function renderLegend(){
+    const box=$("#legend"); let html="";
+    html+=`<div class="title">PH (kolor wypełnienia)</div>`;
+    for(const ph of PH_LIST){ const col=PH_COLOR_MAP[ph]||DEFAULT_PH_COLOR; html+=`<div><span class="pill" style="background:${col}"></span>${esc(ph)}</div>`; }
+    html+=`<div style="margin:6px 0;border-top:1px solid #ddd"></div>`;
+    html+=`<div class="title">Status (kolor obrysu)</div>`;
+    for(const [st,col] of Object.entries(STATUS_COLOR_MAP)){ html+=`<div><span class="pill status-pill" style="background:${col};border-color:${col}"></span>${esc(st)}</div>`; }
+    box.innerHTML=html;
+  }
+  function buildPopup(rec){
+    const phOpts = ['<option value="">(brak)</option>'].concat(PH_LIST.map(ph=>`<option ${ph===rec.PH?'selected':''}>${esc(ph)}</option>`)).join("");
+    const stOpts = ['<option value="">(brak)</option>'].concat(STATUS_LIST.map(st=>`<option ${st===rec.Status?'selected':''}>${esc(st)}</option>`)).join("");
 
-/* =========================== MAPA =========================== */
-function initMap(){
-  if(map) map.remove();
-  map=L.map('map');
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
-  map.createPane('points'); map.getPane('points').style.zIndex = 650;
-  renderer = L.canvas({ padding:0.5 });
-  layer=L.layerGroup([], {pane:'points'}).addTo(map);
-}
-function fitToData(){
-  const pts=rows.filter(r=>isFinite(r.lat)&&isFinite(r.lon));
-  if(!pts.length){ map.setView([52,19],6); return; }
-  const fg=L.featureGroup(pts.map(p=>L.circleMarker([p.lat,p.lon])));
-  map.fitBounds(fg.getBounds().pad(0.2));
-}
-function renderLegend(){
-  const box=$("#legend"); let html="";
-  html+=`<div class="title">PH (kolor wypełnienia)</div>`;
-  for(const ph of PH_LIST){ const col=PH_COLOR_MAP[ph]||DEFAULT_PH_COLOR; html+=`<div><span class="pill" style="background:${col}"></span>${esc(ph)}</div>`; }
-  html+=`<div style="margin:6px 0;border-top:1px solid #ddd"></div>`;
-  html+=`<div class="title">Status (kolor obrysu)</div>`;
-  for(const [st,col] of Object.entries(STATUS_COLOR_MAP)){ html+=`<div><span class="pill status-pill" style="background:${col};border-color:${col}"></span>${esc(st)}</div>`; }
-  box.innerHTML=html;
-}
-function buildPopup(rec){
-  const phOpts = ['<option value="">(brak)</option>'].concat(PH_LIST.map(ph=>`<option ${ph===rec.PH?'selected':''}>${esc(ph)}</option>`)).join("");
-  const stOpts = ['<option value="">(brak)</option>'].concat(STATUS_LIST.map(st=>`<option ${st===rec.Status?'selected':''}>${esc(st)}</option>`)).join("");
+    const actions=`
+      <div class="actions" style="margin-top:8px">
+        <a href="#" data-mail="INV">📩 Wyślij prośbę o wycenę (Inwestycje)</a>
+        <a href="#" data-mail="CLI">✉️ Wyślij wiadomość do klienta</a>
+        <a href="#" data-mail="STD">📄 Wyślij standardową ofertę</a>
+        <a href="#" data-mail="DEV">🏗️ Wyślij ofertę deweloperską</a>
+        <a href="tel:${encodeURIComponent(rec.telefon||'')}">📞 Zadzwoń do klienta</a>
+      </div>`;
 
-  const actions=`
-    <div class="actions" style="margin-top:8px">
-      <a href="#" data-mail="INV">📩 Wyślij prośbę o wycenę (Inwestycje)</a>
-      <a href="#" data-mail="CLI">✉️ Wyślij wiadomość do klienta</a>
-      <a href="#" data-mail="STD">📄 Wyślij standardową ofertę</a>
-      <a href="#" data-mail="DEV">🏗️ Wyślij ofertę deweloperską</a>
-      <a href="tel:${encodeURIComponent(rec.telefon||'')}">📞 Zadzwoń do klienta</a>
+    return `<div class="popup">
+      <h4>${esc(rec.nazwa||'')}</h4>
+      ${esc(rec.adres_pelny||'')}<br/>
+      <div class="meta"><b>Email:</b> ${esc(rec.email||'')} &nbsp; <b>Telefon:</b> ${esc(rec.telefon||'')}</div>
+
+      <div class="row">
+        <label>PH:</label>
+        <select id="phSel">${phOpts}</select>
+        <label>Status:</label>
+        <select id="stSel">${stOpts}</select>
+        <button id="savePHST">Zapisz</button>
+      </div>
+
+      <div class="meta"><b>Aktualnie:</b> PH = <b>${esc(rec.PH||'-')}</b>, Status = <b>${esc(rec.Status||'-')}</b></div>
+      ${actions}
     </div>`;
-
-  return `<div class="popup">
-    <h4>${esc(rec.nazwa||'')}</h4>
-    ${esc(rec.adres_pelny||'')}<br/>
-    <div class="meta"><b>Email:</b> ${esc(rec.email||'')} &nbsp; <b>Telefon:</b> ${esc(rec.telefon||'')}</div>
-
-    <div class="row">
-      <label>PH:</label>
-      <select id="phSel">${phOpts}</select>
-      <label>Status:</label>
-      <select id="stSel">${stOpts}</select>
-      <button id="savePHST">Zapisz</button>
-    </div>
-
-    <div class="meta"><b>Aktualnie:</b> PH = <b>${esc(rec.PH||'-')}</b>, Status = <b>${esc(rec.Status||'-')}</b></div>
-    ${actions}
-  </div>`;
-}
-async function savePhStatus(rec, newPH, newStatus){
-  // pobierz UsedRange, sprawdź/utwórz kolumny, znajdź adres_pelny i zapisz
-  const used = await usedRange(CONFIG.dataSheet);
-  const vals = used.values || [];
-  const headers = (vals[0]||[]).map(h=>String(h||"").trim());
-  const body = vals.slice(1);
-  const idxAdres = findIdx(headers, "adres_pelny");
-  if(idxAdres<0) throw new Error("W arkuszu „Dane” brak kolumny 'adres_pelny'.");
-
-  // zapewnij kolumny PH/Status
-  let idxPH = headers.findIndex(h=>String(h).toLowerCase().trim()==="ph");
-  if(idxPH<0){ idxPH = headers.length; headers.push("PH"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
-  let idxST = headers.findIndex(h=>String(h).toLowerCase().trim()==="status");
-  if(idxST<0){ idxST = headers.length; headers.push("Status"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
-
-  // znajdź wiersz po dokładnym adres_pelny
-  let row1=-1, oldPH="", oldST="";
-  for(let r=0; r<body.length; r++){
-    const row = body[r]||[];
-    const adr = String(row[idxAdres]||"").trim();
-    if(adr && adr===String(rec.adres_pelny||"").trim()){
-      row1 = r+2; // offset o nagłówek
-      oldPH = String(row[idxPH]||"");
-      oldST = String(row[idxST]||"");
-      break;
-    }
   }
-  if(row1<0) throw new Error("Nie znaleziono pozycji w Excelu (adres_pelny).");
-
-  // zapis zmian
-  await writeCell(CONFIG.dataSheet, row1, idxPH+1, newPH||"");  // kolumny 1-index
-  await writeCell(CONFIG.dataSheet, row1, idxST+1, newStatus||"");
-
-  // log
-  const now = new Date().toISOString();
-  const upn = (account && (account.username||account.homeAccountId)) || "";
-  await appendLog([ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}`, "" ]);
-}
-
-function addOnePoint(rec){
-  const marker = L.circleMarker([rec.lat,rec.lon],{
-    renderer, pane:'points',
-    radius:9, color: STATUS_COLOR_MAP[(rec.Status||"").trim()] || DEFAULT_STATUS_COLOR,
-    weight:3, fill:true, fillColor: PH_COLOR_MAP[(rec.PH||"").trim()] || DEFAULT_PH_COLOR, fillOpacity:1
-  });
-
-  marker.bindPopup(buildPopup(rec));
-  marker.on('popupopen', e=>{
-    const el=e.popup.getElement()?.querySelector('.leaflet-popup-content');
-    if(!el) return;
-
-    el.querySelector('#savePHST')?.addEventListener('click', async ()=>{
-      const ph = el.querySelector('#phSel')?.value || "";
-      const st = el.querySelector('#stSel')?.value || "";
-      try{
-        setStatus("Zapis do Excela…");
-        await savePhStatus(rec, ph, st);
-        rec.PH = ph; rec.Status = st;
-        marker.setStyle({
-          fillColor: PH_COLOR_MAP[(rec.PH||"").trim()] || DEFAULT_PH_COLOR,
-          color: STATUS_COLOR_MAP[(rec.Status||"").trim()] || DEFAULT_STATUS_COLOR
-        });
-        marker.setPopupContent(buildPopup(rec));
-        marker.openPopup();
-        setStatus("Zapisano.");
-      }catch(err){
-        console.error(err);
-        showError("Błąd zapisu: " + err.message);
-        setStatus("Błąd zapisu.");
-      }
+  function addOnePoint(rec){
+    const marker = L.circleMarker([rec.lat,rec.lon],{
+      renderer, pane:'points',
+      radius:9, color: STATUS_COLOR_MAP[(rec.Status||"").trim()] || DEFAULT_STATUS_COLOR,
+      weight:3, fill:true, fillColor: PH_COLOR_MAP[(rec.PH||"").trim()] || DEFAULT_PH_COLOR, fillOpacity:1
     });
 
-    el.querySelectorAll('a[data-mail]').forEach(a=>{
-      a.addEventListener('click', ev=>{
-        ev.preventDefault();
-        const kind=a.getAttribute('data-mail');
-        const t=mailTemplates(rec)[kind];
-        composeAndSend(t.to, t.subject, t.body);
+    marker.bindPopup(buildPopup(rec));
+    marker.on('popupopen', e=>{
+      const el=e.popup.getElement()?.querySelector('.leaflet-popup-content');
+      if(!el) return;
+
+      el.querySelector('#savePHST')?.addEventListener('click', async ()=>{
+        const ph = el.querySelector('#phSel')?.value || "";
+        const st = el.querySelector('#stSel')?.value || "";
+        try{
+          setStatus("Zapis do Excela…");
+          await savePhStatus(rec, ph, st);
+          rec.PH = ph; rec.Status = st;
+          marker.setStyle({
+            fillColor: PH_COLOR_MAP[(rec.PH||"").trim()] || DEFAULT_PH_COLOR,
+            color: STATUS_COLOR_MAP[(rec.Status||"").trim()] || DEFAULT_STATUS_COLOR
+          });
+          marker.setPopupContent(buildPopup(rec));
+          marker.openPopup();
+          setStatus("Zapisano.");
+        }catch(err){
+          console.error(err);
+          showError("Błąd zapisu: " + err.message);
+          setStatus("Błąd zapisu.");
+        }
+      });
+
+      el.querySelectorAll('a[data-mail]').forEach(a=>{
+        a.addEventListener('click', ev=>{
+          ev.preventDefault();
+          const kind=a.getAttribute('data-mail');
+          const t=mailTemplates(rec)[kind];
+          composeAndSend(t.to, t.subject, t.body);
+        });
       });
     });
-  });
 
-  layer.addLayer(marker);
-}
-function rebuild(){
-  initMap(); renderLegend();
-  let placed=0;
-  rows.forEach(rec=>{
-    if(!isFinite(rec.lat)||!isFinite(rec.lon)) return;
-    try{ addOnePoint(rec); placed++; }catch(err){ console.error("Render error for",rec,err); }
-  });
-  fitToData();
-  const sample = rows.slice(0,2).map(r=>`(${r.lat.toFixed(5)}, ${r.lon.toFixed(5)})`).join(" ; ");
-  const txt=statusbar.textContent + `\nUmieszczono na mapie: ${placed}\nPrzykładowe współrzędne: ${sample||"—"}`;
-  setStatus(txt);
-}
-
-/* =========================== UI =========================== */
-$("#btnLogin").addEventListener('click', async ()=>{
-  try{ await ensureLogin(); setStatus("Zalogowano."); }catch(err){ showError("Logowanie nieudane: " + err.message); }
-});
-$("#btnLogout").addEventListener('click', async ()=>{
-  try{
-    const acc = msalApp.getAllAccounts()[0];
-    if(acc){ await msalApp.logoutPopup({ account: acc }); }
-    account=null; who.textContent=""; setStatus("Wylogowano.");
-  }catch(err){ showError("Wylogowanie nieudane: " + err.message); }
-});
-$("#btnReload").addEventListener('click', async ()=>{
-  try{
-    await ensureLogin();
-    await getSiteId();
-    await getFileItemId();
-    await loadDataFromExcel();
-    rebuild();
-  }catch(err){
-    console.error(err);
-    showError(err.message);
+    layer.addLayer(marker);
   }
-});
+  function rebuild(){
+    initMap(); renderLegend();
+    let placed=0;
+    rows.forEach(rec=>{
+      if(!isFinite(rec.lat)||!isFinite(rec.lon)) return;
+      try{ addOnePoint(rec); placed++; }catch(err){ console.error("Render error for",rec,err); }
+    });
+    fitToData();
+    const sample = rows.slice(0,2).map(r=>`(${r.lat.toFixed(5)}, ${r.lon.toFixed(5)})`).join(" ; ");
+    const txt=statusbar.textContent + `\nUmieszczono na mapie: ${placed}\nPrzykładowe współrzędne: ${sample||"—"}`;
+    setStatus(txt);
+  }
 
-/* =========================== START =========================== */
-initMap(); renderLegend(); setStatus("Kliknij „Zaloguj”, a potem „Odśwież dane z Excela”.");
-/* obsługa redirectów MSAL */
-msalApp.handleRedirectPromise().then(()=>{}).catch(e=>console.warn(e));
+  /* =========================== MAILE =========================== */
+  function mailTemplates(rec){
+    const nazwa = rec.nazwa||"";
+    const miasto = rec.miejscowosc||"";
+    const adres = rec.adres_pelny||"";
+    const tel  = rec.telefon||"";
+    const email = rec.email||"";
+    const subj_cli = `Internet światłowodowy - The Network - ${adres}, ${miasto}`;
+    return {
+      INV: { to:"inwestycje@internetunion.pl", subject:`Zapytanie o wycenę - ${miasto} - ${adres} - SIDUSIS`,
+        body:`Proszę o wycenę podłączenia klienta:\nNazwa: ${nazwa}\nMiasto: ${miasto}\nAdres: ${adres}\nTelefon: ${tel}\nE-mail: ${email}\n` },
+      CLI: { to:email, subject:subj_cli,
+        body:`Dzień dobry ${nazwa},\n\nSerdecznie dziękujemy...` },
+      STD: { to:email, subject:subj_cli,
+        body:`Dzień dobry,\n\nW odpowiedzi na przesłane zapytanie...` },
+      DEV: { to:email, subject:subj_cli,
+        body:`Dzień dobry,\n\nW odpowiedzi na przesłane zapytanie...` }
+    };
+  }
+  function composeAndSend(to, subject, body){
+    const base = "mailto:"+encodeURIComponent(to||"")+"?subject="+encodeURIComponent(subject||"");
+    const full = base + "&body=" + encodeURIComponent(body||"");
+    if(full.length <= 1500){
+      window.location.href = full;
+    } else if(navigator.clipboard?.writeText){
+      navigator.clipboard.writeText(body||"").then(()=>{ window.location.href = base; alert("Treść zbyt długa – skopiowano do schowka. Wklej w oknie poczty (Ctrl+V)."); });
+    } else {
+      window.location.href = base;
+      alert("Treść zbyt długa – wklej ręcznie.");
+    }
+  }
+
+  /* =========================== ZAŁADUJ MSAL (z fallbackiem) =========================== */
+  try {
+    await loadScriptSequential(MSAL_CDNS);
+  } catch (e) {
+    alert('Nie udało się załadować msal-browser (alcdn/jsDelivr/unpkg). Skontaktuj się z DT, aby odblokować co najmniej jedno z tych CDN.');
+    console.error(e);
+    return;
+  }
+  if (typeof msal === 'undefined' || !msal.PublicClientApplication) {
+    alert('MSAL nie jest dostępny w przeglądarce.');
+    return;
+  }
+
+  /* =========================== MSAL / GRAPH =========================== */
+  const msalApp = new msal.PublicClientApplication({
+    auth: {
+      clientId: CONFIG.clientId,
+      authority: "https://login.microsoftonline.com/" + CONFIG.tenantId,
+      // Uwaga: to *musi* dokładnie odpowiadać wpisowi w Entra ID (Redirect URIs dla SPA)
+      redirectUri: window.location.origin + window.location.pathname
+    },
+    cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false }
+  });
+  const graphScopes = ["openid","profile","offline_access","Files.ReadWrite.All","Sites.Read.All"];
+
+  async function ensureLogin(){
+    const accs = msalApp.getAllAccounts();
+    if(accs.length){ account=accs[0]; who.textContent = "Zalogowano: " + (account.username||account.homeAccountId); return; }
+    const r = await msalApp.loginPopup({ scopes: graphScopes });
+    account = r.account; who.textContent = "Zalogowano: " + (account.username||account.homeAccountId);
+  }
+  async function getToken(){
+    await ensureLogin();
+    try{
+      const r=await msalApp.acquireTokenSilent({ scopes: graphScopes, account });
+      return r.accessToken;
+    }catch{
+      const r=await msalApp.acquireTokenPopup({ scopes: graphScopes });
+      return r.accessToken;
+    }
+  }
+  async function gfetch(method, url, body){
+    const token = await getToken();
+    const resp = await fetch(url, {
+      method,
+      headers: {
+        "Authorization":"Bearer " + token,
+        "Accept":"application/json",
+        "Content-Type":"application/json"
+      },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    if(!resp.ok){
+      const txt=await resp.text().catch(()=>String(resp.status));
+      throw new Error(`${method} ${url} -> ${resp.status} ${txt}`);
+    }
+    return resp.status===204 ? null : resp.json();
+  }
+  async function getSiteId(){
+    if(siteId) return siteId;
+    const url = `https://graph.microsoft.com/v1.0/sites/${CONFIG.spHost}:/sites/${CONFIG.spSitePath}`;
+    const js = await gfetch("GET", url);
+    siteId = js.id; return siteId;
+  }
+  async function getFileItemId(){
+    if(fileId) return fileId;
+    const sid = await getSiteId();
+    const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/root:${encodeURI(CONFIG.filePath)}`;
+    const js = await gfetch("GET", url);
+    fileId = js.id; return fileId;
+  }
+  async function usedRange(wsName){
+    const id = await getFileItemId();
+    const wsq = wsName.replace(/'/g,"''");
+    const url = `https://graph.microsoft.com/v1.0/drive/items/${id}/workbook/worksheets('${wsq}')/usedRange(valuesOnly=true)`;
+    return gfetch("GET", url);
+  }
+  async function patchRange(wsName, a1, values2d){
+    const id = await getFileItemId();
+    const wsq = wsName.replace(/'/g,"''");
+    const url = `https://graph.microsoft.com/v1.0/drive/items/${id}/workbook/worksheets('${wsq}')/range(address='${a1}')`;
+    return gfetch("PATCH", url, { values: values2d });
+  }
+  async function writeCell(wsName, row1, col1, value){
+    const a1 = colLetter(col1) + row1;
+    return patchRange(wsName, a1, [[ value ]]);
+  }
+  async function appendLog(row){
+    const used = await usedRange(CONFIG.logSheet);
+    const rowsV = used.values || [];
+    const next = rowsV.length + 1;
+    const cols = Math.max(row.length, (rowsV[0]||[]).length || row.length);
+    const a1 = `A${next}:${colLetter(cols)}${next}`;
+    return patchRange(CONFIG.logSheet, a1, [row]);
+  }
+
+  function pickHeader(headers, tokens){
+    const lc=headers.map(h=>String(h||"").toLowerCase());
+    for(const t of tokens){
+      const i = lc.findIndex(n=>n.includes(t));
+      if(i>=0) return headers[i];
+    }
+    return null;
+  }
+  function parseRows(values){
+    if(!values || !values.length) return [];
+    const headers = (values[0]||[]).map(h=>String(h||"").trim());
+    const body = values.slice(1);
+
+    const H = {
+      lat:  pickHeader(headers,["lat","latitude","szerokość","szerokosc"]),
+      lon:  pickHeader(headers,["lon","longitude","długość","dlugosc"]),
+      tel:  pickHeader(headers,["telefon","tel"]),
+      mail: pickHeader(headers,["email","e-mail","mail"]),
+      ph:   pickHeader(headers,["ph"]),
+      st:   pickHeader(headers,["status"]),
+      ulica:pickHeader(headers,["ulica","adres"]),
+      nr:   pickHeader(headers,["nr budynku","numer","nr","nr domu"]),
+      msc:  pickHeader(headers,["miejscowość","miejscowosc","miasto"]),
+      nazwa:pickHeader(headers,["zgłaszający","zglaszajacy","nazwa","imię","imie","nazwisko","klient","firma"]),
+      adresPelny: pickHeader(headers,["adres_pelny","adres pełny","adres pelny"]),
+    };
+    const get = (r, col) => { const idx=headers.indexOf(col); return idx>=0 ? r[idx] : ""; };
+
+    let out = body.map(r=>{
+      let lat = toNum(get(r,H.lat));
+      let lon = toNum(get(r,H.lon));
+      let adr = get(r,H.adresPelny) || "";
+      if(!adr){
+        const u=String(get(r,H.ulica)||"").trim();
+        const n=String(get(r,H.nr)||"").trim();
+        const m=String(get(r,H.msc)||"").trim();
+        adr = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
+      }
+      return {
+        lat, lon, adres_pelny: adr||"",
+        PH: String(get(r,H.ph)||""),
+        Status: String(get(r,H.st)||""),
+        telefon: String(get(r,H.tel)||""),
+        email: String(get(r,H.mail)||""),
+        nazwa: String(get(r,H.nazwa)||""),
+        miejscowosc: String(get(r,H.msc)||""),
+      };
+    });
+
+    const validLat=v=>isFinite(v)&&v>=-90&&v<=90;
+    const validLon=v=>isFinite(v)&&v>=-180&&v<=180;
+    const okNormal = out.filter(o=>validLat(o.lat)&&validLon(o.lon)).length;
+    const okSwapped= out.filter(o=>validLat(o.lon)&&validLon(o.lat)).length;
+    if(okSwapped>okNormal){ out = out.map(o=>({ ...o, lat:o.lon, lon:o.lat })); }
+    out = out.filter(o=>validLat(o.lat)&&validLon(o.lon));
+    return out;
+  }
+  async function loadDataFromExcel(){
+    setStatus("Ładowanie danych z Excela (Graph)…");
+    const used = await usedRange(CONFIG.dataSheet);
+    const values = used.values || [];
+    if(!values.length){ setStatus("Arkusz pusty."); rows=[]; return; }
+    rows = parseRows(values);
+    setStatus(`Załadowano ${rows.length} wierszy z arkusza „${CONFIG.dataSheet}”.`);
+  }
+  async function savePhStatus(rec, newPH, newStatus){
+    const used = await usedRange(CONFIG.dataSheet);
+    const vals = used.values || [];
+    const headers = (vals[0]||[]).map(h=>String(h||"").trim());
+    const body = vals.slice(1);
+    const idxAdres = findIdx(headers, "adres_pelny");
+    if(idxAdres<0) throw new Error("W arkuszu „Dane” brak kolumny 'adres_pelny'.");
+
+    let idxPH = headers.findIndex(h=>String(h).toLowerCase().trim()==="ph");
+    if(idxPH<0){ idxPH = headers.length; headers.push("PH"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+    let idxST = headers.findIndex(h=>String(h).toLowerCase().trim()==="status");
+    if(idxST<0){ idxST = headers.length; headers.push("Status"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+
+    let row1=-1, oldPH="", oldST="";
+    for(let r=0; r<body.length; r++){
+      const row = body[r]||[];
+      const adr = String(row[idxAdres]||"").trim();
+      if(adr && adr===String(rec.adres_pelny||"").trim()){
+        row1 = r+2; oldPH = String(row[idxPH]||""); oldST = String(row[idxST]||""); break;
+      }
+    }
+    if(row1<0) throw new Error("Nie znaleziono pozycji w Excelu (adres_pelny).");
+
+    await writeCell(CONFIG.dataSheet, row1, idxPH+1, newPH||"");
+    await writeCell(CONFIG.dataSheet, row1, idxST+1, newStatus||"");
+
+    const now = new Date().toISOString();
+    const upn = (account && (account.username||account.homeAccountId)) || "";
+    await appendLog([ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}`, "" ]);
+  }
+
+  /* =========================== UI: przyciski =========================== */
+  $("#btnLogin").addEventListener('click', async ()=>{
+    try{ await ensureLogin(); setStatus("Zalogowano."); }catch(err){ showError("Logowanie nieudane: " + err.message); }
+  });
+  $("#btnLogout").addEventListener('click', async ()=>{
+    try{
+      const acc = msalApp.getAllAccounts()[0];
+      if(acc){ await msalApp.logoutPopup({ account: acc }); }
+      account=null; who.textContent=""; setStatus("Wylogowano.");
+    }catch(err){ showError("Wylogowanie nieudane: " + err.message); }
+  });
+  $("#btnReload").addEventListener('click', async ()=>{
+    try{
+      await ensureLogin();
+      await getSiteId();
+      await getFileItemId();
+      await loadDataFromExcel();
+      rebuild();
+    }catch(err){ console.error(err); showError(err.message); }
+  });
+
+  /* =========================== START =========================== */
+  initMap(); renderLegend(); setStatus("Kliknij „Zaloguj”, a potem „Odśwież dane z Excelem”.");
+  msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e));
+})();
 </script>
 </body>
 </html>
