@@ -269,30 +269,28 @@ function mailTemplates(rec){
   // ujednolić początek: "ul" / "UL" -> "ul. "
   adres = adres.replace(/^\s*ul\b\.?/i, "ul. ");
 
-  // 2) Jeśli miasto już jest na końcu adresu, nie dopisuj go drugi raz
+// 2) Jeśli miasto już jest na końcu adresu – wykryj to
   const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const cityAtEnd = miasto
-    ? new RegExp(`(?:,\\s*)?\\b${reEsc(miasto)}\\b$`, "i")
-    : null;
+  const reCityAtEnd = miasto ? new RegExp(`(?:,\\s*)?\\b${reEsc(miasto)}\\b$`, "i") : null;
+  const hasCityAtEnd = miasto && reCityAtEnd.test(adres);
 
-  // wersja do tematu/wiersza "Adres:" bez powtórzonego miasta
-  const adresBezMiasta = miasto && cityAtEnd.test(adres)
-    ? adres.replace(cityAtEnd, "").replace(/,\s*$/,"").trim()
+  // Adres bez miasta (do wiersza "Adres:" w treści)
+  const adresBezMiasta = hasCityAtEnd
+    ? adres.replace(reCityAtEnd, "").replace(/,\s*$/,"").trim()
     : adres;
 
-  // Do tematu: adres + ewentualnie ", miasto" gdy brakuje go w adresie
-  const cityPartForSubject = miasto && !cityAtEnd?.test(adres) ? `, ${miasto}` : "";
+  // Adres z miastem (do tematów i akapitów opisowych)
+  const adresZMiastem = hasCityAtEnd
+    ? adres
+    : (miasto ? `${adres}, ${miasto}` : adres);
 
-  // Tematy
-  const subj_inv = `Zapytanie o wycenę - ${adresBezMiasta}${cityPartForSubject} - SIDUSIS`;
-  const subj_cli = `Internet światłowodowy - The Network - ${adresBezMiasta}${cityPartForSubject}`;
+  // Tematy – zawsze pokazujemy adres razem z miastem (tylko raz)
+  const subj_inv = `Zapytanie o wycenę - ${adresZMiastem} - SIDUSIS`;
+  const subj_cli = `Internet światłowodowy - The Network - ${adresZMiastem}`;
   const subj_std = subj_cli;
   const subj_dev = subj_cli;
 
-  // Treści
-  const tel   = rec.telefon || "";
-  const email = rec.email || "";
-
+  // Treści (w tekście informacyjnym używamy adresu z miastem, w polu "Adres:" bez miasta)
   const body_inv =
 `Proszę o wycenę podłączenia klienta:
 Nazwa: ${nazwa}
