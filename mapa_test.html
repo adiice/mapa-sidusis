@@ -504,14 +504,57 @@ async function patchRange(wsName, a1, values2d){
     const a1 = colLetter(col1) + row1;
     return patchRange(wsName, a1, [[ value ]]);
   }
-  async function appendLog(row){
-    const used = await usedRange(CONFIG.logSheet);
-    const rowsV = used.values || [];
-    const next = rowsV.length + 1;
-    const cols = Math.max(row.length, (rowsV[0]||[]).length || row.length);
-    const a1 = `A${next}:${colLetter(cols)}${next}`;
-    return patchRange(CONFIG.logSheet, a1, [row]);
+  
+  const AUDIT_HEADERS = ["ts","user","action","itemId","adres_pelny","old","new","note"];
+  const AUDIT_TABLE_NAME = "AuditLogTbl";
+
+async function ensureAuditHeaders(){
+  // dopisz nagłówki jeśli puste lub brakujące
+  const used = await usedRange(CONFIG.logSheet);
+  const have = (used.values && used.values[0]) ? used.values[0] : [];
+  const needHeaders = AUDIT_HEADERS.some((h,i)=> (have[i]||"").toString().trim() !== h);
+  if (needHeaders){
+    const a1 = `A1:${colLetter(AUDIT_HEADERS.length)}1`;
+    await patchRange(CONFIG.logSheet, a1, [AUDIT_HEADERS]);
   }
+}
+
+async function ensureAuditTable(){
+  const id = await getFileItemId();
+
+  // czy jest już jakaś tabela o tej nazwie?
+  const list = await gfetch("GET", `https://graph.microsoft.com/v1.0/drive/items/${id}/workbook/tables?$select=id,name`);
+  let tbl = (list.value||[]).find(t => (t.name||"") === AUDIT_TABLE_NAME);
+
+  if (!tbl){
+    await ensureAuditHeaders();
+    // utwórz tabelę na nagłówkach (A1:H1) – Excel sam rozszerzy na kolejne wiersze
+    const created = await gfetch("POST",
+      `https://graph.microsoft.com/v1.0/drive/items/${id}/workbook/tables/add`,
+      { address: `${CONFIG.logSheet}!A1:${colLetter(AUDIT_HEADERS.length)}1`, hasHeaders: true }
+    );
+    // nazwa tabeli (łatwo znaleźć później)
+    try {
+      await gfetch("PATCH",
+        `https://graph.microsoft.com/v1.0/drive/items/${id}/workbook/tables/${created.id}`,
+        { name: AUDIT_TABLE_NAME }
+      );
+      tbl = { id: created.id, name: AUDIT_TABLE_NAME };
+    } catch {
+      tbl = created; // nawet jeśli nie da się zmienić nazwy, mamy id
+    }
+  }
+  return tbl.id;
+}
+
+  async function appendLog(row){
+  // row: [ts, user, action, itemId, adres_pelny, old, new, note]
+  const tblId = await ensureAuditTable();
+  await gfetch("POST",
+    `https://graph.microsoft.com/v1.0/drive/items/${await getFileItemId()}/workbook/tables/${tblId}/rows/add`,
+    { values: [row] }
+  );
+}
 
   function pickHeader(headers, tokens){
     const lc=headers.map(h=>String(h||"").toLowerCase());
