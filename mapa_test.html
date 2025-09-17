@@ -256,7 +256,7 @@ const near = (a,b,tol=1e-5) => isFinite(a)&&isFinite(b)&&Math.abs(a-b)<=tol;
     setStatus(txt);
   }
 
-<script>
+
 // =========================== MAILE ===========================
 function mailTemplates(rec){
   const nazwa  = rec.nazwa || "";
@@ -381,7 +381,6 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     DEV: { to: email, subject: subj_dev, body: body_dev }
   };
 }
-</script>
 
   function composeAndSend(to, subject, body){
     const base = "mailto:"+encodeURIComponent(to||"")+"?subject="+encodeURIComponent(subject||"");
