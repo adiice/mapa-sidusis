@@ -2,52 +2,55 @@
 <html lang="pl">
 <head>
 <meta charset="utf-8" />
-<title>SIDUSIS – Dashboard KPI</title>
+<title>SIDUSIS – Dashboard KPI (ONLINE)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
 <style>
-  :root{
-    --card-bg:#fff; --card-br:#e5e7eb; --muted:#6b7280; --ink:#111827; --accent:#374151;
-  }
-  html,body{margin:0;padding:0;font-family:system-ui, Segoe UI, Roboto, Arial;background:#f3f4f6;color:var(--ink)}
-  .wrap{max-width:1200px;margin:32px auto;padding:0 16px}
-  h1{font-size:20px;margin:0 0 16px}
-  .bar{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:16px}
-  .bar .f{display:flex;flex-direction:column}
-  .bar input,.bar select{padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font:inherit;background:#fff}
-  .bar button{padding:9px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#eef2ff;cursor:pointer}
-  .status{margin-top:10px;font-size:12px;color:var(--muted)}
-  .cards{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:12px;margin:18px 0}
-  .card{background:var(--card-bg);border:1px solid var(--card-br);border-radius:14px;padding:16px}
-  .card h3{margin:0 0 8px;font-size:14px;color:var(--accent);font-weight:600}
-  .big{font-size:28px;font-weight:700}
-  .muted{color:var(--muted);font-size:12px}
-  .error{background:#fff3f3;border:1px solid #fca5a5;color:#991b1b;border-radius:10px;padding:10px;display:none}
-  .credit{
-    position:fixed; right:10px; bottom:8px; z-index:9999;
-    background:#ffffffd9; backdrop-filter: blur(4px);
-    border:1px solid #e5e7eb; border-radius:999px; padding:6px 10px; font-size:12px; color:#374151;
-  }
-  @media (max-width:900px){ .cards{grid-template-columns:1fr} }
-  
+  :root { --card:#fff; --muted:#6b7280; --line:#e5e7eb; --bg:#f6f7fb; }
+  html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,Roboto,Arial;background:var(--bg);}
+  .wrap{max-width:1200px;margin:20px auto;padding:0 16px;}
+  .topbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .auth{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
+  .auth button{padding:8px 10px;border:1px solid #d1d5db;border-radius:10px;background:#fff;cursor:pointer}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .filters{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+  .filters .f{display:flex;flex-direction:column;font-size:13px}
+  .filters input,.filters select{padding:8px 10px;border:1px solid #d1d5db;border-radius:10px;background:#fff;font:inherit}
+  .filters button{padding:9px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#eef2ff;cursor:pointer}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
+  .tile{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px}
+  .tile .k{font-size:28px;font-weight:700;margin-top:6px}
+  .tile .l{font-size:12px;color:var(--muted)}
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  .status{margin-top:12px;font-size:12px;color:var(--muted)}
+  .error{position:fixed;left:0;right:0;top:0;background:#fff3f3;border-bottom:1px solid #f0caca;color:#8b0000;padding:10px 14px;display:none;z-index:9999}
+  .tablewrap{margin-top:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right}
+  th:first-child,td:first-child{text-align:left}
+  tfoot td{font-weight:700;background:#f8fafc}
+  .chip{display:inline-block;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:2px 8px;font-size:12px}
+  @media (max-width:960px){ .grid{grid-template-columns:repeat(2,1fr)} .charts{grid-template-columns:1fr} }
+  @media (max-width:640px){ .grid{grid-template-columns:1fr} }
+
   .credit{
   position:fixed; right:10px; bottom:8px; z-index:9999;
   background:#ffffffd9; backdrop-filter: blur(4px);
   border:1px solid #e5e7eb; border-radius:999px;
   padding:6px 10px; font-size:12px; color:#374151;
 }
-  
 </style>
 
-<!-- MSAL loader (z fallbackiem) -->
+<!-- MSAL (3 CDN fallbacki) -->
 <script>
   function loadScriptSequential(urls){
-    return new Promise((resolve,reject)=>{
-      let i=0; const next=()=>{
-        if(i>=urls.length) return reject(new Error("Nie udało się załadować msal-browser."));
+    return new Promise((res,rej)=>{
+      let i=0;
+      const go=()=>{
+        if(i>=urls.length) return rej(new Error('MSAL nie wstał z żadnego CDN.'));
         const s=document.createElement('script'); s.src=urls[i++]; s.async=true;
-        s.onload=()=>resolve(); s.onerror=()=>next(); document.head.appendChild(s);
-      }; next();
+        s.onload=()=>res(); s.onerror=()=>go(); document.head.appendChild(s);
+      }; go();
     });
   }
   const MSAL_CDNS=[
@@ -56,318 +59,465 @@
     'https://unpkg.com/@azure/msal-browser@2.38.3/lib/msal-browser.min.js'
   ];
 </script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 </head>
-
 <body>
+<div class="error" id="errorBar"></div>
+
 <div class="wrap">
-  <h1>SIDUSIS – Dashboard KPI</h1>
-
-  <!-- Pasek filtrów (PH + zakres dat po dacie zgłoszenia) -->
-  <div class="bar">
-    <div class="f">
-      <label>PH</label>
-      <select id="fPH"><option value="">(wszyscy)</option></select>
-    </div>
-    <div class="f">
-      <label>Zakres od</label>
-      <input type="date" id="fFrom">
-    </div>
-    <div class="f">
-      <label>…do</label>
-      <input type="date" id="fTo">
-    </div>
-    <div class="f">
-      <button id="btnReload">Odśwież z Excela</button>
+  <div class="topbar">
+    <h2 style="margin:0">SIDUSIS – Dashboard KPI</h2>
+    <div class="auth">
+      <span id="who">Nie zalogowano.</span>
+      <button id="btnLogin">Zaloguj</button>
+      <button id="btnLogout">Wyloguj</button>
+      <a href="mapa_test.html" style="margin-left:6px;text-decoration:none;border:1px solid #d1d5db;border-radius:10px;padding:8px 10px;background:#fff">↩︎ Mapa</a>
     </div>
   </div>
 
-  <!-- Kafelki KPI – średnie czasy -->
-  <div class="cards">
-    <div class="card"><h3>Lead → Wycena</h3><div class="big" id="kpiL2E">–</div><div class="muted" id="kpiL2Einfo">–</div></div>
-    <div class="card"><h3>Wycena → Oferta</h3><div class="big" id="kpiE2O">–</div><div class="muted" id="kpiE2Oinfo">–</div></div>
-    <div class="card"><h3>Oferta → Zamknięcie</h3><div class="big" id="kpiO2C">–</div><div class="muted" id="kpiO2Cinfo">–</div></div>
+  <div class="panel">
+    <div class="filters">
+      <div class="f">
+        <label>Zakres od</label>
+        <input type="date" id="fFrom">
+      </div>
+      <div class="f">
+        <label>…do</label>
+        <input type="date" id="fTo">
+      </div>
+      <div class="f">
+        <label>PH</label>
+        <select id="fPH" multiple size="4" style="min-width:220px"></select>
+        <span class="l" style="margin-top:4px;color:#64748b">Wskazówka: Ctrl/⌘ aby zaznaczać wiele</span>
+      </div>
+      <div class="f">
+        <label>Status</label>
+        <select id="fStatus" multiple size="4" style="min-width:220px"></select>
+      </div>
+      <div class="f">
+        <button id="btnApply">Zastosuj filtry</button>
+      </div>
+      <div class="f" style="margin-left:auto">
+        <button id="btnReload">Odśwież dane z Excela</button>
+      </div>
+    </div>
+    <div class="status" id="status">Załaduj dane…</div>
   </div>
 
-  <div class="error" id="errorBox"></div>
-  <div class="status" id="statusBox">Gotowe.</div>
+  <div class="grid">
+    <div class="tile"><div class="l">Nowe leady</div><div class="k" id="kLeads">–</div></div>
+    <div class="tile"><div class="l">Przypisane PH</div><div class="k"><span id="kPH">–</span> <span class="l">/ nieprzypisane: <span class="chip" id="kUnassigned">–</span></span></div></div>
+    <div class="tile"><div class="l">Oferta wysłana (leady z okresu)</div><div class="k" id="kOffers">–</div></div>
+    <div class="tile"><div class="l">Akceptacje (konwersja)</div><div class="k" id="kAcc">–</div></div>
+    <div class="tile"><div class="l">Śr. czas: Lead → Oferta</div><div class="k" id="kT1">–</div></div>
+    <div class="tile"><div class="l">Śr. czas: Oferta → Akceptacja</div><div class="k" id="kT2">–</div></div>
+  </div>
+
+  <div class="charts">
+    <div class="tile"><canvas id="chTrend" height="140"></canvas></div>
+    <div class="tile"><canvas id="chPH" height="140"></canvas></div>
+  </div>
+
+  <div class="tablewrap">
+    <div class="tile">
+      <h3 style="margin:0 0 10px 0">Leady wg PH i Statusu</h3>
+      <div style="overflow:auto">
+        <table id="tblPH"></table>
+      </div>
+    </div>
+  </div>
 </div>
-
-<!-- Dyskretna stopka z autorem (możesz przenieść/usunąć) -->
-<div class="credit">Autor: Adrian Daniel</div>
 
 <script>
 (async function main(){
-  /* ======================== KONFIG + STAN ======================== */
-  const CONFIG = {
-    clientId: "2c5a0274-30c0-4efa-b13c-7ce1e0768cf9",
-    tenantId: "e44d0310-65ed-4096-a024-dac77110765a",
-    spHost: "internetunion.sharepoint.com",
-    spSitePath: "PHTheNetwork",
-    filePath: "/General/Kopia pliku Lista - SIDUSIS - PEŁNA - od 08-2025 - kopia do mapy.xlsx",
-    dataSheet: "Dane",
-    logSheet: "AuditLog"
+/* =========================== KONFIG (skopiuj z mapy) =========================== */
+const CONFIG = {
+  clientId: "2c5a0274-30c0-4efa-b13c-7ce1e0768cf9",
+  tenantId: "e44d0310-65ed-4096-a024-dac77110765a",
+  spHost:   "internetunion.sharepoint.com",
+  spSitePath: "PHTheNetwork",
+  filePath: "/General/Kopia pliku Lista - SIDUSIS - PEŁNA - od 08-2025 - kopia do mapy.xlsx",
+  dataSheet: "Dane",
+  logSheet:  "AuditLog",
+};
+
+// Statusy (stringi jak w Excelu)
+const STATUS_LIST = ["Zapytanie o wycenę","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO"];
+const PH_ALL = "(Wszyscy PH)";
+const PH_NONE = "(Brak PH)";
+
+/* =========================== UTYLITY/UI =========================== */
+const $ = s => document.querySelector(s);
+const statusBox = $("#status");
+const who = $("#who"); const errorBar=$("#errorBar");
+function setStatus(t){ statusBox.textContent = t; }
+function showError(t){ errorBar.textContent=t; errorBar.style.display='block'; setTimeout(()=>errorBar.style.display='none',7000); }
+function toDate(v){
+  if(v==null || v==="") return null;
+  if(typeof v==="number"){ const d = new Date(Date.UTC(1899,11,30)); d.setUTCDate(d.getUTCDate()+Math.floor(v)); return d; }
+  const s=String(v).trim(); const d1 = new Date(s); if(!isNaN(d1)) return d1;
+  const m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+  if(m){ const [_,dd,mm,yy]=m; return new Date(Number(yy.length===2?("20"+yy):yy), Number(mm)-1, Number(dd)); }
+  return null;
+}
+function fmtDays(n){ return isFinite(n)? (n.toFixed(1)+" d") : "–"; }
+function diffDays(a,b){ return (b-a)/86400000; }
+function normAddr(s){
+  return String(s||"").toLowerCase()
+    .replace(/\s+/g,' ')
+    .replace(/^\s*(ul\.?\s*){2,}/i,'ul. ')
+    .replace(/^\s*ul\b\.?/i,'ul. ')
+    .replace(/\s*,\s*/g,', ').trim();
+}
+
+/* =========================== MSAL / GRAPH =========================== */
+await loadScriptSequential(MSAL_CDNS);
+if(typeof msal==='undefined' || !msal.PublicClientApplication){ alert('MSAL nie wstał.'); return; }
+
+const msalApp = new msal.PublicClientApplication({
+  auth:{ clientId:CONFIG.clientId, authority:"https://login.microsoftonline.com/"+CONFIG.tenantId,
+         redirectUri: window.location.origin + window.location.pathname },
+  cache:{ cacheLocation:"localStorage", storeAuthStateInCookie:false }
+});
+const graphScopes=["openid","profile","offline_access","Files.ReadWrite.All","Sites.Read.All"];
+let account=null, siteId=null, fileId=null;
+
+async function ensureLogin(){
+  const accs=msalApp.getAllAccounts();
+  if(accs.length){ account=accs[0]; who.textContent="Zalogowano: "+(account.username||account.homeAccountId); return; }
+  const r = await msalApp.loginPopup({ scopes:graphScopes });
+  account=r.account; who.textContent="Zalogowano: "+(account.username||account.homeAccountId);
+}
+async function getToken(){
+  await ensureLogin();
+  try{ const r=await msalApp.acquireTokenSilent({scopes:graphScopes,account}); return r.accessToken; }
+  catch{ const r=await msalApp.acquireTokenPopup({scopes:graphScopes}); return r.accessToken; }
+}
+async function gfetch(method, url){
+  const token = await getToken();
+  const resp = await fetch(url,{method,headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+  if(!resp.ok){ const txt=await resp.text().catch(()=>String(resp.status)); throw new Error(`${method} ${url} -> ${resp.status} ${txt}`); }
+  return resp.status===204?null:resp.json();
+}
+async function getSiteId(){
+  if(siteId) return siteId;
+  const js = await gfetch("GET", `https://graph.microsoft.com/v1.0/sites/${CONFIG.spHost}:/sites/${CONFIG.spSitePath}`);
+  siteId = js.id; return siteId;
+}
+async function getFileItemId(){
+  if(fileId) return fileId;
+  const sid = await getSiteId();
+  const js = await gfetch("GET", `https://graph.microsoft.com/v1.0/sites/${sid}/drive/root:${encodeURI(CONFIG.filePath)}`);
+  fileId = js.id; return fileId;
+}
+async function usedRange(wsName){
+  const [sid,iid]=await Promise.all([getSiteId(), getFileItemId()]);
+  const wsq=wsName.replace(/'/g,"''");
+  return gfetch("GET", `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/usedRange(valuesOnly=true)`);
+}
+
+/* =========================== DANE: pobranie i parsowanie =========================== */
+let ROWS=[], LOGS=[]; // surowe
+let PH_LIST=[];       // do filtra
+
+function pickHeader(headers, tokens){
+  const lc=headers.map(h=>String(h||"").toLowerCase());
+  for(const t of tokens){ const i=lc.findIndex(n=>n.includes(t)); if(i>=0) return headers[i]; }
+  return null;
+}
+
+function parseDane(values){
+  if(!values || !values.length) return [];
+  const H = values[0].map(h=>String(h||"").trim());
+  const body = values.slice(1);
+  const COL = {
+    created: H[0], // A: Data zgłoszenia
+    ph:      pickHeader(H,["ph"]),
+    status:  pickHeader(H,["status"]),
+    addr:    pickHeader(H,["adres_pelny","adres pełny","adres pelny"]),
+    ulica:   pickHeader(H,["ulica","adres"]),
+    nr:      pickHeader(H,["nr budynku","numer","nr","nr domu"]),
+    msc:     pickHeader(H,["miejscowość","miejscowosc","miasto"])
   };
 
-  // wyłączone z KPI / czasów / konwersji:
-  const EXCLUDED_STATUS = new Set(["KPO","Poza Zasięgiem","MOICO","Duplikat","SEEV"]);
-  const STATUS_TARGETS = {
-    est: "Wycena Inwestycji",
-    offer: "Oferta wysłana",
-    won: "Akceptacja klienta",
-    lost: "Odmowa klienta"
+  const out = body.map(r=>{
+    const idx = name => H.indexOf(name);
+    let adres = COL.addr ? String(r[idx(COL.addr)]||"") : "";
+    if(!adres){
+      const u = COL.ulica ? String(r[idx(COL.ulica)]||"").trim() : "";
+      const n = COL.nr    ? String(r[idx(COL.nr)]||"").trim()    : "";
+      const m = COL.msc   ? String(r[idx(COL.msc)]||"").trim()   : "";
+      adres = (u&&n&&m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
+    }
+    return {
+      createdAt: toDate(r[idx(COL.created)]),
+      PH: String(COL.ph ? (r[idx(COL.ph)]||"") : ""),
+      Status: String(COL.status ? (r[idx(COL.status)]||"") : ""),
+      adres_pelny: adres,
+      key: normAddr(adres)
+    };
+  }).filter(o=>o.adres_pelny);
+
+  // PH list (zawiera też "(Brak PH)")
+  PH_LIST = [...new Set(out.map(o=>(o.PH||"")))].sort();
+  if(!PH_LIST.includes("")) PH_LIST.unshift("");
+  return out;
+}
+
+function parseLog(values){
+  if(!values || !values.length) return [];
+  const H = values[0].map(h=>String(h||"").trim());
+  const body = values.slice(1);
+  const idxTs   = H.indexOf("ts");
+  const idxAct  = H.indexOf("action");
+  const idxAddr = H.indexOf("adres_pelny");
+  const idxOld  = H.indexOf("old");
+  const idxNew  = H.indexOf("new");
+
+  return body.map(r=>{
+    const ts = new Date(String(r[idxTs]||""));
+    const addr = normAddr(String(r[idxAddr]||""));
+    const old = String(r[idxOld]||"");
+    const nw  = String(r[idxNew]||"");
+    const oldStatus = old.split("|")[1]||"";
+    const newStatus = nw.split("|")[1]||"";
+    return { ts, addr, action:String(r[idxAct]||""), oldStatus, newStatus };
+  }).filter(x=>x.addr && !isNaN(x.ts));
+}
+
+/* =========================== KPI liczenie =========================== */
+function applyFilters(allRows, from, to, selPH, selST){
+  const inRange = r => (!from || r.createdAt>=from) && (!to || r.createdAt<=to);
+  const phOk = r => {
+    if(!selPH.length) return true;                        // (Wszyscy PH)
+    // Zamieniamy "(Brak PH)" na pusty string gdy filtrujemy
+    const wanted = selPH.map(x=> x===PH_NONE ? "" : x);
+    return wanted.includes(r.PH||"");
   };
+  const stOk = r => !selST.length || selST.includes(r.Status||"");
+  return allRows.filter(r=>inRange(r)&&phOk(r)&&stOk(r));
+}
 
-  let account=null, siteId=null, fileId=null;
-  let rows=[];            // wiersze z "Dane"
-  let logs=[];            // wiersze z "AuditLog"
-  let byAddrCurrent={};   // adres_norm -> bieżący status (z "Dane")
-  let phSet=new Set();    // unikalne PH do filtra
-
-  const $ = s=>document.querySelector(s);
-  const statusBox=$("#statusBox"), errBox=$("#errorBox");
-
-  const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const norm = s => String(s||"").toLowerCase().replace(/\s+/g," ").trim();
-
-  function toDate(v){
-    if(v==null || v==="") return null;
-    if(typeof v==="number"){ const d = new Date(Date.UTC(1899,11,30)); d.setUTCDate(d.getUTCDate()+Math.floor(v)); return d; }
-    const s=String(v).trim(); const d1 = new Date(s); if(!isNaN(d1)) return d1;
-    const m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
-    if(m){ const [_,dd,mm,yy]=m; return new Date(Number(yy.length===2?("20"+yy):yy), Number(mm)-1, Number(dd)); }
-    return null;
+function firstStatusTsByAddr(logs, status){
+  const map=new Map();
+  const target = (s)=> (String(s||"").toLowerCase().trim()===status.toLowerCase());
+  const sorted=[...logs].sort((a,b)=>a.ts-b.ts);
+  for(const e of sorted){
+    if(target(e.newStatus) && !map.has(e.addr)) map.set(e.addr, e.ts);
   }
-  const diffDays = (a,b)=> (b-a)/(1000*60*60*24);
-  const fmtDays = d => isFinite(d) ? (d>=1 ? d.toFixed(1)+" dnia" : (d*24).toFixed(0)+" h") : "–";
+  return map;
+}
+function weeklyKey(d){
+  const dt=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  const onejan=new Date(dt.getFullYear(),0,1);
+  const w=Math.ceil((((dt-onejan)/86400000)+onejan.getDay()+1)/7);
+  return `${dt.getFullYear()}-W${String(w).padStart(2,'0')}`;
+}
 
-  function setStatus(s){ statusBox.textContent = s; }
-  function showError(e){ errBox.textContent = String(e||"Błąd"); errBox.style.display="block"; setTimeout(()=>errBox.style.display="none", 7000); }
+function computeKPI(rows, logs, from, to, selPH, selST){
+  const filtered = applyFilters(rows, from, to, selPH, selST);
 
-  /* ======================== MSAL/GRAPH ======================== */
-  try { await loadScriptSequential(MSAL_CDNS); } 
-  catch(e){ alert("Brak msal-browser."); console.error(e); return; }
-  if(typeof msal==='undefined' || !msal.PublicClientApplication){ alert("MSAL niedostępny."); return; }
+  const firstOffer = firstStatusTsByAddr(logs,"Oferta wysłana");
+  const firstAccept= firstStatusTsByAddr(logs,"Akceptacja klienta");
 
-  const msalApp = new msal.PublicClientApplication({
-    auth:{ clientId:CONFIG.clientId, authority:"https://login.microsoftonline.com/"+CONFIG.tenantId,
-           redirectUri: window.location.origin + window.location.pathname },
-    cache:{ cacheLocation:"localStorage", storeAuthStateInCookie:false }
+  let nLeads=filtered.length;
+  let nPHassigned=filtered.filter(r=> (r.PH||"").trim()).length;
+  let nUnassigned = nLeads - nPHassigned;
+
+  let nOffer=0, nAcc=0;
+  let tLeadOffer=[], tOfferAcc=[];
+
+  for(const r of filtered){
+    const key=r.key;
+    const tsOffer = firstOffer.get(key)||null;
+    const tsAcc   = firstAccept.get(key)||null;
+
+    if(tsOffer) nOffer++;
+    if(tsAcc) nAcc++;
+
+    if(r.createdAt && tsOffer && tsOffer>=r.createdAt){
+      tLeadOffer.push(diffDays(r.createdAt, tsOffer));
+    }
+    if(tsOffer && tsAcc && tsAcc>=tsOffer){
+      tOfferAcc.push(diffDays(tsOffer, tsAcc));
+    }
+  }
+
+  const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : NaN;
+
+  // trend (tygodnie)
+  const trend = {};
+  for(const r of filtered){
+    if(!r.createdAt) continue;
+    const k=weeklyKey(r.createdAt);
+    trend[k]=(trend[k]||{leads:0,offers:0,acc:0});
+    trend[k].leads++;
+  }
+  for(const r of filtered){
+    const k = r.createdAt ? weeklyKey(r.createdAt) : null;
+    if(!k) continue;
+    if(firstOffer.get(r.key)) trend[k].offers++;
+    if(firstAccept.get(r.key)) trend[k].acc++;
+  }
+
+  // macierz PH x Status (stan bieżący)
+  const phCatsRaw = [...new Set(filtered.map(r=> (r.PH||"") ))].sort();
+  const phCats = phCatsRaw.map(x=> x||PH_NONE); // puste -> "(Brak PH)"
+  const stCats = STATUS_LIST;
+  const phMatrix = phCatsRaw.map(()=> stCats.map(()=>0));
+  const phTotals = phCatsRaw.map(()=>0);
+
+  for(const r of filtered){
+    const pi = phCatsRaw.indexOf(r.PH||"");
+    const si = stCats.indexOf(r.Status||"");
+    if(pi>=0){ phTotals[pi]++; if(si>=0) phMatrix[pi][si]++; }
+  }
+
+  return {
+    counts:{
+      leads:nLeads,
+      phPct: nLeads? Math.round(nPHassigned/nLeads*100):0,
+      unassigned: nUnassigned,
+      offers:nOffer,
+      acc: nAcc,
+      convPct: nLeads? Math.round(nAcc/nLeads*100):0,
+      tLeadOffer: avg(tLeadOffer),
+      tOfferAcc:  avg(tOfferAcc),
+    },
+    trend,
+    phCats, stCats, phMatrix, phTotals
+  };
+}
+
+/* =========================== WYKRESY/TABLE =========================== */
+let chartTrend=null, chartPH=null;
+function renderCharts(kpi){
+  const keys = Object.keys(kpi.trend).sort();
+  const leads = keys.map(k=>kpi.trend[k].leads);
+  const offers= keys.map(k=>kpi.trend[k].offers);
+  const acc   = keys.map(k=>kpi.trend[k].acc);
+  if(chartTrend) chartTrend.destroy();
+  chartTrend = new Chart($("#chTrend"),{
+    type:'line',
+    data:{ labels:keys, datasets:[
+      { label:'Leady', data:leads },
+      { label:'Oferty', data:offers },
+      { label:'Akceptacje', data:acc },
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
   });
-  /* const graphScopes=["openid","profile","offline_access","Files.Read.All","Files.ReadWrite.All","Sites.Read.All"]; */
-  const graphScopes = ["openid","profile","offline_access","Files.ReadWrite.All","Sites.Read.All"];
 
+  if(chartPH) chartPH.destroy();
+  chartPH = new Chart($("#chPH"),{
+    type:'bar',
+    data:{
+      labels:kpi.phCats,
+      datasets: kpi.stCats.map((st,idx)=>({
+        label: st,
+        data: kpi.phMatrix.map(row=>row[idx]),
+        stack:'st'
+      }))
+    },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}, scales:{x:{stacked:true}, y:{stacked:true}} }
+  });
+}
 
-  async function ensureLogin(){
-    const accs = msalApp.getAllAccounts();
-    if(accs.length){ account=accs[0]; return; }
-    const r = await msalApp.loginPopup({ scopes: graphScopes }); account=r.account;
-  }
-  async function getToken(){
+function renderTable(kpi){
+  const tbl=$("#tblPH");
+  const head = `<tr>
+    <th>PH</th>
+    <th>Razem</th>
+    ${kpi.stCats.map(s=>`<th>${s}</th>`).join("")}
+  </tr>`;
+  const rows = kpi.phCats.map((phDisp, i)=>{
+    const total = kpi.phTotals[i];
+    const cells = kpi.stCats.map((_,j)=> `<td>${kpi.phMatrix[i][j]}</td>`).join("");
+    return `<tr><td>${phDisp}</td><td>${total}</td>${cells}</tr>`;
+  }).join("");
+  const totalRow = (()=> {
+    const colTotals = kpi.stCats.map((_,j)=> kpi.phMatrix.reduce((a,row)=>a+row[j],0));
+    const all = kpi.phTotals.reduce((a,b)=>a+b,0);
+    return `<tr><td><b>Suma</b></td><td><b>${all}</b></td>${colTotals.map(n=>`<td><b>${n}</b></td>`).join("")}</tr>`;
+  })();
+  tbl.innerHTML = `<thead>${head}</thead><tbody>${rows}</tbody><tfoot>${totalRow}</tfoot>`;
+}
+
+/* =========================== UI / LOGIKA =========================== */
+let FROM=null, TO=null, SEL_PH=[], SEL_ST=[];
+
+function fillFilters(){
+  // PH: najpierw (Wszyscy), potem lista PH, na końcu (Brak PH)
+  const phSel=$("#fPH"); phSel.innerHTML="";
+  const mk = (v,t)=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; return o; };
+  phSel.appendChild(mk(PH_ALL, PH_ALL));
+  for(const ph of PH_LIST.filter(x=>x)){ phSel.appendChild(mk(ph, ph)); }
+  phSel.appendChild(mk(PH_NONE, PH_NONE));
+  // domyślnie zaznaczamy (Wszyscy PH)
+  phSel.options[0].selected = true;
+
+  // Status
+  const stSel=$("#fStatus"); stSel.innerHTML="";
+  for(const st of STATUS_LIST){ const opt=document.createElement('option'); opt.value=st; opt.textContent=st; stSel.appendChild(opt); }
+
+  // domyślny zakres: ostatnie 30 dni (z możliwością poszerzenia)
+  const today=new Date(); const from=new Date(today); from.setDate(today.getDate()-30);
+  $("#fFrom").value = from.toISOString().slice(0,10);
+  $("#fTo").value   = today.toISOString().slice(0,10);
+}
+function readFilters(){
+  FROM = $("#fFrom").value ? new Date($("#fFrom").value+"T00:00:00") : null;
+  TO   = $("#fTo").value   ? new Date($("#fTo").value+"T23:59:59") : null;
+  const sel = [...$("#fPH").selectedOptions].map(o=>o.value);
+  // jeśli wybrano "(Wszyscy PH)" albo nic – traktuj jak brak filtru
+  SEL_PH = (!sel.length || sel.includes(PH_ALL)) ? [] : sel;
+  SEL_ST = [...$("#fStatus").selectedOptions].map(o=>o.value);
+}
+function renderTiles(kpi){
+  $("#kLeads").textContent = kpi.counts.leads;
+  $("#kPH").textContent    = `${kpi.counts.phPct}%`;
+  $("#kUnassigned").textContent = kpi.counts.unassigned;
+  $("#kOffers").textContent= kpi.counts.offers;
+  $("#kAcc").textContent   = `${kpi.counts.acc} (${kpi.counts.convPct}%)`;
+  $("#kT1").textContent    = fmtDays(kpi.counts.tLeadOffer);
+  $("#kT2").textContent    = fmtDays(kpi.counts.tOfferAcc);
+}
+
+async function loadAll(){
+  try{
+    setStatus("Ładowanie danych (Graph)…");
     await ensureLogin();
-    try{ const r=await msalApp.acquireTokenSilent({ scopes:graphScopes, account }); return r.accessToken; }
-    catch{ const r=await msalApp.acquireTokenPopup({ scopes:graphScopes }); return r.accessToken; }
-  }
-  async function gfetch(method, url, body){
-    const token = await getToken();
-    const resp = await fetch(url,{
-      method,
-      headers:{ "Authorization":"Bearer "+token, "Accept":"application/json", "Content-Type":"application/json" },
-      body: body ? JSON.stringify(body) : undefined
-    });
-    if(!resp.ok){
-      const txt=await resp.text().catch(()=>String(resp.status));
-      throw new Error(`${method} ${url} -> ${resp.status} ${txt}`);
-    }
-    return resp.status===204 ? null : resp.json();
-  }
-  async function getSiteId(){
-    if(siteId) return siteId;
-    const js = await gfetch("GET", `https://graph.microsoft.com/v1.0/sites/${CONFIG.spHost}:/sites/${CONFIG.spSitePath}`);
-    siteId = js.id; return siteId;
-  }
-  async function getFileItemId(){
-    if(fileId) return fileId;
-    const sid=await getSiteId();
-    const js = await gfetch("GET", `https://graph.microsoft.com/v1.0/sites/${sid}/drive/root:${encodeURI(CONFIG.filePath)}`);
-    fileId = js.id; return fileId;
-  }
-  async function usedRange(wsName){
-    const [sid,iid] = await Promise.all([getSiteId(), getFileItemId()]);
-    const wsq = wsName.replace(/'/g,"''");
-    return gfetch("GET", `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/usedRange(valuesOnly=true)`);
-  }
+    const [d1,d2] = await Promise.all([ usedRange(CONFIG.dataSheet), usedRange(CONFIG.logSheet) ]);
+    ROWS = parseDane(d1.values||[]);
+    LOGS = parseLog(d2.values||[]);
+    fillFilters();
+    readFilters();
+    const kpi = computeKPI(ROWS, LOGS, FROM, TO, SEL_PH, SEL_ST);
+    renderTiles(kpi);
+    renderCharts(kpi);
+    renderTable(kpi);
+    setStatus(`Wiersze: Dane=${ROWS.length}, AuditLog=${LOGS.length}. Filtry aktywne.`);
+  }catch(err){ console.error(err); showError(err.message); }
+}
 
-  /* ======================== ŁADOWANIE DANYCH ======================== */
-  function pickHeader(headers, keywords){
-    const lc=headers.map(h=>String(h||"").toLowerCase());
-    for(const t of keywords){ const i=lc.findIndex(n=>n.includes(t)); if(i>=0) return headers[i]; }
-    return null;
-  }
+$("#btnLogin").addEventListener('click', ()=>ensureLogin().catch(e=>showError(e.message)));
+$("#btnLogout").addEventListener('click', async ()=>{
+  try{ const acc=msalApp.getAllAccounts()[0]; if(acc) await msalApp.logoutPopup({account:acc}); who.textContent="Nie zalogowano."; }
+  catch(e){ showError(e.message); }
+});
+$("#btnReload").addEventListener('click', loadAll);
+$("#btnApply").addEventListener('click', ()=>{
+  readFilters();
+  const kpi = computeKPI(ROWS, LOGS, FROM, TO, SEL_PH, SEL_ST);
+  renderTiles(kpi); renderCharts(kpi); renderTable(kpi);
+});
 
-  async function loadData(){
-    setStatus("Ładowanie danych…");
-    const usedData = await usedRange(CONFIG.dataSheet);
-    const V = usedData.values || [];
-    if(!V.length){ rows=[]; phSet.clear(); setStatus("Arkusz „Dane” pusty."); return; }
+msalApp.handleRedirectPromise().catch(()=>{});
+loadAll();
 
-    const headers = (V[0]||[]).map(h=>String(h||"").trim());
-    const body = V.slice(1);
-
-    const H = {
-      created: headers[0], // kol. A – „Data zgłoszenia”
-      ph:   pickHeader(headers,["ph"]),
-      st:   pickHeader(headers,["status"]),
-      msc:  pickHeader(headers,["miejscowość","miejscowosc","miasto"]),
-      ulica:pickHeader(headers,["ulica","adres"]),
-      nr:   pickHeader(headers,["nr budynku","nr domu","numer","nr"]),
-      adr:  pickHeader(headers,["adres_pelny","adres pełny","adres pelny"])
-    };
-
-    rows = body.map(r=>{
-      const get=(c)=>{ const i=headers.indexOf(c); return i>=0 ? r[i] : ""; };
-      let adr = get(H.adr)||"";
-      if(!adr){
-        const u=String(get(H.ulica)||"").trim();
-        const n=String(get(H.nr)||"").trim();
-        const m=String(get(H.msc)||"").trim();
-        adr = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
-      }
-      const PH = String(get(H.ph)||"").trim();
-      const Status = String(get(H.st)||"").trim();
-      const createdAt = toDate(get(H.created));
-      if(PH) phSet.add(PH);
-      return {
-        createdAt,
-        PH,
-        Status,
-        adres_pelny: adr,
-        addr_norm: norm(adr)
-      };
-    });
-
-    // mapy pomocnicze: aktualny status per adres
-    byAddrCurrent = {};
-    rows.forEach(r=>{ byAddrCurrent[r.addr_norm] = r.Status; });
-
-    // PH do filtra
-    const sel=$("#fPH"); sel.innerHTML = `<option value="">(wszyscy)</option>` + [...phSet].sort().map(ph=>`<option>${esc(ph)}</option>`).join("");
-
-    // Wczytaj logi
-    const usedLog = await usedRange(CONFIG.logSheet);
-    const L = usedLog.values || [];
-    const hdr = (L[0]||[]).map(h=>String(h||"").trim());
-    const bdy = L.slice(1);
-
-    const I = {
-      ts:  hdr.indexOf("ts"),
-      act: hdr.indexOf("action"),
-      addr: hdr.indexOf("adres_pelny"),
-      old: hdr.indexOf("old"),
-      neu: hdr.indexOf("new")
-    };
-
-    logs = bdy.map(r=>{
-      const ts = new Date(String(r[I.ts]||""));
-      const act = String(r[I.act]||"");
-      const addr = String(r[I.addr]||"");
-      const neu = String(r[I.neu]||""); // format: newPH|newStatus|reason
-      let newStatus = "";
-      const parts = neu.split("|");
-      if(parts.length>=2) newStatus = parts[1].trim();
-      return {
-        ts, action: act, addr, addr_norm: norm(addr), newStatus
-      };
-    }).filter(x=> x.ts && !isNaN(x.ts) && x.action==="UpdatePHStatus");
-
-    setStatus(`Załadowano: Dane=${rows.length}, Logi=${logs.length}.`);
-  }
-
-  /* ====== KPI: średnie czasy (Lead→Wycena, Wycena→Oferta, Oferta→Zamknięcie) ====== */
-  function computeAverages(){
-    // Filtry z UI
-    const wantPH = $("#fPH").value.trim();
-    const dFrom  = $("#fFrom").value ? new Date($("#fFrom").value+"T00:00:00") : null;
-    const dTo    = $("#fTo").value   ? new Date($("#fTo").value  +"T23:59:59") : null;
-
-    // Index logów: po adresie
-    const byAddrLogs = new Map();
-    for(const l of logs){
-      if(!byAddrLogs.has(l.addr_norm)) byAddrLogs.set(l.addr_norm, []);
-      byAddrLogs.get(l.addr_norm).push(l);
-    }
-    for(const arr of byAddrLogs.values()){ arr.sort((a,b)=>a.ts-b.ts); }
-
-    // Zbierz czasy
-    const deltasL2E=[], deltasE2O=[], deltasO2C=[];
-    let nLead=0, nAfterExclude=0;
-
-    for(const r of rows){
-      // Wykluczenia wg aktualnego statusu
-      if(EXCLUDED_STATUS.has(r.Status)) continue;
-
-      // Filtr PH (jeśli ustawiony)
-      if(wantPH && r.PH !== wantPH) continue;
-
-      // Filtr zakresu po dacie zgłoszenia (kol. A)
-      if(dFrom || dTo){
-        if(!r.createdAt) continue;
-        if(dFrom && r.createdAt < dFrom) continue;
-        if(dTo   && r.createdAt > dTo)   continue;
-      }
-
-      nLead++;
-
-      const arr = byAddrLogs.get(r.addr_norm) || [];
-
-      // szukamy pierwszych wystąpień poszczególnych statusów
-      const t_est   = arr.find(x=>x.newStatus===STATUS_TARGETS.est)?.ts || null;
-      const t_offer = arr.find(x=>x.newStatus===STATUS_TARGETS.offer)?.ts || null;
-      const t_close = arr.find(x=>x.newStatus===STATUS_TARGETS.won || x.newStatus===STATUS_TARGETS.lost)?.ts || null;
-
-      if(r.createdAt && t_est){
-        deltasL2E.push(diffDays(r.createdAt, t_est));
-      }
-      if(t_est && t_offer){
-        deltasE2O.push(diffDays(t_est, t_offer));
-      }
-      if(t_offer && t_close){
-        deltasO2C.push(diffDays(t_offer, t_close));
-      }
-    }
-
-    // średnie
-    const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : NaN;
-    const aL2E = avg(deltasL2E);
-    const aE2O = avg(deltasE2O);
-    const aO2C = avg(deltasO2C);
-
-    // prezentacja
-    $("#kpiL2E").textContent = fmtDays(aL2E);
-    $("#kpiE2O").textContent = fmtDays(aE2O);
-    $("#kpiO2C").textContent = fmtDays(aO2C);
-
-    $("#kpiL2Einfo").textContent = deltasL2E.length ? `na podstawie ${deltasL2E.length} spraw` : "brak pełnych danych";
-    $("#kpiE2Oinfo").textContent = deltasE2O.length ? `na podstawie ${deltasE2O.length} spraw` : "brak pełnych danych";
-    $("#kpiO2Cinfo").textContent = deltasO2C.length ? `na podstawie ${deltasO2C.length} spraw` : "brak pełnych danych";
-
-    setStatus(`Policzono KPI. Uwzględniono ${nLead} leadów (po wykluczeniach i filtrach).`);
-  }
-
-  /* ======================== ZDARZENIA ======================== */
-  $("#btnReload").addEventListener("click", async ()=>{
-    try{
-      await ensureLogin(); await getSiteId(); await getFileItemId();
-      await loadData();
-      computeAverages();
-    }catch(e){ console.error(e); showError(e.message||e); }
-  });
-
-  // Autostart: nie ładuję automatycznie — klik „Odśwież” po zalogowaniu
-  setStatus("Kliknij „Odśwież z Excelem”.");
-  msalApp.handleRedirectPromise().catch(e=>console.warn("MSAL redirect:", e));
 })();
 </script>
-<div class="credit">Autor: Adrian Daniel</div>
+  <div class="credit">Autor: Adrian Daniel</div>
 </body>
 </html>
-
