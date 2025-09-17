@@ -46,11 +46,13 @@
 
   /* Mini-filtry (pływający panel) */
   .mini-filter{
-    position: fixed; left:12px; top:12px; z-index:10001;
-    display:flex; gap:6px; align-items:flex-end; flex-wrap:wrap;
-    background:#fff; border:1px solid #ddd; border-radius:12px; padding:10px 12px; box-shadow:0 4px 20px rgba(0,0,0,.08);
-    font-size:13px;
-  }
+  position: fixed; left:12px; top:12px; z-index:10001;
+  display:flex; gap:6px; align-items:flex-end; /* było: end */
+  flex-wrap:wrap;
+  background:#fff; border:1px solid #ddd; border-radius:12px; padding:10px 12px; box-shadow:0 4px 20px rgba(0,0,0,.08);
+  font-size:13px;
+}
+
   .mini-filter .f{ display:flex; flex-direction:column; }
   .mini-filter input,.mini-filter select{ padding:6px 8px; border:1px solid #d1d5db; border-radius:8px; font:inherit; }
   .mini-filter button{ padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#eef2ff; cursor:pointer; }
@@ -69,20 +71,20 @@
     border:1px solid rgba(0,0,0,.2);
   }
   /* === Collapsibles (strzałka + zwijanie) === */
-.collapsible { position: relative; }
+.collapsible { position: relative; display: inline-block; box-sizing: border-box; }
 .collapsible .toggle{
   position:absolute; top:6px; right:6px;
   width:24px; height:24px; border:1px solid #cbd5e1; border-radius:999px;
   background:#f8fafc; cursor:pointer; line-height:22px; font-size:14px;
   display:flex; align-items:center; justify-content:center;
 }
-/* Gdy zwinięte: kontener ma rozmiar przycisku, a przycisk staje się elementem statycznym */
-.collapsible.is-collapsed {
-  padding:6px; min-width:28px; min-height:28px;
+/* Gdy zwinięte: kontener ma rozmiar przycisku (i NIE jest flexem) */
+.collapsible.is-collapsed{
+  display:inline-block !important;
+  padding:6px; min-width:28px; min-height:28px; width:auto; height:auto;
 }
-.collapsible.is-collapsed .toggle { position: static; }
-.collapsible.is-collapsed > :not(.toggle) { display:none !important; }
-
+.collapsible.is-collapsed .toggle{ position: static; }
+.collapsible.is-collapsed > :not(.toggle){ display:none !important; }
 
 </style>
 
@@ -265,8 +267,27 @@ function attachToggle(boxId, btnId, key){
     if(map) map.remove();
     map=L.map('map');
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
-    cluster = L.markerClusterGroup();
-    map.addLayer(cluster);
+    // agresywnie mały promień klastrowania – klaster pojawi się tylko przy bardzo gęstych grupach
+const radiusFn = (z) => {
+  // im większy zoom, tym mniejszy promień (px); wartości dobrane tak,
+  // by klastrowanie występowało dopiero przy "kupkach" pinów
+  if (z <= 8)  return 30;
+  if (z <= 10) return 26;
+  if (z <= 12) return 22;
+  if (z <= 14) return 18;
+  return 14; // na dużych zbliżeniach prawie brak klastrów
+};
+
+cluster = L.markerClusterGroup({
+  maxClusterRadius: radiusFn,
+  disableClusteringAtZoom: 17,   // na bardzo dużym zoomie wyłącz całkiem
+  chunkedLoading: true,          // płynniejsze dokładanie wielu markerów
+  spiderfyOnEveryZoom: false,
+  showCoverageOnHover: false
+});
+
+map.addLayer(cluster);
+
   }
   function fitToData(arr){
     const pts=arr.filter(r=>isFinite(r.lat)&&isFinite(r.lon));
@@ -320,28 +341,29 @@ function attachToggle(boxId, btnId, key){
       </div>`;
 
     const showReason = (rec.Status||"").trim()==="Odmowa klienta";
+	const reasonInfo = rec.PowodOdmowy ? (', Powód = <b>' + esc(rec.PowodOdmowy) + '</b>') : '';
 
     return `<div class="popup">
-      <h4>${esc(rec.nazwa||'')}</h4>
-      ${esc(rec.adres_pelny||'')}<br/>
-      <div class="meta"><b>Email:</b> ${esc(rec.email||'')} &nbsp; <b>Telefon:</b> ${esc(rec.telefon||'')}</div>
+  <h4>${esc(rec.nazwa||'')}</h4>
+  ${esc(rec.adres_pelny||'')}<br/>
+  <div class="meta"><b>Email:</b> ${esc(rec.email||'')} &nbsp; <b>Telefon:</b> ${esc(rec.telefon||'')}</div>
 
-      <div class="row">
-        <label>PH:</label>
-        <select id="phSel">${phOpts}</select>
-        <label>Status:</label>
-        <select id="stSel">${stOpts}</select>
-        <button id="savePHST">Zapisz</button>
-      </div>
+  <div class="row">
+    <label>PH:</label>
+    <select id="phSel">${phOpts}</select>
+    <label>Status:</label>
+    <select id="stSel">${stOpts}</select>
+    <button id="savePHST">Zapisz</button>
+  </div>
 
-      <div class="row" id="reasonRow" style="display:${showReason?'flex':'none'}">
-        <label>Powód odmowy:</label>
-        <select id="reasonSel" style="min-width:240px">${reasonOpts}</select>
-      </div>
+  <div class="row" id="reasonRow" style="display:${showReason ? 'flex' : 'none'}">
+    <label>Powód odmowy:</label>
+    <select id="reasonSel" style="min-width:240px">${reasonOpts}</select>
+  </div>
 
-      <div class="meta"><b>Aktualnie:</b> PH = <b>${esc(rec.PH||'-')}</b>, Status = <b>${esc(rec.Status||'-')}</b>${rec.PowodOdmowy ? `, Powód = <b>${esc(rec.PowodOdmowy)}</b>` : ''}</div>
-      ${actions}
-    </div>`;
+  <div class="meta"><b>Aktualnie:</b> PH = <b>${esc(rec.PH||'-')}</b>, Status = <b>${esc(rec.Status||'-')}</b>${reasonInfo}</div>
+  ${actions}
+</div>`;
   }
 
   function addOneMarker(rec){
@@ -914,7 +936,7 @@ attachToggle("toolbarBox","tgToolbar","toolbar");
 attachToggle("filtersBox","tgFilters","filters");
 attachToggle("legend","tgLegend","legend");
 setStatus("Kliknij „Zaloguj”, a potem „Odśwież dane z Excelem”.");
-  msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e));
+msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e));
 })();
 </script>
 </body>
