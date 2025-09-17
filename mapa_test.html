@@ -347,18 +347,19 @@ const CONFIG = {
     const js = await gfetch("GET", url);
     fileId = js.id; return fileId;
   }
-  async function usedRange(wsName){
-    const id = await getFileItemId();
-    const wsq = wsName.replace(/'/g,"''");
-    const url = `https://graph.microsoft.com/v1.0/drive/items/${id}/workbook/worksheets('${wsq}')/usedRange(valuesOnly=true)`;
-    return gfetch("GET", url);
-  }
-  async function patchRange(wsName, a1, values2d){
-    const id = await getFileItemId();
-    const wsq = wsName.replace(/'/g,"''");
-    const url = `https://graph.microsoft.com/v1.0/drive/items/${id}/workbook/worksheets('${wsq}')/range(address='${a1}')`;
-    return gfetch("PATCH", url, { values: values2d });
-  }
+async function usedRange(wsName){
+  const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
+  const wsq = wsName.replace(/'/g,"''");
+  const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/usedRange(valuesOnly=true)`;
+  return gfetch("GET", url);
+}
+
+async function patchRange(wsName, a1, values2d){
+  const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
+  const wsq = wsName.replace(/'/g,"''");
+  const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='${a1}')`;
+  return gfetch("PATCH", url, { values: values2d });
+}
   async function writeCell(wsName, row1, col1, value){
     const a1 = colLetter(col1) + row1;
     return patchRange(wsName, a1, [[ value ]]);
