@@ -153,7 +153,9 @@
            redirectUri: window.location.origin + window.location.pathname },
     cache:{ cacheLocation:"localStorage", storeAuthStateInCookie:false }
   });
-  const graphScopes=["openid","profile","offline_access","Files.Read.All","Files.ReadWrite.All","Sites.Read.All"];
+  /* const graphScopes=["openid","profile","offline_access","Files.Read.All","Files.ReadWrite.All","Sites.Read.All"]; */
+  const graphScopes = ["openid","profile","offline_access","Files.ReadWrite.All","Sites.Read.All"];
+
 
   async function ensureLogin(){
     const accs = msalApp.getAllAccounts();
@@ -368,3 +370,4 @@
 <div class="credit">Autor: Adrian Daniel</div>
 </body>
 </html>
+
