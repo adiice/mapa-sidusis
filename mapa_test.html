@@ -46,13 +46,12 @@
 
   /* Mini-filtry (pływający panel) */
   .mini-filter{
-  position: fixed; left:12px; top:12px; z-index:10001;
-  display:flex; gap:6px; align-items:flex-end; /* było: end */
-  flex-wrap:wrap;
-  background:#fff; border:1px solid #ddd; border-radius:12px; padding:10px 12px; box-shadow:0 4px 20px rgba(0,0,0,.08);
-  font-size:13px;
-}
-
+    position: fixed; left:12px; top:12px; z-index:10001;
+    display:flex; gap:6px; align-items:flex-end;
+    flex-wrap:wrap;
+    background:#fff; border:1px solid #ddd; border-radius:12px; padding:10px 12px; box-shadow:0 4px 20px rgba(0,0,0,.08);
+    font-size:13px;
+  }
   .mini-filter .f{ display:flex; flex-direction:column; }
   .mini-filter input,.mini-filter select{ padding:6px 8px; border:1px solid #d1d5db; border-radius:8px; font:inherit; }
   .mini-filter button{ padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#eef2ff; cursor:pointer; }
@@ -70,22 +69,21 @@
     border-radius:50%; display:flex; align-items:center; justify-content:center;
     border:1px solid rgba(0,0,0,.2);
   }
-  /* === Collapsibles (strzałka + zwijanie) === */
-.collapsible { display: inline-block; box-sizing: border-box; }
-.collapsible .toggle{
-  position:absolute; top:6px; right:6px;
-  width:24px; height:24px; border:1px solid #cbd5e1; border-radius:999px;
-  background:#f8fafc; cursor:pointer; line-height:22px; font-size:14px;
-  display:flex; align-items:center; justify-content:center;
-}
-/* Gdy zwinięte: kontener ma rozmiar przycisku (i NIE jest flexem) */
-.collapsible.is-collapsed{
-  display:inline-block !important;
-  padding:6px; min-width:28px; min-height:28px; width:auto; height:auto;
-}
-.collapsible.is-collapsed .toggle{ position: static; }
-.collapsible.is-collapsed > :not(.toggle){ display:none !important; }
 
+  /* === Collapsibles (strzałka + zwijanie) === */
+  .collapsible { display: inline-block; box-sizing: border-box; }
+  .collapsible .toggle{
+    position:absolute; top:6px; right:6px;
+    width:24px; height:24px; border:1px solid #cbd5e1; border-radius:999px;
+    background:#f8fafc; cursor:pointer; line-height:22px; font-size:14px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .collapsible.is-collapsed{
+    display:inline-block !important;
+    padding:6px; min-width:28px; min-height:28px; width:auto; height:auto;
+  }
+  .collapsible.is-collapsed .toggle{ position: static; }
+  .collapsible.is-collapsed > :not(.toggle){ display:none !important; }
 </style>
 
 <!-- Leaflet + MarkerCluster -->
@@ -119,7 +117,7 @@
 <body>
 <div id="map"></div>
 
-<!-- Panel narzędziowy (jak było) -->
+<!-- Panel narzędziowy -->
 <div class="toolbar collapsible" id="toolbarBox">
   <button class="toggle" id="tgToolbar" title="Zwiń/rozwiń">⯅</button>
   <div class="row">
@@ -135,34 +133,29 @@
   <div class="statusbar" id="statusbar">Nie zalogowano.</div>
 </div>
 
-<!-- Mini-filtry (PH/Status/Miasto/Dziś + masowe działanie) -->
+<!-- Mini-filtry -->
 <div class="mini-filter collapsible" id="filtersBox">
   <button class="toggle" id="tgFilters" title="Zwiń/rozwiń">⯅</button>
   <div class="f">
     <label>PH</label>
-    <select id="mfPH">
-      <option value="">(wszyscy)</option>
-    </select>
+    <select id="mfPH"><option value="">(wszyscy)</option></select>
   </div>
   <div class="f">
     <label>Status</label>
-    <select id="mfStatus">
-      <option value="">(wszystkie)</option>
-    </select>
+    <select id="mfStatus"><option value="">(wszystkie)</option></select>
   </div>
   <div class="f">
-  <label>Miasto / ulica (zawiera)</label>
-  <input id="mfSearch" placeholder="np. Poznań lub Piłsudskiego" />
+    <label>Miasto / ulica (zawiera)</label>
+    <input id="mfSearch" placeholder="np. Poznań lub Piłsudskiego" />
   </div>
   <div class="f">
-	<label>Zakres od</label>
-	<input type="date" id="mfFrom">
+    <label>Zakres od</label>
+    <input type="date" id="mfFrom">
   </div>
   <div class="f">
-	<label>…do</label>
-	<input type="date" id="mfTo">
+    <label>…do</label>
+    <input type="date" id="mfTo">
   </div>
-
   <div class="f">
     <button id="mfApply">Filtruj</button>
   </div>
@@ -220,16 +213,16 @@
   const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const DEFAULT_STATUS = "Kliknij „Zaloguj”, a potem „Odśwież dane z Excelem”.";
   function setStatus(msg, opts={}){
-	const { append = false, autoClearMs = 0 } = opts;
-	if(append){
-		const sep = statusbar.textContent ? "\n" : "";
-		statusbar.textContent = statusbar.textContent + sep + (Array.isArray(msg)? msg.join("\n") : String(msg||""));
-	}else{
-		statusbar.textContent = Array.isArray(msg)? msg.join("\n") : String(msg||"");
-	}
-	if(autoClearMs>0){
-		setTimeout(()=>{ statusbar.textContent = ""; }, autoClearMs);
-	}
+    const { append = false, autoClearMs = 0 } = opts;
+    if(append){
+      const sep = statusbar.textContent ? "\n" : "";
+      statusbar.textContent = statusbar.textContent + sep + (Array.isArray(msg)? msg.join("\n") : String(msg||""));
+    }else{
+      statusbar.textContent = Array.isArray(msg)? msg.join("\n") : String(msg||"");
+    }
+    if(autoClearMs>0){
+      setTimeout(()=>{ statusbar.textContent = ""; }, autoClearMs);
+    }
   }
   function showError(msg){ errorBar.textContent = msg; errorBar.style.display='block'; setTimeout(()=>{ errorBar.style.display='none'; }, 7000); }
   function toNum(v){ if(v==null) return NaN; const s=String(v).replace(",", ".").replace(/[^\d\.\-+Ee]/g,"").trim(); return parseFloat(s); }
@@ -238,7 +231,7 @@
   const normAddr = s => normStr(s).replace(/^\s*(ul\.?\s*){2,}/i,"ul. ").replace(/^\s*ul\b\.?/i,"ul. ");
   const near = (a,b,eps=0.0005)=> isFinite(a)&&isFinite(b)&&Math.abs(a-b)<=eps;
 
-  // pomocnicze: daty (kol. A „Data zgłoszenia” – używamy tylko do filtra „Tylko dziś”)
+  // daty (kol. A)
   function toDate(v){
     if(v==null || v==="") return null;
     if(typeof v==="number"){ const d = new Date(Date.UTC(1899,11,30)); d.setUTCDate(d.getUTCDate()+Math.floor(v)); return d; }
@@ -247,86 +240,78 @@
     if(m){ const [_,dd,mm,yy]=m; return new Date(Number(yy.length===2?("20"+yy):yy), Number(mm)-1, Number(dd)); }
     return null;
   }
-  function isToday(d){
-    if(!d) return false;
-    const t=new Date(); return d.getFullYear()===t.getFullYear() && d.getMonth()===t.getMonth() && d.getDate()===t.getDate();
+
+  /* === UI collapsibles === */
+  const UI_STATE_KEY = "uiCollapsed_v1";
+  const UI_STATE = loadUiState(); // { toolbar:bool, filters:bool, legend:bool }
+  function loadUiState(){
+    try{ return JSON.parse(localStorage.getItem(UI_STATE_KEY)) || {toolbar:false, filters:false, legend:false}; }
+    catch{ return {toolbar:false, filters:false, legend:false}; }
   }
-  
-  /* === UI collapsibles: stan i pomocnicze === */
-const UI_STATE_KEY = "uiCollapsed_v1";
-const UI_STATE = loadUiState(); // { toolbar:bool, filters:bool, legend:bool }
+  function saveUiState(){ localStorage.setItem(UI_STATE_KEY, JSON.stringify(UI_STATE)); }
+  function attachToggle(boxId, btnId, key){
+    const box = document.getElementById(boxId);
+    const btn = document.getElementById(btnId);
+    if(!box || !btn) return;
+    box.classList.toggle('is-collapsed', !!UI_STATE[key]);
+    btn.textContent = UI_STATE[key] ? "⯈" : "⯅";
+    btn.addEventListener('click', ()=>{
+      const now = !box.classList.contains('is-collapsed');
+      box.classList.toggle('is-collapsed', now);
+      btn.textContent = now ? "⯈" : "⯅";
+      UI_STATE[key] = now;
+      saveUiState();
+    });
+  }
 
-function loadUiState(){
-  try{ return JSON.parse(localStorage.getItem(UI_STATE_KEY)) || {toolbar:false, filters:false, legend:false}; }
-  catch{ return {toolbar:false, filters:false, legend:false}; }
-}
-function saveUiState(){ localStorage.setItem(UI_STATE_KEY, JSON.stringify(UI_STATE)); }
-
-function attachToggle(boxId, btnId, key){
-  const box = document.getElementById(boxId);
-  const btn = document.getElementById(btnId);
-  if(!box || !btn) return;
-  // zastosuj stan startowy
-  box.classList.toggle('is-collapsed', !!UI_STATE[key]);
-  btn.textContent = UI_STATE[key] ? "⯈" : "⯅";
-  btn.addEventListener('click', ()=>{
-    const now = !box.classList.contains('is-collapsed');
-    box.classList.toggle('is-collapsed', now);
-    btn.textContent = now ? "⯈" : "⯅";
-    UI_STATE[key] = now;
-    saveUiState();
-  });
-}
   /* =========================== MAPA =========================== */
   function initMap(){
     if(map) map.remove();
     map=L.map('map');
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
-    // agresywnie mały promień klastrowania – klaster pojawi się tylko przy bardzo gęstych grupach
-const radiusFn = (z) => {
-  // im większy zoom, tym mniejszy promień (px); wartości dobrane tak,
-  // by klastrowanie występowało dopiero przy "kupkach" pinów
-  if (z <= 8)  return 30;
-  if (z <= 10) return 26;
-  if (z <= 12) return 22;
-  if (z <= 14) return 18;
-  return 14; // na dużych zbliżeniach prawie brak klastrów
-};
 
-cluster = L.markerClusterGroup({
-  maxClusterRadius: radiusFn,
-  disableClusteringAtZoom: 17,   // na bardzo dużym zoomie wyłącz całkiem
-  chunkedLoading: true,          // płynniejsze dokładanie wielu markerów
-  spiderfyOnEveryZoom: false,
-  showCoverageOnHover: false
-});
-
-map.addLayer(cluster);
-
+    // klastry – „gęste tylko”
+    const radiusFn = (z) => {
+      if (z <= 8)  return 30;
+      if (z <= 10) return 26;
+      if (z <= 12) return 22;
+      if (z <= 14) return 18;
+      return 14;
+    };
+    cluster = L.markerClusterGroup({
+      maxClusterRadius: radiusFn,
+      disableClusteringAtZoom: 17,
+      chunkedLoading: true,
+      spiderfyOnEveryZoom: false,
+      showCoverageOnHover: false
+    });
+    map.addLayer(cluster);
   }
+
   function fitToData(arr){
     const pts=arr.filter(r=>isFinite(r.lat)&&isFinite(r.lon));
     if(!pts.length){ map.setView([52,19],6); return; }
     const fg=L.featureGroup(pts.map(p=>L.marker([p.lat,p.lon])));
     map.fitBounds(fg.getBounds().pad(0.2));
   }
+
   function renderLegend(){
-	const box = document.getElementById("legend");
-	const body = box.querySelector(".legend-body");
-	let html="";
-	html+=`<div class="title">PH (kolor wypełnienia)</div>`;
-	for(const ph of PH_LIST){
-    const col=PH_COLOR_MAP[ph]||DEFAULT_PH_COLOR;
-    html+=`<div><span class="pill" style="background:${col}"></span>${esc(ph)}</div>`;
-	}
-	html+=`<div style="margin:6px 0;border-top:1px solid #ddd"></div>`;
-	html+=`<div class="title">Status (kolor obrysu)</div>`;
-	for(const [st,col] of Object.entries(STATUS_COLOR_MAP)){
-    html+=`<div><span class="pill status-pill" style="background:${col};border-color:${col}"></span>${esc(st)}</div>`;
-	}
-	body.innerHTML = html;
-	}
-	
+    const box = document.getElementById("legend");
+    const body = box.querySelector(".legend-body");
+    let html="";
+    html+=`<div class="title">PH (kolor wypełnienia)</div>`;
+    for(const ph of PH_LIST){
+      const col=PH_COLOR_MAP[ph]||DEFAULT_PH_COLOR;
+      html+=`<div><span class="pill" style="background:${col}"></span>${esc(ph)}</div>`;
+    }
+    html+=`<div style="margin:6px 0;border-top:1px solid #ddd"></div>`;
+    html+=`<div class="title">Status (kolor obrysu)</div>`;
+    for(const [st,col] of Object.entries(STATUS_COLOR_MAP)){
+      html+=`<div><span class="pill status-pill" style="background:${col};border-color:${col}"></span>${esc(st)}</div>`;
+    }
+    body.innerHTML = html;
+  }
+
   function makeIcon(rec){
     const fill = PH_COLOR_MAP[(rec.PH||"").trim()] || DEFAULT_PH_COLOR;
     const stroke = STATUS_COLOR_MAP[(rec.Status||"").trim()] || DEFAULT_STATUS_COLOR;
@@ -356,7 +341,7 @@ map.addLayer(cluster);
       </div>`;
 
     const showReason = (rec.Status||"").trim()==="Odmowa klienta";
-	const reasonInfo = rec.PowodOdmowy ? (', Powód = <b>' + esc(rec.PowodOdmowy) + '</b>') : '';
+    const reasonInfo = rec.PowodOdmowy ? (', Powód = <b>' + esc(rec.PowodOdmowy) + '</b>') : '';
 
     return `<div class="popup">
   <h4>${esc(rec.nazwa||'')}</h4>
@@ -389,7 +374,6 @@ map.addLayer(cluster);
       const el=e.popup.getElement()?.querySelector('.leaflet-popup-content');
       if(!el) return;
 
-      // Pokaż/ukryj „Powód odmowy” live
       const stSel = el.querySelector('#stSel');
       const reasonRow = el.querySelector('#reasonRow');
       stSel?.addEventListener('change', ()=>{
@@ -397,7 +381,6 @@ map.addLayer(cluster);
         reasonRow.style.display = (st==="Odmowa klienta") ? 'flex' : 'none';
       });
 
-      // Zapis
       el.querySelector('#savePHST')?.addEventListener('click', async ()=>{
         const ph = el.querySelector('#phSel')?.value || "";
         const st = el.querySelector('#stSel')?.value || "";
@@ -421,7 +404,6 @@ map.addLayer(cluster);
         }
       });
 
-      // Szybkie akcje
       el.querySelectorAll('a[data-quick]').forEach(a=>{
         a.addEventListener('click', async ev=>{
           ev.preventDefault();
@@ -433,7 +415,7 @@ map.addLayer(cluster);
           if(kind==="me"){
             const me = (account && (account.name||"")) || "";
             if(me && PH_LIST.includes(me)) phSel.value = me;
-            else if(PH_LIST.length){ phSel.value = PH_LIST[0]; } // fallback
+            else if(PH_LIST.length){ phSel.value = PH_LIST[0]; }
           }
           if(kind==="offer"){
             stSel.value = "Oferta wysłana";
@@ -447,7 +429,6 @@ map.addLayer(cluster);
         });
       });
 
-      // Maile
       el.querySelectorAll('a[data-mail]').forEach(a=>{
         a.addEventListener('click', ev=>{
           ev.preventDefault();
@@ -462,7 +443,6 @@ map.addLayer(cluster);
   }
 
   function rebuild(){
-    // zbuduj klastr na podstawie frows
     cluster.clearLayers();
     let placed=0;
     frows.forEach(rec=>{
@@ -472,9 +452,9 @@ map.addLayer(cluster);
     fitToData(frows);
     const sample = frows.slice(0,2).map(r=>`(${r.lat.toFixed(5)}, ${r.lon.toFixed(5)})`).join(" ; ");
     setStatus([
-	`Widocznych na mapie: ${placed}`,
-	`Przykładowe współrzędne: ${sample||"—"}`
-	]);
+      `Widocznych na mapie: ${placed}`,
+      `Przykładowe współrzędne: ${sample||"—"}`
+    ]);
   }
 
   /* ==================== MAIL – formatowanie + szablony ==================== */
@@ -665,22 +645,21 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     return resp.status===204 ? null : resp.json();
   }
   async function gBatch(requests){
-  const token = await getToken();
-  const resp = await fetch("https://graph.microsoft.com/v1.0/$batch", {
-    method: "POST",
-    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
-    body: JSON.stringify({ requests })
-  });
-  const js = await resp.json();
-  if (!resp.ok) {
-    const msg = (js && js.error && js.error.message) ? js.error.message : JSON.stringify(js);
-    throw new Error("Batch error: " + msg);
+    const token = await getToken();
+    const resp = await fetch("https://graph.microsoft.com/v1.0/$batch", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ requests })
+    });
+    const js = await resp.json();
+    if (!resp.ok) {
+      const msg = (js && js.error && js.error.message) ? js.error.message : JSON.stringify(js);
+      throw new Error("Batch error: " + msg);
+    }
+    const bad = (js.responses || []).find(r => r.status < 200 || r.status >= 300);
+    if (bad) throw new Error("Batch subrequest failed: " + bad.status + " " + JSON.stringify(bad.body||{}));
+    return js;
   }
-  // kontrola sub-odpowiedzi
-  const bad = (js.responses || []).find(r => r.status < 200 || r.status >= 300);
-  if (bad) throw new Error("Batch subrequest failed: " + bad.status + " " + JSON.stringify(bad.body||{}));
-  return js;
-}
   async function getSiteId(){
     if(siteId) return siteId;
     const url = `https://graph.microsoft.com/v1.0/sites/${CONFIG.spHost}:/sites/${CONFIG.spSitePath}`;
@@ -760,7 +739,7 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     const headers = (values[0]||[]).map(h=>String(h||"").trim());
     const body = values.slice(1);
     const H = {
-      created: headers[0], // kol. A – Data zgłoszenia
+      created: headers[0],
       lat:  pickHeader(headers,["lat","latitude","szerokość","szerokosc"]),
       lon:  pickHeader(headers,["lon","longitude","długość","dlugosc"]),
       tel:  pickHeader(headers,["telefon","tel"]),
@@ -777,29 +756,28 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     const get = (r, col) => { const idx=headers.indexOf(col); return idx>=0 ? r[idx] : ""; };
 
     let out = body.map((r, idx) => {
-  let lat = toNum(get(r,H.lat)); 
-  let lon = toNum(get(r,H.lon));
-  let adr = get(r,H.adresPelny) || "";
-  if(!adr){
-    const u = String(get(r,H.ulica)||"").trim();
-    const n = String(get(r,H.nr)||"").trim();
-    const m = String(get(r,H.msc)||"").trim();
-    adr = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
-  }
-  return {
-    _row1: idx + 2,                        // poprawnie wyliczony numer wiersza
-    createdAt: toDate(get(r,H.created)),
-    lat, lon, adres_pelny: adr||"",
-    PH: String(get(r,H.ph)||""),
-    Status: String(get(r,H.st)||""),
-    telefon: String(get(r,H.tel)||""),
-    email: String(get(r,H.mail)||""),
-    nazwa: String(get(r,H.nazwa)||""),
-    miejscowosc: String(get(r,H.msc)||""),
-    PowodOdmowy: String(get(r,H.powod)||"")
-  };
-});
-
+      let lat = toNum(get(r,H.lat)); 
+      let lon = toNum(get(r,H.lon));
+      let adr = get(r,H.adresPelny) || "";
+      if(!adr){
+        const u = String(get(r,H.ulica)||"").trim();
+        const n = String(get(r,H.nr)||"").trim();
+        const m = String(get(r,H.msc)||"").trim();
+        adr = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
+      }
+      return {
+        _row1: idx + 2,
+        createdAt: toDate(get(r,H.created)),
+        lat, lon, adres_pelny: adr||"",
+        PH: String(get(r,H.ph)||""),
+        Status: String(get(r,H.st)||""),
+        telefon: String(get(r,H.tel)||""),
+        email: String(get(r,H.mail)||""),
+        nazwa: String(get(r,H.nazwa)||""),
+        miejscowosc: String(get(r,H.msc)||""),
+        PowodOdmowy: String(get(r,H.powod)||"")
+      };
+    });
 
     const validLat=v=>isFinite(v)&&v>=-90&&v<=90;
     const validLon=v=>isFinite(v)&&v>=-180&&v<=180;
@@ -816,9 +794,7 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     const values = used.values || [];
     if(!values.length){ setStatus("Arkusz pusty."); rows=[]; frows=[]; return; }
     rows = parseRows(values);
-    // uzupełnij filtry mini-panelu
     fillMiniFilters();
-    // start: bez filtrów
     frows = rows.slice();
     setStatus(`Załadowano ${rows.length} wierszy z arkusza „${CONFIG.dataSheet}”.`);
   }
@@ -854,139 +830,133 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
       else idxRS = headers.indexOf(H.reason);
     }
 
-    // dopasowanie wiersza – najpierw użyj znanego numeru, fallback jeśli brak
-let row1 = Number(rec._row1) || -1, oldPH="", oldST="";
-if(row1>0){
-  const row = body[row1-2] || [];
-  oldPH = idxPH>=0 ? String(row[idxPH]||"") : "";
-  oldST = idxST>=0 ? String(row[idxST]||"") : "";
-}else{
-  const wantAddr = normAddr(rec.adres_pelny||"");
-  for(let r=0; r<body.length; r++){
-    const row = body[r]||[];
-    let adrRow = "";
-    if(H.adresPelny){
-      const i = headers.indexOf(H.adresPelny);
-      adrRow = String(row[i]||"");
-    }else{
-      const u = H.ulica ? String(row[headers.indexOf(H.ulica)]||"").trim() : "";
-      const n = H.nr    ? String(row[headers.indexOf(H.nr)]||"").trim()    : "";
-      const m = H.msc   ? String(row[headers.indexOf(H.msc)]||"").trim()   : "";
-      adrRow = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
-    }
-    if(wantAddr && normAddr(adrRow) === wantAddr){
-      row1 = r+2;
-    } else if(H.lat && H.lon && isFinite(rec.lat) && isFinite(rec.lon)){
-      const iLat = headers.indexOf(H.lat);
-      const iLon = headers.indexOf(H.lon);
-      const latR = toNum(row[iLat]); const lonR = toNum(row[iLon]);
-      if(near(latR, rec.lat) && near(lonR, rec.lon)){ row1 = r+2; }
-    }
+    // dopasowanie wiersza – najpierw znany numer, fallback jeśli brak
+    let row1 = Number(rec._row1) || -1, oldPH="", oldST="";
     if(row1>0){
+      const row = body[row1-2] || [];
       oldPH = idxPH>=0 ? String(row[idxPH]||"") : "";
       oldST = idxST>=0 ? String(row[idxST]||"") : "";
-      break;
+    }else{
+      const wantAddr = normAddr(rec.adres_pelny||"");
+      for(let r=0; r<body.length; r++){
+        const row = body[r]||[];
+        let adrRow = "";
+        if(H.adresPelny){
+          const i = headers.indexOf(H.adresPelny);
+          adrRow = String(row[i]||"");
+        }else{
+          const u = H.ulica ? String(row[headers.indexOf(H.ulica)]||"").trim() : "";
+          const n = H.nr    ? String(row[headers.indexOf(H.nr)]||"").trim()    : "";
+          const m = H.msc   ? String(row[headers.indexOf(H.msc)]||"").trim()   : "";
+          adrRow = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
+        }
+        if(wantAddr && normAddr(adrRow) === wantAddr){
+          row1 = r+2;
+        } else if(H.lat && H.lon && isFinite(rec.lat) && isFinite(rec.lon)){
+          const iLat = headers.indexOf(H.lat);
+          const iLon = headers.indexOf(H.lon);
+          const latR = toNum(row[iLat]); const lonR = toNum(row[iLon]);
+          if(near(latR, rec.lat) && near(lonR, rec.lon)){ row1 = r+2; }
+        }
+        if(row1>0){
+          oldPH = idxPH>=0 ? String(row[idxPH]||"") : "";
+          oldST = idxST>=0 ? String(row[idxST]||"") : "";
+          break;
+        }
+      }
+      if(row1<0) throw new Error("Nie znaleziono pozycji w Excelu (dopasowanie po adresie i/lub współrzędnych).");
+      rec._row1 = row1;
     }
-  }
-  if(row1<0) throw new Error("Nie znaleziono pozycji w Excelu (dopasowanie po adresie i/lub współrzędnych).");
-  // zapisz numer na przyszłość
-  rec._row1 = row1;
-}
 
-    // zapis
     // --- [BATCH] zapis PH, Status, (opcjonalnie) Powód + dopis do loga w jednym żądaniu ---
-const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
-const wsqData = CONFIG.dataSheet.replace(/'/g,"''");
+    const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
+    const wsqData = CONFIG.dataSheet.replace(/'/g,"''");
 
-// adresy komórek (A1-notation)
-const a1PH     = `${colLetter(idxPH+1)}${row1}`;
-const a1ST     = `${colLetter(idxST+1)}${row1}`;
-const a1REASON = (idxRS>=0) ? `${colLetter(idxRS+1)}${row1}` : null;
+    // adresy komórek
+    const a1PH     = `${colLetter(idxPH+1)}${row1}`;
+    const a1ST     = `${colLetter(idxST+1)}${row1}`;
+    const a1REASON = (idxRS>=0) ? `${colLetter(idxRS+1)}${row1}` : null;
 
-// przygotuj log (potrzebny numer następnego wiersza)
-await ensureAuditHeaders();
-const nextLog = await getNextLogRow();
-const logA1   = `A${nextLog}:${colLetter(AUDIT_HEADERS.length)}${nextLog}`;
-const now     = new Date().toISOString();
-const upn     = (account && (account.username||account.homeAccountId)) || "";
-const logRow  = [ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}|${newReason||""}`, "" ];
+    // log
+    await ensureAuditHeaders();
+    const nextLog = await getNextLogRow();
+    const logA1   = `A${nextLog}:${colLetter(AUDIT_HEADERS.length)}${nextLog}`;
+    const now     = new Date().toISOString();
+    const upn     = (account && (account.username||account.homeAccountId)) || "";
+    const logRow  = [ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}|${newReason||""}`, "" ];
 
-// budujemy tablicę żądań do $batch
-const requests = [
-  {
-    id: "ph",
-    method: "PATCH",
-    url: `/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1PH}')`,
-    headers: { "Content-Type": "application/json" },
-    body: { values: [[ newPH || "" ]] }
-  },
-  {
-    id: "st",
-    method: "PATCH",
-    url: `/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1ST}')`,
-    headers: { "Content-Type": "application/json" },
-    body: { values: [[ newStatus || "" ]] }
+    // sub-requests do $batch (UWAGA: bez /v1.0 w URL!)
+    const requests = [
+      {
+        id: "ph",
+        method: "PATCH",
+        url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1PH}')`,
+        headers: { "Content-Type": "application/json" },
+        body: { values: [[ newPH || "" ]] }
+      },
+      {
+        id: "st",
+        method: "PATCH",
+        url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1ST}')`,
+        headers: { "Content-Type": "application/json" },
+        body: { values: [[ newStatus || "" ]] }
+      }
+    ];
+
+    if (a1REASON){
+      requests.push({
+        id: "reason",
+        method: "PATCH",
+        url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1REASON}')`,
+        headers: { "Content-Type": "application/json" },
+        body: { values: [[ newReason || "" ]] }
+      });
+    }
+
+    const wsqLog = CONFIG.logSheet.replace(/'/g,"''");
+    requests.push({
+      id: "log",
+      method: "PATCH",
+      url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqLog}')/range(address='${logA1}')`,
+      headers: { "Content-Type": "application/json" },
+      body: { values: [ logRow ] }
+    });
+
+    await gBatch(requests);
   }
-];
-
-if (a1REASON){
-  requests.push({
-    id: "reason",
-    method: "PATCH",
-    url: `/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1REASON}')`,
-    headers: { "Content-Type": "application/json" },
-    body: { values: [[ newReason || "" ]] }
-  });
-}
-
-// dopis do AuditLog w tym samym batchu
-const wsqLog = CONFIG.logSheet.replace(/'/g,"''");
-requests.push({
-  id: "log",
-  method: "PATCH",
-  url: `/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqLog}')/range(address='${logA1}')`,
-  headers: { "Content-Type": "application/json" },
-  body: { values: [ logRow ] }
-});
-
-// wyślij jedno żądanie
-await gBatch(requests);
-}
 
   /* =========================== MINI-FILTRY + MASÓWKA =========================== */
   function fillMiniFilters(){
     const phSel=$("#mfPH"); const stSel=$("#mfStatus");
-    // PH
     phSel.innerHTML = `<option value="">(wszyscy)</option>` + PH_LIST.map(ph=>`<option>${esc(ph)}</option>`).join("");
-    // Status
     stSel.innerHTML = `<option value="">(wszystkie)</option>` + STATUS_LIST.map(st=>`<option>${esc(st)}</option>`).join("");
   }
   function applyMiniFilters(){
-  const wantPH = $("#mfPH").value.trim();
-  const wantST = $("#mfStatus").value.trim();
-  const query  = ($("#mfSearch").value || "").trim().toLowerCase();
-  const dFrom  = $("#mfFrom").value ? new Date($("#mfFrom").value+"T00:00:00") : null;
-  const dTo    = $("#mfTo").value   ? new Date($("#mfTo").value  +"T23:59:59") : null;
+    const wantPH = $("#mfPH").value.trim();
+    const wantST = $("#mfStatus").value.trim();
+    const query  = ($("#mfSearch").value || "").trim().toLowerCase();
+    const dFrom  = $("#mfFrom").value ? new Date($("#mfFrom").value+"T00:00:00") : null;
+    const dTo    = $("#mfTo").value   ? new Date($("#mfTo").value  +"T23:59:59") : null;
 
-  frows = rows.filter(r=>{
-    if(wantPH && (r.PH||"").trim() !== wantPH) return false;
-    if(wantST && (r.Status||"").trim() !== wantST) return false;
+    frows = rows.filter(r=>{
+      if(wantPH && (r.PH||"").trim() !== wantPH) return false;
+      if(wantST && (r.Status||"").trim() !== wantST) return false;
 
-    if(query){
-      const inCity = String(r.miejscowosc||"").toLowerCase().includes(query);
-      const inAddr = String(r.adres_pelny||"").toLowerCase().includes(query);
-      if(!inCity && !inAddr) return false;
-    }
+      if(query){
+        const inCity = String(r.miejscowosc||"").toLowerCase().includes(query);
+        const inAddr = String(r.adres_pelny||"").toLowerCase().includes(query);
+        if(!inCity && !inAddr) return false;
+      }
 
-    if (dFrom || dTo){
-      if(!r.createdAt) return false;
-      const t = r.createdAt;
-      if(dFrom && t < dFrom) return false;
-      if(dTo   && t > dTo)   return false;
-    }
-    return true;
-  });
-}
+      if (dFrom || dTo){
+        if(!r.createdAt) return false;
+        const t = r.createdAt;
+        if(dFrom && t < dFrom) return false;
+        if(dTo   && t > dTo)   return false;
+      }
+      return true;
+    });
+  }
 
   async function massAssignToMe(){
     const me = (account && (account.name||"")) || "";
@@ -1022,12 +992,12 @@ await gBatch(requests);
 
   /* =========================== START =========================== */
   initMap();
-renderLegend();
-attachToggle("toolbarBox","tgToolbar","toolbar");
-attachToggle("filtersBox","tgFilters","filters");
-attachToggle("legend","tgLegend","legend");
-setStatus(DEFAULT_STATUS);
-msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e));
+  renderLegend();
+  attachToggle("toolbarBox","tgToolbar","toolbar");
+  attachToggle("filtersBox","tgFilters","filters");
+  attachToggle("legend","tgLegend","legend");
+  setStatus(DEFAULT_STATUS);
+  msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e));
 })();
 </script>
 </body>
