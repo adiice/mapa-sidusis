@@ -68,6 +68,17 @@
     border-radius:50%; display:flex; align-items:center; justify-content:center;
     border:1px solid rgba(0,0,0,.2);
   }
+  
+  /* === Collapsibles (strzałka + zwijanie) === */
+.collapsible { position: relative; }
+.collapsible .toggle{
+  position:absolute; top:6px; right:6px;
+  width:24px; height:24px; border:1px solid #cbd5e1; border-radius:999px;
+  background:#f8fafc; cursor:pointer; line-height:22px; font-size:14px;
+  display:flex; align-items:center; justify-content:center;
+}
+.collapsible.is-collapsed > :not(.toggle) { display:none !important; }
+
 </style>
 
 <!-- Leaflet + MarkerCluster -->
@@ -102,7 +113,8 @@
 <div id="map"></div>
 
 <!-- Panel narzędziowy (jak było) -->
-<div class="toolbar">
+<div class="toolbar collapsible" id="toolbarBox">
+  <button class="toggle" id="tgToolbar" title="Zwiń/rozwiń">⯅</button>
   <div class="row">
     <strong>SIDUSIS – Mapa leadów (ONLINE)</strong>
     <span class="small" id="who"></span>
@@ -117,7 +129,8 @@
 </div>
 
 <!-- Mini-filtry (PH/Status/Miasto/Dziś + masowe działanie) -->
-<div class="mini-filter">
+<div class="mini-filter collapsible" id="filtersBox">
+  <button class="toggle" id="tgFilters" title="Zwiń/rozwiń">⯅</button>
   <div class="f">
     <label>PH</label>
     <select id="mfPH">
@@ -131,8 +144,8 @@
     </select>
   </div>
   <div class="f">
-    <label>Miasto (zawiera)</label>
-    <input id="mfCity" placeholder="np. Poznań" />
+  <label>Miasto / ulica (zawiera)</label>
+  <input id="mfSearch" placeholder="np. Poznań lub Piłsudskiego" />
   </div>
   <div class="f">
     <label>&nbsp;</label>
@@ -148,7 +161,10 @@
   </div>
 </div>
 
-<div class="legend" id="legend"></div>
+<div class="legend collapsible" id="legend">
+  <button class="toggle" id="tgLegend" title="Zwiń/rozwiń">⯅</button>
+  <div class="legend-body"></div>
+</div>
 <div class="error" id="errorBar"></div>
 
 <script>
@@ -213,7 +229,32 @@
     if(!d) return false;
     const t=new Date(); return d.getFullYear()===t.getFullYear() && d.getMonth()===t.getMonth() && d.getDate()===t.getDate();
   }
+  
+  /* === UI collapsibles: stan i pomocnicze === */
+const UI_STATE_KEY = "uiCollapsed_v1";
+const UI_STATE = loadUiState(); // { toolbar:bool, filters:bool, legend:bool }
 
+function loadUiState(){
+  try{ return JSON.parse(localStorage.getItem(UI_STATE_KEY)) || {toolbar:false, filters:false, legend:false}; }
+  catch{ return {toolbar:false, filters:false, legend:false}; }
+}
+function saveUiState(){ localStorage.setItem(UI_STATE_KEY, JSON.stringify(UI_STATE)); }
+
+function attachToggle(boxId, btnId, key){
+  const box = document.getElementById(boxId);
+  const btn = document.getElementById(btnId);
+  if(!box || !btn) return;
+  // zastosuj stan startowy
+  box.classList.toggle('is-collapsed', !!UI_STATE[key]);
+  btn.textContent = UI_STATE[key] ? "⯈" : "⯅";
+  btn.addEventListener('click', ()=>{
+    const now = !box.classList.contains('is-collapsed');
+    box.classList.toggle('is-collapsed', now);
+    btn.textContent = now ? "⯈" : "⯅";
+    UI_STATE[key] = now;
+    saveUiState();
+  });
+}
   /* =========================== MAPA =========================== */
   function initMap(){
     if(map) map.remove();
@@ -229,15 +270,22 @@
     map.fitBounds(fg.getBounds().pad(0.2));
   }
   function renderLegend(){
-    const box=$("#legend"); let html="";
-    html+=`<div class="title">PH (kolor wypełnienia)</div>`;
-    for(const ph of PH_LIST){ const col=PH_COLOR_MAP[ph]||DEFAULT_PH_COLOR; html+=`<div><span class="pill" style="background:${col}"></span>${esc(ph)}</div>`; }
-    html+=`<div style="margin:6px 0;border-top:1px solid #ddd"></div>`;
-    html+=`<div class="title">Status (kolor obrysu)</div>`;
-    for(const [st,col] of Object.entries(STATUS_COLOR_MAP)){ html+=`<div><span class="pill status-pill" style="background:${col};border-color:${col}"></span>${esc(st)}</div>`; }
-    box.innerHTML=html;
-  }
-
+	const box = document.getElementById("legend");
+	const body = box.querySelector(".legend-body");
+	let html="";
+	html+=`<div class="title">PH (kolor wypełnienia)</div>`;
+	for(const ph of PH_LIST){
+    const col=PH_COLOR_MAP[ph]||DEFAULT_PH_COLOR;
+    html+=`<div><span class="pill" style="background:${col}"></span>${esc(ph)}</div>`;
+	}
+	html+=`<div style="margin:6px 0;border-top:1px solid #ddd"></div>`;
+	html+=`<div class="title">Status (kolor obrysu)</div>`;
+	for(const [st,col] of Object.entries(STATUS_COLOR_MAP)){
+    html+=`<div><span class="pill status-pill" style="background:${col};border-color:${col}"></span>${esc(st)}</div>`;
+	}
+	body.innerHTML = html;
+	}
+	
   function makeIcon(rec){
     const fill = PH_COLOR_MAP[(rec.PH||"").trim()] || DEFAULT_PH_COLOR;
     const stroke = STATUS_COLOR_MAP[(rec.Status||"").trim()] || DEFAULT_STATUS_COLOR;
@@ -795,19 +843,33 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     stSel.innerHTML = `<option value="">(wszystkie)</option>` + STATUS_LIST.map(st=>`<option>${esc(st)}</option>`).join("");
   }
   function applyMiniFilters(){
-    const wantPH = $("#mfPH").value.trim();
-    const wantST = $("#mfStatus").value.trim();
-    const city   = $("#mfCity").value.trim().toLowerCase();
-    const onlyToday = $("#mfToday").checked;
+  const wantPH = $("#mfPH").value.trim();
+  const wantST = $("#mfStatus").value.trim();
+  const query  = ($("#mfSearch").value || "").trim().toLowerCase();
+  const onlyToday = $("#mfToday").checked;
 
-    frows = rows.filter(r=>{
-      if(wantPH && (r.PH||"").trim() !== wantPH) return false;
-      if(wantST && (r.Status||"").trim() !== wantST) return false;
-      if(city && !String(r.miejscowosc||"").toLowerCase().includes(city)) return false;
-      if(onlyToday && !isToday(r.createdAt)) return false;
-      return true;
-    });
-  }
+  frows = rows.filter(r=>{
+    if(wantPH && (r.PH||"").trim() !== wantPH) return false;
+    if(wantST && (r.Status||"").trim() !== wantST) return false;
+
+    if(query){
+      const inCity  = String(r.miejscowosc||"").toLowerCase().includes(query);
+      const inAddr  = String(r.adres_pelny ||"").toLowerCase().includes(query);
+      if(!inCity && !inAddr) return false;
+    }
+
+    if(onlyToday){
+      if(!r.createdAt) return false;
+      const t=new Date();
+      const sameDay = r.createdAt.getFullYear()===t.getFullYear() &&
+                      r.createdAt.getMonth()===t.getMonth() &&
+                      r.createdAt.getDate()===t.getDate();
+      if(!sameDay) return false;
+    }
+    return true;
+  });
+}
+
   async function massAssignToMe(){
     const me = (account && (account.name||"")) || "";
     const targetPH = (me && PH_LIST.includes(me)) ? me : (PH_LIST[0]||"");
@@ -841,7 +903,12 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
   $("#mfMassAssign").addEventListener('click', ()=>{ massAssignToMe(); });
 
   /* =========================== START =========================== */
-  initMap(); renderLegend(); setStatus("Kliknij „Zaloguj”, a potem „Odśwież dane z Excelem”.");
+  initMap(); renderLegend();initMap();
+renderLegend();
+attachToggle("toolbarBox","tgToolbar","toolbar");
+attachToggle("filtersBox","tgFilters","filters");
+attachToggle("legend","tgLegend","legend");
+setStatus("Kliknij „Zaloguj”, a potem „Odśwież dane z Excelem”.");
   msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e));
 })();
 </script>
