@@ -776,28 +776,30 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     };
     const get = (r, col) => { const idx=headers.indexOf(col); return idx>=0 ? r[idx] : ""; };
 
-    let out = body.map(r=>{
-      let lat = toNum(get(r,H.lat)); let lon = toNum(get(r,H.lon));
-      let adr = get(r,H.adresPelny) || "";
-      if(!adr){
-        const u=String(get(r,H.ulica)||"").trim();
-        const n=String(get(r,H.nr)||"").trim();
-        const m=String(get(r,H.msc)||"").trim();
-        adr = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
-      }
-      return {
-		_row1: idx + 2, // numer wiersza w Excelu (1-based, z nagłówkiem)
-		createdAt: toDate(get(r,H.created)),
-		lat, lon, adres_pelny: adr||"",
-		PH: String(get(r,H.ph)||""),
-		Status: String(get(r,H.st)||""),
-		telefon: String(get(r,H.tel)||""),
-		email: String(get(r,H.mail)||""),
-		nazwa: String(get(r,H.nazwa)||""),
-		miejscowosc: String(get(r,H.msc)||""),
-		PowodOdmowy: String(get(r,H.powod)||"")
-		};
-    });
+    let out = body.map((r, idx) => {
+  let lat = toNum(get(r,H.lat)); 
+  let lon = toNum(get(r,H.lon));
+  let adr = get(r,H.adresPelny) || "";
+  if(!adr){
+    const u = String(get(r,H.ulica)||"").trim();
+    const n = String(get(r,H.nr)||"").trim();
+    const m = String(get(r,H.msc)||"").trim();
+    adr = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
+  }
+  return {
+    _row1: idx + 2,                        // poprawnie wyliczony numer wiersza
+    createdAt: toDate(get(r,H.created)),
+    lat, lon, adres_pelny: adr||"",
+    PH: String(get(r,H.ph)||""),
+    Status: String(get(r,H.st)||""),
+    telefon: String(get(r,H.tel)||""),
+    email: String(get(r,H.mail)||""),
+    nazwa: String(get(r,H.nazwa)||""),
+    miejscowosc: String(get(r,H.msc)||""),
+    PowodOdmowy: String(get(r,H.powod)||"")
+  };
+});
+
 
     const validLat=v=>isFinite(v)&&v>=-90&&v<=90;
     const validLon=v=>isFinite(v)&&v>=-180&&v<=180;
@@ -949,7 +951,7 @@ requests.push({
 
 // wyślij jedno żądanie
 await gBatch(requests);
-
+}
 
   /* =========================== MINI-FILTRY + MASÓWKA =========================== */
   function fillMiniFilters(){
@@ -1024,7 +1026,6 @@ renderLegend();
 attachToggle("toolbarBox","tgToolbar","toolbar");
 attachToggle("filtersBox","tgFilters","filters");
 attachToggle("legend","tgLegend","legend");
-setStatus("Kliknij „Zaloguj”, a potem „Odśwież dane z Excelem”.");
 setStatus(DEFAULT_STATUS);
 msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e));
 })();
