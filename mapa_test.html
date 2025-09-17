@@ -71,7 +71,7 @@
     border:1px solid rgba(0,0,0,.2);
   }
   /* === Collapsibles (strzałka + zwijanie) === */
-.collapsible { /* === position: relative === */; display: inline-block; box-sizing: border-box; }
+.collapsible { display: inline-block; box-sizing: border-box; }
 .collapsible .toggle{
   position:absolute; top:6px; right:6px;
   width:24px; height:24px; border:1px solid #cbd5e1; border-radius:999px;
@@ -190,15 +190,15 @@
   };
 
   /* =========================== UI/MAPA =========================== */
-  const PH_LIST = ["Adrian Daniel","Robert Kaźmierczak","Mariusz Kielczyk","Inga Kaźmierczak","Jacek Trybuchowski","Tomasz Józefowicz"];
-  const STATUS_LIST = ["Zapytanie o wycenę","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO"];
+  const PH_LIST = ["Adrian Daniel","Robert Kaźmierczak","Mariusz Kielczyk","Inga Kaźmierczak","Jacek Trybuchowski","Tomasz Józefowicz","Duplikat","MOICO","SEEV"];
+  const STATUS_LIST = ["Zapytanie o wycenę","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO","Duplikat","MOICO","SEEV"];
   const PH_COLORS = ["#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2","#7f7f7f","#bcbd22","#17becf"];
   const PH_COLOR_MAP = Object.fromEntries(PH_LIST.map((ph,i)=>[ph,PH_COLORS[i%PH_COLORS.length]]));
   const STATUS_COLOR_MAP = {"Zapytanie o wycenę":"#607D8B","Oferta wysłana":"#2196F3","Odmowa klienta":"#F44336","Akceptacja klienta":"#4CAF50","Poza Zasięgiem":"#000000","KPO":"#FF9800"};
   const REJECTION_REASONS = [
-    "Cena zbyt wysoka",
-    "Brak zapotrzebowania",
-    "Konkurencyjna oferta",
+    "Zbyt droga instalacja",
+    "Drogi abonament",
+    "Lepsza oferta konkurencji",
     "Brak możliwości technicznych",
     "Nieaktualny kontakt",
     "Inne"
@@ -941,4 +941,3 @@ msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e));
 </script>
 </body>
 </html>
-
