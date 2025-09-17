@@ -84,6 +84,13 @@
   }
   .collapsible.is-collapsed .toggle{ position: static; }
   .collapsible.is-collapsed > :not(.toggle){ display:none !important; }
+  
+  .credit{
+  position:fixed; right:10px; bottom:8px; z-index:9999;
+  background:#ffffffd9; backdrop-filter: blur(4px);
+  border:1px solid #e5e7eb; border-radius:999px;
+  padding:6px 10px; font-size:12px; color:#374151;
+}  
 </style>
 
 <!-- Leaflet + MarkerCluster -->
@@ -1000,5 +1007,6 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
   msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e));
 })();
 </script>
+<div class="credit">Autor: Adrian Daniel</div>
 </body>
 </html>
