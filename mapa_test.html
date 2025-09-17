@@ -92,16 +92,15 @@
 (async function main(){
   /* =========================== KONFIG (Twoje dane) =========================== */
   const CONFIG = {
-    // Entra ID (Azure AD)
     clientId: "2c5a0274-30c0-4efa-b13c-7ce1e0768cf9",
     tenantId: "e44d0310-65ed-4096-a024-dac77110765a",
-
-    // SharePoint + Excel
     spHost: "internetunion.sharepoint.com",
     spSitePath: "PHTheNetwork", // bez /sites/
-    filePath: "filePath: "/sites/PHTheNetwork/Shared Documents/PH TheNetwork - General/Kopia pliku Lista - SIDUSIS - PEŁNA - od 08-2025 - kopia do mapy.xlsx",",
 
-    // Arkusze
+    // >>> UPEWNIJ SIĘ, ŻE ŚCIEŻKA JEST POPRAWNA (relatywna do root'a dysku!)
+    // typowo: "/Shared Documents/General/NazwaPliku.xlsx"
+    filePath: "/Shared Documents/PH TheNetwork - General/Kopia pliku Lista - SIDUSIS - PEŁNA - od 08-2025 - kopia do mapy.xlsx",
+
     dataSheet: "Dane",
     logSheet: "AuditLog",
   };
