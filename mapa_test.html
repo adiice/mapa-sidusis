@@ -185,62 +185,74 @@
   };
 
   /* =========================== LISTY (wspólne z dashboardem) =========================== */
-  const DEFAULT_LISTS = {
-    ph: [],
-    status: ["Wycena Inwestycji","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO","MOICO","Duplikat","SEEV"],
-    statusAliases: {
-      "zapytanie o wycenę":"Wycena Inwestycji","zapytanie o wycene":"Wycena Inwestycji","wycena inwestycji":"Wycena Inwestycji",
-      "oferta wysłana":"Oferta wysłana","odmowa klienta":"Odmowa klienta","akceptacja klienta":"Akceptacja klienta",
-      "poza zasięgiem":"Poza Zasięgiem","kpo":"KPO","duplikat":"Duplikat","moico":"MOICO","seev":"SEEV"
-    },
-    statusColors: {
-      "Wycena Inwestycji":"#607D8B","Oferta wysłana":"#2196F3","Odmowa klienta":"#F44336",
-      "Akceptacja klienta":"#4CAF50","Poza Zasięgiem":"#000000","KPO":"#FF9800",
-      "MOICO":"#8E24AA","Duplikat":"#9E9E9E","SEEV":"#00BCD4"
-    },
-    excluded: ["KPO","Poza Zasięgiem","MOICO","Duplikat","SEEV"],
-    rejectionReasons: [
-      "Zbyt droga instalacja","Drogi abonament","Lepsza oferta konkurencji",
-      "Brak możliwości technicznych","Nieaktualny kontakt","Inne"
-    ]
-  };
+const DEFAULT_LISTS = {
+  ph: [
+    /* <-- wpisz pełną, oficjalną listę PH (te, które mają być w legendzie/filtrach) */
+    "Adrian Daniel","Robert Kaźmierczak","Mariusz Kielczyk","Inga Kaźmierczak","Jacek Trybuchowski","Tomasz Józefowicz"
+  ],
+  /* mapowanie skrótów z Excela -> pełne imię i nazwisko (klucze najlepiej małymi znakami) */
+  phAliases: {
+    "ad":"Adrian Daniel","rk":"Robert Kaźmierczak","mk":"Mariusz Kielczyk",
+    "ik":"Inga Kaźmierczak","jt":"Jacek Trybuchowski","tj":"Tomasz Józefowicz"
+  },
 
-  let LISTS = DEFAULT_LISTS;
-  let PH_LIST = [], STATUS_LIST = [], REJECTION_REASONS = [];
-  let STATUS_COLOR_MAP = {};
-  let EXCLUDED_STATUSES = new Set();
-  let PH_COLOR_MAP = {}; // uzupełniany po wczytaniu list PH
+  status: ["Wycena Inwestycji","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO","MOICO","Duplikat","SEEV"],
+  statusAliases: {
+    "zapytanie o wycenę":"Wycena Inwestycji","zapytanie o wycene":"Wycena Inwestycji","wycena inwestycji":"Wycena Inwestycji",
+    "oferta wysłana":"Oferta wysłana","odmowa klienta":"Odmowa klienta","akceptacja klienta":"Akceptacja klienta",
+    "poza zasięgiem":"Poza Zasięgiem","kpo":"KPO","duplikat":"Duplikat","moico":"MOICO","seev":"SEEV"
+  },
+  statusColors: {
+    "Wycena Inwestycji":"#607D8B","Oferta wysłana":"#2196F3","Odmowa klienta":"#F44336",
+    "Akceptacja klienta":"#4CAF50","Poza Zasięgiem":"#000000","KPO":"#FF9800",
+    "MOICO":"#8E24AA","Duplikat":"#9E9E9E","SEEV":"#00BCD4"
+  },
+  excluded: ["KPO","Poza Zasięgiem","MOICO","Duplikat","SEEV"],
+  rejectionReasons: [
+    "Zbyt droga instalacja","Drogi abonament","Lepsza oferta konkurencji",
+    "Brak możliwości technicznych","Nieaktualny kontakt","Inne"
+  ]
+};
 
-  function buildPhColorMap(phList){
-    const palette = ['#1abc9c','#3498db','#9b59b6','#e67e22','#e74c3c','#2ecc71','#16a085','#2980b9','#8e44ad','#d35400','#c0392b','#27ae60','#7f8c8d'];
-    const map = {};
-    phList.forEach((ph,i)=>{ map[ph] = palette[i % palette.length]; });
-    return map;
-  }
+let LISTS = DEFAULT_LISTS;
+let PH_LIST = [], STATUS_LIST = [], REJECTION_REASONS = [];
+let STATUS_COLOR_MAP = {};
+let EXCLUDED_STATUSES = new Set();
+let PH_ALIASES = {};
+let PH_COLOR_MAP = {}; // uzupełniany po wczytaniu list
 
-  async function loadLists(){
-    try{
-      const resp = await fetch('assets/lists.json?v=' + Date.now(), {cache:'no-store'});
-      if(resp.ok){
-        const js = await resp.json();
-        LISTS = { ...DEFAULT_LISTS, ...js };
-      }
-    }catch(e){
-      console.warn('lists.json – używam domyślnych list:', e);
-      LISTS = DEFAULT_LISTS;
-    }
-    PH_LIST = Array.isArray(LISTS.ph) ? LISTS.ph.slice() : [];
-    STATUS_LIST = Array.isArray(LISTS.status) ? LISTS.status.slice() : [];
-    STATUS_COLOR_MAP = { ...DEFAULT_LISTS.statusColors, ...(LISTS.statusColors||{}) };
-    REJECTION_REASONS = Array.isArray(LISTS.rejectionReasons) ? LISTS.rejectionReasons.slice() : DEFAULT_LISTS.rejectionReasons.slice();
-    EXCLUDED_STATUSES = new Set(Array.isArray(LISTS.excluded) ? LISTS.excluded : DEFAULT_LISTS.excluded);
-    PH_COLOR_MAP = buildPhColorMap(PH_LIST);
-  }
+const normStr = s => String(s||"").toLowerCase().trim();
 
-  function canonStatus(s){
-    const k = String(s||"").toLowerCase().trim();
-    return (LISTS.statusAliases && LISTS.statusAliases[k]) ? LISTS.statusAliases[k] : (s||"");
-  }
+function buildPhColorMap(phList){
+  const palette = ['#1abc9c','#3498db','#9b59b6','#e67e22','#e74c3c','#2ecc71','#16a085','#2980b9','#8e44ad','#d35400','#c0392b','#27ae60','#7f8c8d'];
+  const map = {}; phList.forEach((ph,i)=>{ map[ph] = palette[i % palette.length]; });
+  return map;
+}
+
+async function loadLists(){
+  try{
+    const resp = await fetch('assets/lists.json?v=' + Date.now(), {cache:'no-store'});
+    if(resp.ok){ LISTS = { ...DEFAULT_LISTS, ...(await resp.json()) }; }
+  }catch(e){ console.warn('lists.json – fallback na domyślne:', e); LISTS = DEFAULT_LISTS; }
+
+  PH_LIST = Array.isArray(LISTS.ph) ? LISTS.ph.slice() : [];
+  PH_ALIASES = Object.fromEntries(Object.entries(LISTS.phAliases||{}).map(([k,v])=>[normStr(k), v]));
+  STATUS_LIST = Array.isArray(LISTS.status) ? LISTS.status.slice() : [];
+  STATUS_COLOR_MAP = { ...DEFAULT_LISTS.statusColors, ...(LISTS.statusColors||{}) };
+  REJECTION_REASONS = Array.isArray(LISTS.rejectionReasons) ? LISTS.rejectionReasons.slice() : DEFAULT_LISTS.rejectionReasons.slice();
+  EXCLUDED_STATUSES = new Set(Array.isArray(LISTS.excluded) ? LISTS.excluded : DEFAULT_LISTS.excluded);
+  PH_COLOR_MAP = buildPhColorMap(PH_LIST);
+}
+
+function canonStatus(s){
+  const k = normStr(s);
+  return (LISTS.statusAliases && LISTS.statusAliases[k]) ? LISTS.statusAliases[k] : (s||"");
+}
+function canonPH(s){
+  const raw = String(s||"").trim();
+  const a = PH_ALIASES[normStr(raw)] || raw;    // mapuj skróty -> pełne
+  return PH_LIST.includes(a) ? a : "";          // jeśli nie ma w pliku – traktuj jako „brak”
+}
 
   /* =========================== STAN/UTIL =========================== */
   let account=null, siteId=null, fileId=null;
@@ -291,19 +303,31 @@
 
   /* =========================== MAPA =========================== */
   function initMap(){
-    if(map) map.remove();
-    map=L.map('map');
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
+  if(map) map.remove();
+  map = L.map('map', { updateWhenZooming:false, updateWhenIdle:true, inertia:true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
 
-    const radiusFn = (z) => { if (z <= 8)  return 30; if (z <= 10) return 26; if (z <= 12) return 22; if (z <= 14) return 18; return 14; };
-    cluster = L.markerClusterGroup({ maxClusterRadius: radiusFn, disableClusteringAtZoom: 17, chunkedLoading: true, spiderfyOnEveryZoom: false, showCoverageOnHover: false });
-    map.addLayer(cluster);
-  }
+  const radiusFn = z => (z<=8?30:z<=10?26:z<=12?22:z<=14?18:14);
+  cluster = L.markerClusterGroup({
+    maxClusterRadius: radiusFn,
+    disableClusteringAtZoom: 17,
+    chunkedLoading: true,
+    showCoverageOnHover: false,
+    spiderfyOnEveryZoom: false
+  });
+  map.addLayer(cluster);
+}
   function fitToData(arr){
-    const pts=arr.filter(r=>isFinite(r.lat)&&isFinite(r.lon));
-    if(!pts.length){ map.setView([52,19],6); return; }
-    const fg=L.featureGroup(pts.map(p=>L.marker([p.lat,p.lon]))); map.fitBounds(fg.getBounds().pad(0.2));
+  let minLat=90, maxLat=-90, minLon=180, maxLon=-180, has=false;
+  for(const r of arr){
+    if(!isFinite(r.lat)||!isFinite(r.lon)) continue;
+    has=true;
+    if(r.lat<minLat) minLat=r.lat; if(r.lat>maxLat) maxLat=r.lat;
+    if(r.lon<minLon) minLon=r.lon; if(r.lon>maxLon) maxLon=r.lon;
   }
+  if(!has){ map.setView([52,19],6); return; }
+  map.fitBounds([[minLat,minLon],[maxLat,maxLon]], { padding:[20,20] });
+}
   function renderLegend(){
     const body = document.querySelector("#legend .legend-body");
     let html="";
@@ -371,83 +395,79 @@
   }
 
   function addOneMarker(rec){
-    const m = L.marker([rec.lat, rec.lon], { icon: makeIcon(rec) });
-    m.bindPopup(buildPopup(rec));
+  const m = L.marker([rec.lat, rec.lon], { icon: makeIcon(rec) });
 
-    m.on('popupopen', e=>{
-      const el = e.popup.getElement()?.querySelector('.leaflet-popup-content');
-      if(!el) return;
+  // pusta ramka popupu – wypełnimy przy otwarciu
+  m.bindPopup("", { maxWidth: 420 });
 
-      const stSel = el.querySelector('#stSel');
-      const reasonRow = el.querySelector('#reasonRow');
-      stSel?.addEventListener('change', ()=>{
-        const st = (stSel.value || '').trim();
-        reasonRow.style.display = (st === "Odmowa klienta") ? 'flex' : 'none';
-      });
+  m.on('popupopen', e=>{
+    // wypełnij treść dopiero teraz
+    e.popup.setContent(buildPopup(rec));
 
-      el.querySelector('#savePHST')?.addEventListener('click', async ()=>{
-        const ph = el.querySelector('#phSel')?.value || "";
-        const st = el.querySelector('#stSel')?.value || "";
-        const reason = (st === "Odmowa klienta") ? (el.querySelector('#reasonSel')?.value || "") : "";
-        if(st === "Odmowa klienta" && !reason){ alert("Wybierz Powód odmowy."); return; }
+    const el = e.popup.getElement()?.querySelector('.leaflet-popup-content');
+    if(!el) return;
 
-        try{
-          setStatus("Zapis do Excela…");
-          await savePhStatus(rec, ph, st, reason);
-          rec.PH = ph; rec.Status = st; rec.PowodOdmowy = reason;
-          m.setIcon(makeIcon(rec));
-          m.setPopupContent(buildPopup(rec));
-          m.openPopup();
-          setStatus("Zapisano.", { autoClearMs: 2500 });
-        }catch(err){
-          showError("Błąd zapisu: " + (err.message||err));
-          setStatus("Błąd zapisu.");
+    const stSel = el.querySelector('#stSel');
+    const reasonRow = el.querySelector('#reasonRow');
+    stSel?.addEventListener('change', ()=>{
+      const st = (stSel.value || '').trim();
+      reasonRow.style.display = (st === "Odmowa klienta") ? 'flex' : 'none';
+    });
+
+    el.querySelector('#savePHST')?.addEventListener('click', async ()=>{
+      const ph = el.querySelector('#phSel')?.value || "";
+      const st = el.querySelector('#stSel')?.value || "";
+      const reason = (st === "Odmowa klienta") ? (el.querySelector('#reasonSel')?.value || "") : "";
+      if(st === "Odmowa klienta" && !reason){ alert("Wybierz Powód odmowy."); return; }
+      try{
+        setStatus("Zapis do Excela…");
+        await savePhStatus(rec, ph, st, reason);
+        rec.PH = ph; rec.Status = st; rec.PowodOdmowy = reason;
+        m.setIcon(makeIcon(rec));
+        m.setPopupContent(buildPopup(rec));
+        m.openPopup();
+        setStatus("Zapisano.", { autoClearMs: 2500 });
+      }catch(err){ showError("Błąd zapisu: " + (err.message||err)); setStatus("Błąd zapisu."); }
+    });
+
+    el.querySelectorAll('a[data-quick]').forEach(a=>{
+      a.addEventListener('click', ev=>{
+        ev.preventDefault();
+        if(a.getAttribute('data-quick')==="me"){
+          const phSel = el.querySelector('#phSel');
+          const me = (account && (account.name||"")) || "";
+          if(me && PH_LIST.includes(me)) phSel.value = me;
+          else if(PH_LIST.length){ phSel.value = PH_LIST[0]; }
         }
-      });
-
-      el.querySelectorAll('a[data-quick]').forEach(a=>{
-        a.addEventListener('click', ev=>{
-          ev.preventDefault();
-          const kind = a.getAttribute('data-quick');
-          if(kind === "me"){
-            const phSel = el.querySelector('#phSel');
-            const me = (account && (account.name||"")) || "";
-            if(me && PH_LIST.includes(me)) phSel.value = me;
-            else if(PH_LIST.length){ phSel.value = PH_LIST[0]; }
-          }
-        });
-      });
-
-      const noteBtn = el.querySelector('#saveNote');
-      if(noteBtn){
-        noteBtn.addEventListener('click', async ()=>{
-          const text = (el.querySelector('#noteText')?.value || "").trim();
-          try{
-            setStatus("Zapisuję uwagi…");
-            await saveUwagi(rec, text);
-            rec.Uwagi = text;
-            m.setPopupContent(buildPopup(rec));
-            m.openPopup();
-            setStatus("Zapisano uwagi.", { autoClearMs: 2000 });
-          }catch(err){
-            showError("Błąd zapisu uwag: " + (err.message||err));
-            setStatus("Błąd zapisu.");
-          }
-        });
-      }
-
-      el.querySelectorAll('a[data-mail]').forEach(a=>{
-        a.addEventListener('click', ev=>{
-          ev.preventDefault();
-          const kind = a.getAttribute('data-mail');
-          const t = mailTemplates(rec)[kind];
-          composeAndSend(t.to, t.subject, t.body);
-        });
       });
     });
 
-    cluster.addLayer(m);
-  }
+    const noteBtn = el.querySelector('#saveNote');
+    if(noteBtn){
+      noteBtn.addEventListener('click', async ()=>{
+        const text = (el.querySelector('#noteText')?.value || "").trim();
+        try{
+          setStatus("Zapisuję uwagi…");
+          await saveUwagi(rec, text);
+          rec.Uwagi = text;
+          m.setPopupContent(buildPopup(rec));
+          m.openPopup();
+          setStatus("Zapisano uwagi.", { autoClearMs: 2000 });
+        }catch(err){ showError("Błąd zapisu uwag: " + (err.message||err)); setStatus("Błąd zapisu."); }
+      });
+    }
+
+    el.querySelectorAll('a[data-mail]').forEach(a=>{
+      a.addEventListener('click', ev=>{
+        ev.preventDefault();
+        const t = mailTemplates(rec)[a.getAttribute('data-mail')];
+        composeAndSend(t.to, t.subject, t.body);
+      });
+    });
+  });
+
+  cluster.addLayer(m);
+}
 
   function rebuild(){
     cluster.clearLayers();
@@ -721,8 +741,8 @@ Pozostałe informacje jak w ofercie standardowej.
         _row1: idx + 2,
         createdAt: toDate(get(r,H.created)),
         lat, lon, adres_pelny: adr||"",
-        PH: String(get(r,H.ph)||""),
-        Status: canonStatus(String(get(r,H.st)||"")),
+        PH: canonPH(get(r,H.ph)),
+		Status: canonStatus(String(get(r,H.st)||"")),
         telefon: String(get(r,H.tel)||""),
         email: String(get(r,H.mail)||""),
         nazwa: String(get(r,H.nazwa)||""),
