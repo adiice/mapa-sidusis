@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-<!-- MarkerCluster (klasteryzacja) -->
+<!-- MarkerCluster -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 
@@ -44,11 +44,10 @@
     font-size:13px; display:none;
   }
 
-  /* Mini-filtry (pływający panel) */
+  /* Mini-filtry */
   .mini-filter{
     position: fixed; left:12px; top:12px; z-index:10001;
-    display:flex; gap:6px; align-items:flex-end;
-    flex-wrap:wrap;
+    display:flex; gap:6px; align-items:flex-end; flex-wrap:wrap;
     background:#fff; border:1px solid #ddd; border-radius:12px; padding:10px 12px; box-shadow:0 4px 20px rgba(0,0,0,.08);
     font-size:13px;
   }
@@ -57,11 +56,10 @@
   .mini-filter button{ padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#eef2ff; cursor:pointer; }
   .mini-filter label{ font-size:12px; color:#64748b; margin-bottom:4px; }
 
-  /* Ikony znaczników (DivIcon) */
+  /* Znacznik */
   .dot{
     width:18px; height:18px; border-radius:50%;
-    border:3px solid #999; box-sizing:border-box;
-    background:#777;
+    border:3px solid #999; box-sizing:border-box; background:#777;
   }
   .dot.badge::after{
     content:"!"; position:absolute; top:-6px; right:-6px;
@@ -70,27 +68,23 @@
     border:1px solid rgba(0,0,0,.2);
   }
 
-  /* === Collapsibles (strzałka + zwijanie) === */
+  /* Collapsibles */
   .collapsible { display: inline-block; box-sizing: border-box; }
   .collapsible .toggle{
-    position:absolute; top:6px; right:6px;
-    width:24px; height:24px; border:1px solid #cbd5e1; border-radius:999px;
-    background:#f8fafc; cursor:pointer; line-height:22px; font-size:14px;
-    display:flex; align-items:center; justify-content:center;
+    position:absolute; top:6px; right:6px; width:24px; height:24px;
+    border:1px solid #cbd5e1; border-radius:999px; background:#f8fafc; cursor:pointer;
+    line-height:22px; font-size:14px; display:flex; align-items:center; justify-content:center;
   }
-  .collapsible.is-collapsed{
-    display:inline-block !important;
-    padding:6px; min-width:28px; min-height:28px; width:auto; height:auto;
-  }
+  .collapsible.is-collapsed{ display:inline-block !important; padding:6px; min-width:28px; min-height:28px; width:auto; height:auto; }
   .collapsible.is-collapsed .toggle{ position: static; }
   .collapsible.is-collapsed > :not(.toggle){ display:none !important; }
-  
+
   .credit{
     position:fixed; right:10px; bottom:8px; z-index:9999;
     background:#ffffffd9; backdrop-filter: blur(4px);
     border:1px solid #e5e7eb; border-radius:999px;
     padding:6px 10px; font-size:12px; color:#374151;
-  }  
+  }
 </style>
 
 <!-- Leaflet + MarkerCluster -->
@@ -183,11 +177,9 @@
   const CONFIG = {
     clientId: "2c5a0274-30c0-4efa-b13c-7ce1e0768cf9",
     tenantId: "e44d0310-65ed-4096-a024-dac77110765a",
-
     spHost: "internetunion.sharepoint.com",
-    spSitePath: "PHTheNetwork", // bez /sites/
+    spSitePath: "PHTheNetwork",
     filePath: "/General/Kopia pliku Lista - SIDUSIS - PEŁNA - od 08-2025 - kopia do mapy.xlsx",
-
     dataSheet: "Dane",
     logSheet: "AuditLog"
   };
@@ -217,41 +209,34 @@
   let PH_LIST = [], STATUS_LIST = [], REJECTION_REASONS = [];
   let STATUS_COLOR_MAP = {};
   let EXCLUDED_STATUSES = new Set();
-  const PH_COLOR_MAP = {}; // wypełnimy paletą
+  let PH_COLOR_MAP = {}; // uzupełniany po wczytaniu list PH
+
+  function buildPhColorMap(phList){
+    const palette = ['#1abc9c','#3498db','#9b59b6','#e67e22','#e74c3c','#2ecc71','#16a085','#2980b9','#8e44ad','#d35400','#c0392b','#27ae60','#7f8c8d'];
+    const map = {};
+    phList.forEach((ph,i)=>{ map[ph] = palette[i % palette.length]; });
+    return map;
+  }
 
   async function loadLists(){
     try{
       const resp = await fetch('assets/lists.json?v=' + Date.now(), {cache:'no-store'});
-      if(!resp.ok) throw new Error(String(resp.status));
-      const js = await resp.json();
-      LISTS = {
-        ph: Array.isArray(js.ph)? js.ph : DEFAULT_LISTS.ph,
-        status: Array.isArray(js.status)? js.status : DEFAULT_LISTS.status,
-        statusAliases: js.statusAliases || DEFAULT_LISTS.statusAliases,
-        statusColors: js.statusColors || DEFAULT_LISTS.statusColors,
-        excluded: Array.isArray(js.excluded)? js.excluded : DEFAULT_LISTS.excluded,
-        rejectionReasons: Array.isArray(js.rejectionReasons)? js.rejectionReasons : DEFAULT_LISTS.rejectionReasons
-      };
+      if(resp.ok){
+        const js = await resp.json();
+        LISTS = { ...DEFAULT_LISTS, ...js };
+      }
     }catch(e){
       console.warn('lists.json – używam domyślnych list:', e);
       LISTS = DEFAULT_LISTS;
     }
-    // przypisz krótkie aliasy
-    PH_LIST = LISTS.ph.slice();
-    STATUS_LIST = LISTS.status.slice();
-    STATUS_COLOR_MAP = {...LISTS.statusColors};
-    REJECTION_REASONS = LISTS.rejectionReasons.slice();
-    EXCLUDED_STATUSES = new Set(LISTS.excluded);
-    // kolory PH – stała paleta HSL
-    const n = Math.max(1, PH_LIST.length);
-    PH_LIST.forEach((ph, i)=>{
-      if(!PH_COLOR_MAP[ph]){
-        const hue = Math.round((360*i)/n);
-        PH_COLOR_MAP[ph] = `hsl(${hue}, 65%, 45%)`;
-      }
-    });
+    PH_LIST = Array.isArray(LISTS.ph) ? LISTS.ph.slice() : [];
+    STATUS_LIST = Array.isArray(LISTS.status) ? LISTS.status.slice() : [];
+    STATUS_COLOR_MAP = { ...DEFAULT_LISTS.statusColors, ...(LISTS.statusColors||{}) };
+    REJECTION_REASONS = Array.isArray(LISTS.rejectionReasons) ? LISTS.rejectionReasons.slice() : DEFAULT_LISTS.rejectionReasons.slice();
+    EXCLUDED_STATUSES = new Set(Array.isArray(LISTS.excluded) ? LISTS.excluded : DEFAULT_LISTS.excluded);
+    PH_COLOR_MAP = buildPhColorMap(PH_LIST);
   }
-  // kanonizacja statusu
+
   function canonStatus(s){
     const k = String(s||"").toLowerCase().trim();
     return (LISTS.statusAliases && LISTS.statusAliases[k]) ? LISTS.statusAliases[k] : (s||"");
@@ -261,24 +246,15 @@
   let account=null, siteId=null, fileId=null;
   let rows=[];     // pełne dane
   let frows=[];    // dane po filtrze
-  let map, cluster; // warstwa klastrów
+  let map, cluster;
 
   const $ = s=>document.querySelector(s);
   const statusbar=$("#statusbar"); const who=$("#who"); const errorBar=$("#errorBar");
 
   const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const DEFAULT_STATUS = "Kliknij „Zaloguj”, a potem „Odśwież dane z Excelem”.";
-  function setStatus(msg, opts={}){
-    const { append = false, autoClearMs = 0 } = opts;
-    if(append){
-      const sep = statusbar.textContent ? "\n" : "";
-      statusbar.textContent = statusbar.textContent + sep + (Array.isArray(msg)? msg.join("\n") : String(msg||""));
-    }else{
-      statusbar.textContent = Array.isArray(msg)? msg.join("\n") : String(msg||"");
-    }
-    if(autoClearMs>0){ setTimeout(()=>{ statusbar.textContent = ""; }, autoClearMs); }
-  }
-  function showError(msg){ errorBar.textContent = msg; errorBar.style.display='block'; setTimeout(()=>{ errorBar.style.display='none'; }, 7000); }
+  function setStatus(msg, opts={}){ const {append=false,autoClearMs=0}=opts; statusbar.textContent = append ? (statusbar.textContent?(statusbar.textContent+"\n"):"") + (Array.isArray(msg)?msg.join("\n"):String(msg||"")) : (Array.isArray(msg)?msg.join("\n"):String(msg||"")); if(autoClearMs>0){ setTimeout(()=>statusbar.textContent="",autoClearMs);} }
+  function showError(msg){ console.error(msg); errorBar.textContent = String(msg||""); errorBar.style.display='block'; setTimeout(()=>{ errorBar.style.display='none'; }, 8000); }
   function toNum(v){ if(v==null) return NaN; const s=String(v).replace(",", ".").replace(/[^\d\.\-+Ee]/g,"").trim(); return parseFloat(s); }
   function colLetter(n){ let s="",x=n; while(x>0){x--; s=String.fromCharCode(65+(x%26))+s; x=Math.floor(x/26);} return s; }
   const normStr = s => String(s||"").toLowerCase().replace(/\s+/g," ").trim();
@@ -297,10 +273,7 @@
   /* === UI collapsibles === */
   const UI_STATE_KEY = "uiCollapsed_v1";
   const UI_STATE = loadUiState();
-  function loadUiState(){
-    try{ return JSON.parse(localStorage.getItem(UI_STATE_KEY)) || {toolbar:false, filters:false, legend:false}; }
-    catch{ return {toolbar:false, filters:false, legend:false}; }
-  }
+  function loadUiState(){ try{ return JSON.parse(localStorage.getItem(UI_STATE_KEY)) || {toolbar:false, filters:false, legend:false}; } catch{ return {toolbar:false, filters:false, legend:false}; } }
   function saveUiState(){ localStorage.setItem(UI_STATE_KEY, JSON.stringify(UI_STATE)); }
   function attachToggle(boxId, btnId, key){
     const box = document.getElementById(boxId);
@@ -312,8 +285,7 @@
       const now = !box.classList.contains('is-collapsed');
       box.classList.toggle('is-collapsed', now);
       btn.textContent = now ? "⯈" : "⯅";
-      UI_STATE[key] = now;
-      saveUiState();
+      UI_STATE[key] = now; saveUiState();
     });
   }
 
@@ -323,43 +295,23 @@
     map=L.map('map');
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
 
-    const radiusFn = (z) => {
-      if (z <= 8)  return 30;
-      if (z <= 10) return 26;
-      if (z <= 12) return 22;
-      if (z <= 14) return 18;
-      return 14;
-    };
-    cluster = L.markerClusterGroup({
-      maxClusterRadius: radiusFn,
-      disableClusteringAtZoom: 17,
-      chunkedLoading: true,
-      spiderfyOnEveryZoom: false,
-      showCoverageOnHover: false
-    });
+    const radiusFn = (z) => { if (z <= 8)  return 30; if (z <= 10) return 26; if (z <= 12) return 22; if (z <= 14) return 18; return 14; };
+    cluster = L.markerClusterGroup({ maxClusterRadius: radiusFn, disableClusteringAtZoom: 17, chunkedLoading: true, spiderfyOnEveryZoom: false, showCoverageOnHover: false });
     map.addLayer(cluster);
   }
   function fitToData(arr){
     const pts=arr.filter(r=>isFinite(r.lat)&&isFinite(r.lon));
     if(!pts.length){ map.setView([52,19],6); return; }
-    const fg=L.featureGroup(pts.map(p=>L.marker([p.lat,p.lon])));
-    map.fitBounds(fg.getBounds().pad(0.2));
+    const fg=L.featureGroup(pts.map(p=>L.marker([p.lat,p.lon]))); map.fitBounds(fg.getBounds().pad(0.2));
   }
   function renderLegend(){
-    const box = document.getElementById("legend");
-    const body = box.querySelector(".legend-body");
+    const body = document.querySelector("#legend .legend-body");
     let html="";
     html+=`<div class="title">PH (kolor wypełnienia)</div>`;
-    for(const ph of PH_LIST){
-      const col=PH_COLOR_MAP[ph]||"#455A64";
-      html+=`<div><span class="pill" style="background:${col}"></span>${esc(ph)}</div>`;
-    }
+    for(const ph of PH_LIST){ const col=PH_COLOR_MAP[ph]||"#455A64"; html+=`<div><span class="pill" style="background:${col}"></span>${esc(ph)}</div>`; }
     html+=`<div style="margin:6px 0;border-top:1px solid #ddd"></div>`;
     html+=`<div class="title">Status (kolor obrysu)</div>`;
-    for(const st of STATUS_LIST){
-      const col = STATUS_COLOR_MAP[st] || "#9E9E9E";
-      html+=`<div><span class="pill status-pill" style="background:${col};border-color:${col}"></span>${esc(st)}</div>`;
-    }
+    for(const st of STATUS_LIST){ const col = STATUS_COLOR_MAP[st] || "#9E9E9E"; html+=`<div><span class="pill status-pill" style="background:${col};border-color:${col}"></span>${esc(st)}</div>`; }
     body.innerHTML = html;
   }
   const DEFAULT_PH_COLOR="#455A64", DEFAULT_STATUS_COLOR="#9E9E9E";
@@ -372,12 +324,9 @@
   }
 
   function buildPopup(rec){
-    const phOpts = ['<option value="">(brak)</option>']
-      .concat(PH_LIST.map(ph=>`<option ${ph===rec.PH?'selected':''}>${esc(ph)}</option>`)).join("");
-    const stOpts = ['<option value="">(brak)</option>']
-      .concat(STATUS_LIST.map(st=>`<option ${st===rec.Status?'selected':''}>${esc(st)}</option>`)).join("");
-    const reasonOpts = ['<option value="">(wybierz powód)</option>']
-      .concat(REJECTION_REASONS.map(r=>`<option ${r===(rec.PowodOdmowy||'')?'selected':''}>${esc(r)}</option>`)).join("");
+    const phOpts = ['<option value="">(brak)</option>'].concat(PH_LIST.map(ph=>`<option ${ph===rec.PH?'selected':''}>${esc(ph)}</option>`)).join("");
+    const stOpts = ['<option value="">(brak)</option>'].concat(STATUS_LIST.map(st=>`<option ${st===rec.Status?'selected':''}>${esc(st)}</option>`)).join("");
+    const reasonOpts = ['<option value="">(wybierz powód)</option>'].concat(REJECTION_REASONS.map(r=>`<option ${r===(rec.PowodOdmowy||'')?'selected':''}>${esc(r)}</option>`)).join("");
 
     const actions=`
       <div class="actions" style="margin-top:8px">
@@ -451,8 +400,7 @@
           m.openPopup();
           setStatus("Zapisano.", { autoClearMs: 2500 });
         }catch(err){
-          console.error(err);
-          showError("Błąd zapisu: " + err.message);
+          showError("Błąd zapisu: " + (err.message||err));
           setStatus("Błąd zapisu.");
         }
       });
@@ -482,8 +430,7 @@
             m.openPopup();
             setStatus("Zapisano uwagi.", { autoClearMs: 2000 });
           }catch(err){
-            console.error(err);
-            showError("Błąd zapisu uwag: " + err.message);
+            showError("Błąd zapisu uwag: " + (err.message||err));
             setStatus("Błąd zapisu.");
           }
         });
@@ -511,10 +458,7 @@
     });
     fitToData(frows);
     const sample = frows.slice(0,2).map(r=>`(${r.lat.toFixed(5)}, ${r.lon.toFixed(5)})`).join(" ; ");
-    setStatus([
-      `Widocznych na mapie: ${placed}`,
-      `Przykładowe współrzędne: ${sample||"—"}`
-    ]);
+    setStatus([`Widocznych na mapie: ${placed}`, `Przykładowe współrzędne: ${sample||"—"}`]);
   }
 
   /* ==================== MAIL – szablony ==================== */
@@ -574,75 +518,28 @@ Jednorazowy koszt instalacji wynosi 2500 zł (możliwość rozłożenia na 10 r�
 Abonament miesięczny zależny jest od prędkości łącza:
 300/300Mbs - 125 zł
 1000/1000Mbs - 150 zł
-TV 82 - 10 zł (Telewizja po łączu internetowym)
-TV 177 – 69 zł (Telewizja po łączu internetowym)
+TV 82 - 10 zł
+TV 177 – 69 zł
 lista kanałów: https://thenetwork.pl/telewizja/
 
 - Światłowód wprowadzany jest do pierwszego możliwego punktu w domu,
 - W miejscu, do którego zostanie doprowadzony światłowód niezbędne jest zasilanie dla urządzenia optycznego ONU.
-- Infrastruktura wewnętrzna / w tym urządzenie Wi-Fi / pozostaje w gestii właściciela posesji.
-Umowa zawierana jest na 24 miesiące.
+- Infrastruktura wewnętrzna pozostaje w gestii właściciela posesji.
+Umowa: 24 miesiące.
 
-W przypadku akceptacji warunków proszę o uzupełnienie poniższych danych celem przygotowania umowy.
-
-Nazwisko i Imię: ..............................
-Adres: ...........................
-PESEL: .................
-E-mail: ......................
-Tel.: ........................
-Pakiet TV: ...................
-Prędkość: ...................
-
-Jakie są następne kroki?
-
-Po otrzymaniu danych przygotujemy umowę on-line, która zostanie wysłana w oddzielnej wiadomości.
-Następnie po zaakceptowaniu umowy Zostaną Państwo wpisani na listę do realizacji dla wykonawcy. 
-Po wykonaniu przyłącza domowego oraz połączeniu go z główną magistralą Biuro Obsługi Klienta kontaktuje się z Państwem celem ustalenia dogodnego terminu uruchomienia usługi.
-
-Ostatni etap to wizyta technika, podczas której zostaje uruchomiona usługa. 
-Po tej wizycie w Panelu Klienta pojawi się pierwsza faktura.
-
-W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
+W przypadku akceptacji proszę o dane do umowy (Imię i nazwisko, adres, PESEL, e-mail, tel., pakiet TV, prędkość).
 `;
 
     const body_dev =
 `Dzień dobry,
 
-W odpowiedzi na przesłane zapytanie poniżej przesyłam ofertę na podłączenie Prywatnego Światłowodu The Network:
-
-Jednorazowy koszt instalacji wynosi 1 zł
-
-Abonament miesięczny zależny jest od prędkości łącza:
-300/300Mbs - 89 zł
-1000/1000Mbs - 114 zł
-TV 82 - 10 zł (Telewizja po łączu internetowym)
-TV 177 – 69 zł (Telewizja po łączu internetowym)
+W odpowiedzi na zapytanie – oferta deweloperska:
+Jednorazowy koszt instalacji: 1 zł
+Abonament: 300/300Mbs – 89 zł, 1000/1000Mbs – 114 zł
+TV 82 – 10 zł, TV 177 – 69 zł
 lista kanałów: https://thenetwork.pl/telewizja/
 
-- Światłowód wprowadzany jest do pierwszego możliwego punktu w domu,
-- W miejscu, do którego zostanie doprowadzony światłowód niezbędne jest zasilanie dla urządzenia optycznego ONU.
-- Infrastruktura wewnętrzna / w tym urządzenie Wi-Fi / pozostaje w gestii właściciela posesji.
-Umowa zawierana jest na 24 miesiące.
-
-W przypadku akceptacji warunków proszę o uzupełnienie poniższych danych celem przygotowania umowy.
-
-Nazwisko i Imię: ..............................
-Adres: ...........................
-PESEL: .................
-E-mail: ......................
-Tel.: ........................
-Pakiet TV: ...................
-Prędkość: ...................
-
-Jakie są następne kroki?
-
-Biuro Obsługi Klienta przygotowuje umowę on-line, która zostanie wysłana w oddzielnej wiadomości.
-Następnie po zaakceptowaniu umowy Biuro Obsługi Klienta kontaktuje się z Państwem celem ustalenia dogodnego terminu uruchomienia usługi.
-
-Ostatni etap to wizyta technika, podczas której zostaje uruchomiona usługa. 
-Po tej wizycie w Panelu Klienta pojawi się pierwsza faktura.
-
-W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
+Pozostałe informacje jak w ofercie standardowej.
 `;
 
     return {
@@ -674,11 +571,11 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
   const msalApp = new msal.PublicClientApplication({
     auth: { clientId: CONFIG.clientId, authority: "https://login.microsoftonline.com/" + CONFIG.tenantId,
             redirectUri: window.location.origin + window.location.pathname },
-    cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false }
+    cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false },
+    system: { loggerOptions: { loggerCallback: (l, m)=>console.log("[MSAL]", m) } }
   });
   const graphScopes = ["openid","profile","offline_access","Files.ReadWrite.All","Sites.Read.All"];
 
-  let account=null;
   async function ensureLogin(){
     const accs = msalApp.getAllAccounts();
     if(accs.length){ account=accs[0]; who.textContent = "Zalogowano: " + (account.username||account.homeAccountId); return; }
@@ -742,9 +639,8 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='${a1}')`;
     return gfetch("PATCH", url, { values: values2d });
   }
-  function colLetter(n){ let s="",x=n; while(x>0){x--; s=String.fromCharCode(65+(x%26))+s; x=Math.floor(x/26);} return s; }
 
-  /* ===== AuditLog – stabilny dopis (bez tabel) ===== */
+  /* ===== AuditLog (stabilny dopis) ===== */
   const AUDIT_HEADERS = ["ts","user","action","itemId","adres_pelny","old","new","note"];
 
   async function ensureAuditHeaders(){
@@ -757,35 +653,35 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     }
   }
   async function getNextLogRow(){
-    const used = await usedRange(CONFIG.logSheet);
-    const values = used.values || [];
-    let next = Math.max(2, values.length + 1);
+    const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
+    const wsq = CONFIG.logSheet.replace(/'/g,"''");
+    // szybkie sprawdzenie, a jeśli zajęte – skan kolumny A
+    let next = 2;
     try{
-      const id  = await getFileItemId();
-      const wsq = CONFIG.logSheet.replace(/'/g,"''");
-      const probe = await gfetch("GET",
-        `https://graph.microsoft.com/v1.0/drive/items/${id}/workbook/worksheets('${wsq}')/range(address='A${next-1}')?$select=values`
-      );
+      const used = await usedRange(CONFIG.logSheet);
+      next = Math.max(2, (used.values||[]).length + 1);
+      const probe = await gfetch("GET", `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='A${next-1}')?$select=values`);
       const prevVal = (((probe||{}).values||[])[0]||[])[0];
       if (prevVal && String(prevVal).trim() !== ""){
-        const scan = await gfetch("GET",
-          `https://graph.microsoft.com/v1.0/drive/items/${id}/workbook/worksheets('${wsq}')/range(address='A1:A50000')?$select=values`
-        );
+        const scan = await gfetch("GET", `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='A1:A50000')?$select=values`);
         const col = (scan.values||[]).map(r => String((r||[])[0] ?? "").trim());
         let last = 1; for (let i=col.length-1;i>=0;i--){ if(col[i] !== ""){ last = i+1; break; } }
         next = Math.max(2, last + 1);
       }
-    }catch(_){}
+    }catch(e){ console.warn("getNextLogRow:", e); }
     return next;
+  }
+  async function appendLog(row){
+    await ensureAuditHeaders();
+    const next = await getNextLogRow();
+    const a1 = `A${next}:${colLetter(AUDIT_HEADERS.length)}${next}`;
+    await patchRange(CONFIG.logSheet, a1, [row]);
   }
 
   /* =========================== DANE z Excela =========================== */
   function pickHeader(headers, tokens){
     const lc = headers.map(h => String(h||"").toLowerCase());
-    for(const t of tokens){
-      const i = lc.findIndex(n => n.includes(t));
-      if(i>=0) return headers[i];
-    }
+    for(const t of tokens){ const i = lc.findIndex(n => n.includes(t)); if(i>=0) return headers[i]; }
     return null;
   }
 
@@ -826,7 +722,7 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
         createdAt: toDate(get(r,H.created)),
         lat, lon, adres_pelny: adr||"",
         PH: String(get(r,H.ph)||""),
-        Status: String(get(r,H.st)||""),
+        Status: canonStatus(String(get(r,H.st)||"")),
         telefon: String(get(r,H.tel)||""),
         email: String(get(r,H.mail)||""),
         nazwa: String(get(r,H.nazwa)||""),
@@ -851,12 +747,18 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     const values = used.values || [];
     if(!values.length){ setStatus("Arkusz pusty."); rows=[]; frows=[]; return; }
     rows = parseRows(values);
+
+    // uzupełnij PH_LIST realnymi wartościami z danych
+    const phFromData = [...new Set(rows.map(r => (r.PH||"").trim()).filter(Boolean))];
+    let changed=false; for(const ph of phFromData){ if(!PH_LIST.includes(ph)){ PH_LIST.push(ph); changed=true; } }
+    if(changed){ PH_COLOR_MAP = buildPhColorMap(PH_LIST); renderLegend(); }
+
     fillMiniFilters();
     frows = rows.slice();
     setStatus(`Załadowano ${rows.length} wierszy z arkusza „${CONFIG.dataSheet}”.`);
   }
 
-  /* =========================== MARKERY =========================== */
+  /* =========================== FILTRY / MASÓWKA =========================== */
   function fillMiniFilters(){
     const phSel=$("#mfPH"); const stSel=$("#mfStatus");
     phSel.innerHTML = `<option value="">(wszyscy)</option>` + PH_LIST.map(ph=>`<option>${esc(ph)}</option>`).join("");
@@ -872,13 +774,11 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     frows = rows.filter(r=>{
       if(wantPH && (r.PH||"").trim() !== wantPH) return false;
       if(wantST && (r.Status||"").trim() !== wantST) return false;
-
       if(query){
         const inCity = String(r.miejscowosc||"").toLowerCase().includes(query);
         const inAddr = String(r.adres_pelny||"").toLowerCase().includes(query);
         if(!inCity && !inAddr) return false;
       }
-
       if (dFrom || dTo){
         if(!r.createdAt) return false;
         const t = r.createdAt;
@@ -908,14 +808,6 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
   }
 
   /* =========================== ZAPISY ($batch) =========================== */
-  async function appendLog(row){
-    await ensureAuditHeaders();
-    const next = await getNextLogRow();
-    const a1 = `A${next}:${colLetter(AUDIT_HEADERS.length)}${next}`;
-    await patchRange(CONFIG.logSheet, a1, [row]);
-  }
-
-  // zapis zmian (PH/Status + ewentualnie Powód odmowy)
   async function savePhStatus(rec, newPH, newStatus, newReason){
     const used = await usedRange(CONFIG.dataSheet);
     const vals = used.values || [];
@@ -955,8 +847,7 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     }else{
       const wantAddr = normAddr(rec.adres_pelny||"");
       for(let r=0; r<body.length; r++){
-        const row = body[r]||[];
-        let adrRow = "";
+        const row = body[r]||[]; let adrRow = "";
         if(H.adresPelny){
           const i = headers.indexOf(H.adresPelny);
           adrRow = String(row[i]||"");
@@ -966,11 +857,9 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
           const m = H.msc   ? String(row[headers.indexOf(H.msc)]||"").trim()   : "";
           adrRow = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
         }
-        if(wantAddr && normAddr(adrRow) === wantAddr){
-          row1 = r+2;
-        } else if(H.lat && H.lon && isFinite(rec.lat) && isFinite(rec.lon)){
-          const iLat = headers.indexOf(H.lat);
-          const iLon = headers.indexOf(H.lon);
+        if(wantAddr && normAddr(adrRow) === wantAddr){ row1 = r+2; }
+        else if(H.lat && H.lon && isFinite(rec.lat) && isFinite(rec.lon)){
+          const iLat = headers.indexOf(H.lat); const iLon = headers.indexOf(H.lon);
           const latR = toNum(row[iLat]); const lonR = toNum(row[iLon]);
           if(near(latR, rec.lat) && near(lonR, rec.lon)){ row1 = r+2; }
         }
@@ -1000,44 +889,18 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     const logRow  = [ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}|${newReason||""}`, "" ];
 
     const requests = [
-      {
-        id: "ph",
-        method: "PATCH",
-        url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1PH}')`,
-        headers: { "Content-Type": "application/json" },
-        body: { values: [[ newPH || "" ]] }
-      },
-      {
-        id: "st",
-        method: "PATCH",
-        url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1ST}')`,
-        headers: { "Content-Type": "application/json" },
-        body: { values: [[ newStatus || "" ]] }
-      }
+      { id: "ph", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1PH}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ newPH || "" ]] } },
+      { id: "st", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1ST}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ newStatus || "" ]] } }
     ];
     if (a1REASON){
-      requests.push({
-        id: "reason",
-        method: "PATCH",
-        url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1REASON}')`,
-        headers: { "Content-Type": "application/json" },
-        body: { values: [[ newReason || "" ]] }
-      });
+      requests.push({ id: "reason", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1REASON}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ newReason || "" ]] } });
     }
-
     const wsqLog = CONFIG.logSheet.replace(/'/g,"''");
-    requests.push({
-      id: "log",
-      method: "PATCH",
-      url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqLog}')/range(address='${logA1}')`,
-      headers: { "Content-Type": "application/json" },
-      body: { values: [ logRow ] }
-    });
+    requests.push({ id: "log", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqLog}')/range(address='${logA1}')`, headers: { "Content-Type": "application/json" }, body: { values: [ logRow ] } });
 
     await gBatch(requests);
   }
 
-  // zapis Uwag PH + wpis do AuditLog
   async function saveUwagi(rec, newNotes){
     const used = await usedRange(CONFIG.dataSheet);
     const vals = used.values || [];
@@ -1057,8 +920,7 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
 
     let idxNotes = (H.notes ? headers.indexOf(H.notes) : -1);
     if(idxNotes < 0){
-      idxNotes = headers.length;
-      headers.push("Uwagi");
+      idxNotes = headers.length; headers.push("Uwagi");
       await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]);
     }
 
@@ -1070,10 +932,8 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
       const wantAddr = normAddr(rec.adres_pelny||"");
       for(let r=0; r<body.length; r++){
         const row = body[r]||[]; let adrRow = "";
-        if(H.adresPelny){
-          const i = headers.indexOf(H.adresPelny);
-          adrRow = String(row[i]||"");
-        }else{
+        if(H.adresPelny){ const i = headers.indexOf(H.adresPelny); adrRow = String(row[i]||""); }
+        else{
           const u = H.ulica ? String(row[headers.indexOf(H.ulica)]||"").trim() : "";
           const n = H.nr    ? String(row[headers.indexOf(H.nr)]||"").trim()    : "";
           const m = H.msc   ? String(row[headers.indexOf(H.msc)]||"").trim()   : "";
@@ -1081,8 +941,7 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
         }
         if(wantAddr && normAddr(adrRow) === wantAddr){ row1 = r+2; }
         else if(H.lat && H.lon && isFinite(rec.lat) && isFinite(rec.lon)){
-          const iLat = headers.indexOf(H.lat);
-          const iLon = headers.indexOf(H.lon);
+          const iLat = headers.indexOf(H.lat); const iLon = headers.indexOf(H.lon);
           const latR = toNum(row[iLat]); const lonR = toNum(row[iLon]);
           if(near(latR, rec.lat) && near(lonR, rec.lon)){ row1 = r+2; }
         }
@@ -1104,54 +963,40 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     const logRow  = [ now, upn, "UpdateUwagi", "", rec.adres_pelny||"", oldNotes, newNotes||"", "" ];
 
     const requests = [
-      {
-        id: "notes",
-        method: "PATCH",
-        url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1NOTE}')`,
-        headers: { "Content-Type": "application/json" },
-        body: { values: [[ newNotes || "" ]] }
-      },
-      {
-        id: "log",
-        method: "PATCH",
-        url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${CONFIG.logSheet.replace(/'/g,"''")}')/range(address='${logA1}')`,
-        headers: { "Content-Type": "application/json" },
-        body: { values: [ logRow ] }
-      }
+      { id: "notes", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1NOTE}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ newNotes || "" ]] } },
+      { id: "log",   method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${CONFIG.logSheet.replace(/'/g,"''")}')/range(address='${logA1}')`, headers: { "Content-Type": "application/json" }, body: { values: [ logRow ] } }
     ];
     await gBatch(requests);
   }
 
   /* =========================== UI =========================== */
-  $("#btnLogin").addEventListener('click', async ()=>{ try{ await ensureLogin(); setStatus("Zalogowano."); }catch(err){ showError("Logowanie nieudane: " + err.message); } });
+  $("#btnLogin").addEventListener('click', async ()=>{ try{ await ensureLogin(); setStatus("Zalogowano."); }catch(err){ showError("Logowanie nieudane: " + (err.message||err)); } });
   $("#btnLogout").addEventListener('click', async ()=>{
     try{ const acc = msalApp.getAllAccounts()[0]; if(acc){ await msalApp.logoutPopup({ account: acc }); }
-      account=null; who.textContent=""; setStatus("Wylogowano."); }catch(err){ showError("Wylogowanie nieudane: " + err.message); }
+      account=null; who.textContent=""; setStatus("Wylogowano."); }catch(err){ showError("Wylogowanie nieudane: " + (err.message||err)); }
   });
   $("#btnReload").addEventListener('click', async ()=>{
     try{
       await ensureLogin();
-      await loadLists();          // <— wczytaj listy (PH/Status/kolory)
-      renderLegend();             // <— odśwież legendę po listach
+      await loadLists();  renderLegend();
       await getSiteId(); await getFileItemId();
       await loadDataFromExcel(); applyMiniFilters(); rebuild();
-    }
-    catch(err){ console.error(err); showError(err.message); }
+    } catch(err){ showError(err.message||err); }
   });
 
   $("#mfApply").addEventListener('click', ()=>{ applyMiniFilters(); rebuild(); });
   $("#mfMassAssign").addEventListener('click', ()=>{ massAssignToMe(); });
 
   /* =========================== START =========================== */
-  await loadLists();            // ważne: przed legendą/mapą
+  await loadLists();
   initMap();
   renderLegend();
   attachToggle("toolbarBox","tgToolbar","toolbar");
   attachToggle("filtersBox","tgFilters","filters");
   attachToggle("legend","tgLegend","legend");
   setStatus(DEFAULT_STATUS);
+  window.addEventListener('unhandledrejection', e=>showError(e.reason?.message||e.reason||"Błąd"));
   msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e));
-
 })();
 </script>
 <div class="credit">Autor: Adrian Daniel</div>
