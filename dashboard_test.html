@@ -10,6 +10,7 @@
     --card:#fff; --muted:#64748b; --line:#e5e7eb; --bg:#f6f7fb;
     --ink:#0f172a; --accent:#3b82f6; --chip:#eef2ff;
   }
+  * { box-sizing: border-box; }
   html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--ink)}
   .wrap{max-width:1280px;margin:20px auto;padding:0 16px}
   .topbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}
@@ -21,11 +22,14 @@
   .filters input,.filters select{padding:9px 11px;border:1px solid #d1d5db;border-radius:10px;background:#fff;font:inherit}
   .filters button{padding:10px 13px;border:1px solid #cbd5e1;border-radius:10px;background:var(--chip);cursor:pointer}
   .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
-  .tile{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px}
+  .tile{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;overflow:hidden}
   .tile .k{font-size:28px;font-weight:800;margin-top:6px}
   .tile .l{font-size:12px;color:var(--muted)}
   .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
   .charts-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  .chartbox{position:relative;height:280px;}
+  .chartbox--sm{position:relative;height:240px;}
+  .chartbox > canvas{position:absolute;inset:0;display:block;width:100% !important;height:100% !important;}
   .status{margin-top:12px;font-size:12px;color:var(--muted)}
   .error{position:fixed;left:0;right:0;top:0;background:#fff3f3;border-bottom:1px solid #f0caca;color:#8b0000;padding:10px 14px;display:none;z-index:9999}
   .tablewrap{margin-top:12px}
@@ -124,11 +128,20 @@
 
   <!-- Charts -->
   <div class="charts">
-    <div class="tile"><h4 style="margin:0 0 8px 0">Trend tygodniowy</h4><canvas id="chTrend" height="140"></canvas></div>
-    <div class="tile"><h4 style="margin:0 0 8px 0">PH × Status (stack)</h4><canvas id="chPH" height="140"></canvas></div>
+    <div class="tile">
+      <h4 style="margin:0 0 8px 0">Trend tygodniowy</h4>
+      <div class="chartbox"><canvas id="chTrend"></canvas></div>
+    </div>
+    <div class="tile">
+      <h4 style="margin:0 0 8px 0">PH × Status (stack)</h4>
+      <div class="chartbox"><canvas id="chPH"></canvas></div>
+    </div>
   </div>
   <div class="charts-2">
-    <div class="tile"><h4 style="margin:0 0 8px 0">Powody odmowy</h4><canvas id="chReasons" height="160"></canvas></div>
+    <div class="tile">
+      <h4 style="margin:0 0 8px 0">Powody odmowy</h4>
+      <div class="chartbox--sm"><canvas id="chReasons"></canvas></div>
+    </div>
     <div class="tile">
       <h4 style="margin:0 0 8px 0">Leady wg PH i Statusu</h4>
       <div style="overflow:auto;max-height:380px">
@@ -140,7 +153,7 @@
 
 <script>
 (async function main(){
-/* =========================== KONFIG (skopiuj z mapy) =========================== */
+/* =========================== KONFIG =========================== */
 const CONFIG = {
   clientId: "2c5a0274-30c0-4efa-b13c-7ce1e0768cf9",
   tenantId: "e44d0310-65ed-4096-a024-dac77110765a",
@@ -245,7 +258,7 @@ async function usedRange(wsName){
   return gfetch("GET", `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/usedRange(valuesOnly=true)`);
 }
 
-/* =========================== DANE: pobranie i parsowanie =========================== */
+/* =========================== DANE =========================== */
 let ROWS=[], LOGS=[]; // surowe
 let PH_LIST=[];       // do filtra
 
@@ -291,7 +304,6 @@ function parseDane(values){
     };
   }).filter(o=>o.adres_pelny);
 
-  // PH list (zawiera też "(Brak PH)")
   PH_LIST = [...new Set(out.map(o=>(o.PH||"")))].sort();
   if(!PH_LIST.includes("")) PH_LIST.unshift("");
   return out;
@@ -321,11 +333,11 @@ function parseLog(values){
   }).filter(x=>x.addr && !isNaN(x.ts));
 }
 
-/* =========================== KPI liczenie =========================== */
+/* =========================== KPI =========================== */
 function applyFilters(allRows, from, to, selPH, selST){
   const inRange = r => (!from || r.createdAt>=from) && (!to || r.createdAt<=to);
   const phOk = r => {
-    if(!selPH.length) return true;                        // (Wszyscy PH)
+    if(!selPH.length) return true;
     const wanted = selPH.map(x=> x===PH_NONE ? "" : x);
     return wanted.includes(r.PH||"");
   };
@@ -359,10 +371,9 @@ function weeklyKey(d){
 }
 
 function computeKPI(rows, logs, from, to, selPH, selST){
-  const filteredFull = applyFilters(rows, from, to, selPH, selST); // do tabel i wykresów
-  const filteredKPI  = filteredFull.filter(r=>!EXCLUDED_STATUSES.has(r.Status)); // KPI bez wykluczeń
+  const filteredFull = applyFilters(rows, from, to, selPH, selST);
+  const filteredKPI  = filteredFull.filter(r=>!EXCLUDED_STATUSES.has(r.Status));
 
-  // mapy "pierwszych" statusów
   const firstQuote  = firstStatusTsByAddr(logs,"Wycena Inwestycji");
   const firstOffer  = firstStatusTsByAddr(logs,"Oferta wysłana");
   const firstAccept = firstStatusTsByAddr(logs,"Akceptacja klienta");
@@ -403,7 +414,6 @@ function computeKPI(rows, logs, from, to, selPH, selST){
 
   const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : NaN;
 
-  // trend (tygodnie, wg createdAt; punkty: leads/quotes/offers/closes)
   const trend = {};
   for(const r of filteredKPI){
     if(!r.createdAt) continue;
@@ -415,10 +425,9 @@ function computeKPI(rows, logs, from, to, selPH, selST){
     if(firstAccept.get(r.key) || firstReject.get(r.key)) trend[k].closes++;
   }
 
-  // macierz PH x Status – na pełnym filtrze (również wykluczenia, bo to widok)
   const phCatsRaw = [...new Set(filteredFull.map(r=> (r.PH||"") ))].sort();
-  const phCats = phCatsRaw.map(x=> x||PH_NONE); // puste -> "(Brak PH)"
-  const stCats = STATUS_LIST;
+  const phCats = phCatsRaw.map(x=> x||PH_NONE);
+  const stCats = ["Wycena Inwestycji","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO"];
   const phMatrix = phCatsRaw.map(()=> stCats.map(()=>0));
   const phTotals = phCatsRaw.map(()=>0);
   for(const r of filteredFull){
@@ -427,7 +436,6 @@ function computeKPI(rows, logs, from, to, selPH, selST){
     if(pi>=0){ phTotals[pi]++; if(si>=0) phMatrix[pi][si]++; }
   }
 
-  // powody odmowy – pierwsze wystąpienie (z LOG), fallback: Reason z danych
   const reasonsMap = new Map();
   for(const r of filteredKPI){
     const key=r.key;
@@ -459,7 +467,7 @@ function computeKPI(rows, logs, from, to, selPH, selST){
   };
 }
 
-/* =========================== WYKRESy/TABLE =========================== */
+/* =========================== WYKRESY/TABLE =========================== */
 let chartTrend=null, chartPH=null, chartReasons=null;
 function renderCharts(kpi){
   // Trend
@@ -530,7 +538,6 @@ function renderTable(kpi){
 let FROM=null, TO=null, SEL_PH=[], SEL_ST=[];
 
 function fillFilters(){
-  // PH: najpierw (Wszyscy), potem lista PH, na końcu (Brak PH)
   const phSel=$("#fPH"); phSel.innerHTML="";
   const mk = (v,t)=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; return o; };
   phSel.appendChild(mk(PH_ALL, PH_ALL));
@@ -538,11 +545,9 @@ function fillFilters(){
   phSel.appendChild(mk(PH_NONE, PH_NONE));
   phSel.options[0].selected = true;
 
-  // Status – kanon
   const stSel=$("#fStatus"); stSel.innerHTML="";
   for(const st of STATUS_LIST){ const opt=document.createElement('option'); opt.value=st; opt.textContent=st; stSel.appendChild(opt); }
 
-  // domyślny zakres: ostatnie 30 dni
   const today=new Date(); const from=new Date(today); from.setDate(today.getDate()-30);
   $("#fFrom").value = from.toISOString().slice(0,10);
   $("#fTo").value   = today.toISOString().slice(0,10);
@@ -585,13 +590,13 @@ async function loadAll(){
   }catch(err){ console.error(err); showError(err.message); }
 }
 
-$("#btnLogin").addEventListener('click', ()=>ensureLogin().catch(e=>showError(e.message)));
-$("#btnLogout").addEventListener('click', async ()=>{
+document.getElementById('btnLogin').addEventListener('click', ()=>ensureLogin().catch(e=>showError(e.message)));
+document.getElementById('btnLogout').addEventListener('click', async ()=>{
   try{ const acc=msalApp.getAllAccounts()[0]; if(acc) await msalApp.logoutPopup({account:acc}); who.textContent="Nie zalogowano."; }
   catch(e){ showError(e.message); }
 });
-$("#btnReload").addEventListener('click', loadAll);
-$("#btnApply").addEventListener('click', ()=>{
+document.getElementById('btnReload').addEventListener('click', loadAll);
+document.getElementById('btnApply').addEventListener('click', ()=>{
   readFilters();
   const kpi = computeKPI(ROWS, LOGS, FROM, TO, SEL_PH, SEL_ST);
   renderTiles(kpi); renderCharts(kpi); renderTable(kpi);
