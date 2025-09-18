@@ -184,80 +184,77 @@
     logSheet: "AuditLog"
   };
 
-  /* =========================== LISTY (wspólne z dashboardem) =========================== */
-const DEFAULT_LISTS = {
-  ph: [
-    /* <-- wpisz pełną, oficjalną listę PH (te, które mają być w legendzie/filtrach) */
-    "Adrian Daniel","Robert Kaźmierczak","Mariusz Kielczyk","Inga Kaźmierczak","Jacek Trybuchowski","Tomasz Józefowicz"
-  ],
-  /* mapowanie skrótów z Excela -> pełne imię i nazwisko (klucze najlepiej małymi znakami) */
-  phAliases: {
-    "ad":"Adrian Daniel","rk":"Robert Kaźmierczak","mk":"Mariusz Kielczyk",
-    "ik":"Inga Kaźmierczak","jt":"Jacek Trybuchowski","tj":"Tomasz Józefowicz"
-  },
+  /* =========================== LISTY =========================== */
+  const DEFAULT_LISTS = {
+    ph: [
+      "Adrian Daniel","Robert Kaźmierczak","Mariusz Kielczyk","Inga Kaźmierczak","Jacek Trybuchowski","Tomasz Józefowicz"
+    ],
+    phAliases: {
+      "ad":"Adrian Daniel","rk":"Robert Kaźmierczak","mk":"Mariusz Kielczyk",
+      "ik":"Inga Kaźmierczak","jt":"Jacek Trybuchowski","tj":"Tomasz Józefowicz"
+    },
+    status: ["Wycena Inwestycji","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO","MOICO","Duplikat","SEEV"],
+    statusAliases: {
+      "zapytanie o wycenę":"Wycena Inwestycji","zapytanie o wycene":"Wycena Inwestycji","wycena inwestycji":"Wycena Inwestycji",
+      "oferta wysłana":"Oferta wysłana","odmowa klienta":"Odmowa klienta","akceptacja klienta":"Akceptacja klienta",
+      "poza zasięgiem":"Poza Zasięgiem","kpo":"KPO","duplikat":"Duplikat","moico":"MOICO","seev":"SEEV"
+    },
+    statusColors: {
+      "Wycena Inwestycji":"#607D8B","Oferta wysłana":"#2196F3","Odmowa klienta":"#F44336",
+      "Akceptacja klienta":"#4CAF50","Poza Zasięgiem":"#000000","KPO":"#FF9800",
+      "MOICO":"#8E24AA","Duplikat":"#9E9E9E","SEEV":"#00BCD4"
+    },
+    excluded: ["KPO","Poza Zasięgiem","MOICO","Duplikat","SEEV"],
+    rejectionReasons: [
+      "Zbyt droga instalacja","Drogi abonament","Lepsza oferta konkurencji",
+      "Brak możliwości technicznych","Nieaktualny kontakt","Inne"
+    ]
+  };
 
-  status: ["Wycena Inwestycji","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO","MOICO","Duplikat","SEEV"],
-  statusAliases: {
-    "zapytanie o wycenę":"Wycena Inwestycji","zapytanie o wycene":"Wycena Inwestycji","wycena inwestycji":"Wycena Inwestycji",
-    "oferta wysłana":"Oferta wysłana","odmowa klienta":"Odmowa klienta","akceptacja klienta":"Akceptacja klienta",
-    "poza zasięgiem":"Poza Zasięgiem","kpo":"KPO","duplikat":"Duplikat","moico":"MOICO","seev":"SEEV"
-  },
-  statusColors: {
-    "Wycena Inwestycji":"#607D8B","Oferta wysłana":"#2196F3","Odmowa klienta":"#F44336",
-    "Akceptacja klienta":"#4CAF50","Poza Zasięgiem":"#000000","KPO":"#FF9800",
-    "MOICO":"#8E24AA","Duplikat":"#9E9E9E","SEEV":"#00BCD4"
-  },
-  excluded: ["KPO","Poza Zasięgiem","MOICO","Duplikat","SEEV"],
-  rejectionReasons: [
-    "Zbyt droga instalacja","Drogi abonament","Lepsza oferta konkurencji",
-    "Brak możliwości technicznych","Nieaktualny kontakt","Inne"
-  ]
-};
+  // >>> Uwaga: jedna, wspólna funkcja normStr (żeby nie było konfliktów nazw!)
+  const normStr = s => String(s||"").toLowerCase().replace(/\s+/g," ").trim();
 
-let LISTS = DEFAULT_LISTS;
-let PH_LIST = [], STATUS_LIST = [], REJECTION_REASONS = [];
-let STATUS_COLOR_MAP = {};
-let EXCLUDED_STATUSES = new Set();
-let PH_ALIASES = {};
-let PH_COLOR_MAP = {}; // uzupełniany po wczytaniu list
+  let LISTS = DEFAULT_LISTS;
+  let PH_LIST = [], STATUS_LIST = [], REJECTION_REASONS = [];
+  let STATUS_COLOR_MAP = {};
+  let EXCLUDED_STATUSES = new Set();
+  let PH_ALIASES = {};
+  let PH_COLOR_MAP = {};
 
-const normStr = s => String(s||"").toLowerCase().trim();
+  function buildPhColorMap(phList){
+    const palette = ['#1abc9c','#3498db','#9b59b6','#e67e22','#e74c3c','#2ecc71','#16a085','#2980b9','#8e44ad','#d35400','#c0392b','#27ae60','#7f8c8d'];
+    const map = {}; phList.forEach((ph,i)=>{ map[ph] = palette[i % palette.length]; });
+    return map;
+  }
 
-function buildPhColorMap(phList){
-  const palette = ['#1abc9c','#3498db','#9b59b6','#e67e22','#e74c3c','#2ecc71','#16a085','#2980b9','#8e44ad','#d35400','#c0392b','#27ae60','#7f8c8d'];
-  const map = {}; phList.forEach((ph,i)=>{ map[ph] = palette[i % palette.length]; });
-  return map;
-}
+  async function loadLists(){
+    try{
+      const resp = await fetch('assets/lists.json?v=' + Date.now(), {cache:'no-store'});
+      if(resp.ok){ LISTS = { ...DEFAULT_LISTS, ...(await resp.json()) }; }
+    }catch(e){ console.warn('lists.json – fallback na domyślne:', e); LISTS = DEFAULT_LISTS; }
 
-async function loadLists(){
-  try{
-    const resp = await fetch('assets/lists.json?v=' + Date.now(), {cache:'no-store'});
-    if(resp.ok){ LISTS = { ...DEFAULT_LISTS, ...(await resp.json()) }; }
-  }catch(e){ console.warn('lists.json – fallback na domyślne:', e); LISTS = DEFAULT_LISTS; }
+    PH_LIST = Array.isArray(LISTS.ph) ? LISTS.ph.slice() : [];
+    PH_ALIASES = Object.fromEntries(Object.entries(LISTS.phAliases||{}).map(([k,v])=>[normStr(k), v]));
+    STATUS_LIST = Array.isArray(LISTS.status) ? LISTS.status.slice() : [];
+    STATUS_COLOR_MAP = { ...DEFAULT_LISTS.statusColors, ...(LISTS.statusColors||{}) };
+    REJECTION_REASONS = Array.isArray(LISTS.rejectionReasons) ? LISTS.rejectionReasons.slice() : DEFAULT_LISTS.rejectionReasons.slice();
+    EXCLUDED_STATUSES = new Set(Array.isArray(LISTS.excluded) ? LISTS.excluded : DEFAULT_LISTS.excluded);
+    PH_COLOR_MAP = buildPhColorMap(PH_LIST);
+  }
 
-  PH_LIST = Array.isArray(LISTS.ph) ? LISTS.ph.slice() : [];
-  PH_ALIASES = Object.fromEntries(Object.entries(LISTS.phAliases||{}).map(([k,v])=>[normStr(k), v]));
-  STATUS_LIST = Array.isArray(LISTS.status) ? LISTS.status.slice() : [];
-  STATUS_COLOR_MAP = { ...DEFAULT_LISTS.statusColors, ...(LISTS.statusColors||{}) };
-  REJECTION_REASONS = Array.isArray(LISTS.rejectionReasons) ? LISTS.rejectionReasons.slice() : DEFAULT_LISTS.rejectionReasons.slice();
-  EXCLUDED_STATUSES = new Set(Array.isArray(LISTS.excluded) ? LISTS.excluded : DEFAULT_LISTS.excluded);
-  PH_COLOR_MAP = buildPhColorMap(PH_LIST);
-}
-
-function canonStatus(s){
-  const k = normStr(s);
-  return (LISTS.statusAliases && LISTS.statusAliases[k]) ? LISTS.statusAliases[k] : (s||"");
-}
-function canonPH(s){
-  const raw = String(s||"").trim();
-  const a = PH_ALIASES[normStr(raw)] || raw;    // mapuj skróty -> pełne
-  return PH_LIST.includes(a) ? a : "";          // jeśli nie ma w pliku – traktuj jako „brak”
-}
+  function canonStatus(s){
+    const k = normStr(s);
+    return (LISTS.statusAliases && LISTS.statusAliases[k]) ? LISTS.statusAliases[k] : (s||"");
+  }
+  function canonPH(s){
+    const raw = String(s||"").trim();
+    const a = PH_ALIASES[normStr(raw)] || raw;    // skrót -> pełne
+    return PH_LIST.includes(a) ? a : "";          // spoza listy = „brak”
+  }
 
   /* =========================== STAN/UTIL =========================== */
   let account=null, siteId=null, fileId=null;
-  let rows=[];     // pełne dane
-  let frows=[];    // dane po filtrze
+  let rows=[]; let frows=[];
   let map, cluster;
 
   const $ = s=>document.querySelector(s);
@@ -269,7 +266,6 @@ function canonPH(s){
   function showError(msg){ console.error(msg); errorBar.textContent = String(msg||""); errorBar.style.display='block'; setTimeout(()=>{ errorBar.style.display='none'; }, 8000); }
   function toNum(v){ if(v==null) return NaN; const s=String(v).replace(",", ".").replace(/[^\d\.\-+Ee]/g,"").trim(); return parseFloat(s); }
   function colLetter(n){ let s="",x=n; while(x>0){x--; s=String.fromCharCode(65+(x%26))+s; x=Math.floor(x/26);} return s; }
-  const normStr = s => String(s||"").toLowerCase().replace(/\s+/g," ").trim();
   const normAddr = s => normStr(s).replace(/^\s*(ul\.?\s*){2,}/i,"ul. ").replace(/^\s*ul\b\.?/i,"ul. ");
   const near = (a,b,eps=0.0005)=> isFinite(a)&&isFinite(b)&&Math.abs(a-b)<=eps;
 
@@ -284,8 +280,7 @@ function canonPH(s){
 
   /* === UI collapsibles === */
   const UI_STATE_KEY = "uiCollapsed_v1";
-  const UI_STATE = loadUiState();
-  function loadUiState(){ try{ return JSON.parse(localStorage.getItem(UI_STATE_KEY)) || {toolbar:false, filters:false, legend:false}; } catch{ return {toolbar:false, filters:false, legend:false}; } }
+  const UI_STATE = (()=>{ try{ return JSON.parse(localStorage.getItem(UI_STATE_KEY)) || {toolbar:false, filters:false, legend:false}; } catch{ return {toolbar:false, filters:false, legend:false}; } })();
   function saveUiState(){ localStorage.setItem(UI_STATE_KEY, JSON.stringify(UI_STATE)); }
   function attachToggle(boxId, btnId, key){
     const box = document.getElementById(boxId);
@@ -303,31 +298,31 @@ function canonPH(s){
 
   /* =========================== MAPA =========================== */
   function initMap(){
-  if(map) map.remove();
-  map = L.map('map', { updateWhenZooming:false, updateWhenIdle:true, inertia:true });
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
+    if(map) map.remove();
+    map = L.map('map', { updateWhenZooming:false, updateWhenIdle:true, inertia:true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
 
-  const radiusFn = z => (z<=8?30:z<=10?26:z<=12?22:z<=14?18:14);
-  cluster = L.markerClusterGroup({
-    maxClusterRadius: radiusFn,
-    disableClusteringAtZoom: 17,
-    chunkedLoading: true,
-    showCoverageOnHover: false,
-    spiderfyOnEveryZoom: false
-  });
-  map.addLayer(cluster);
-}
-  function fitToData(arr){
-  let minLat=90, maxLat=-90, minLon=180, maxLon=-180, has=false;
-  for(const r of arr){
-    if(!isFinite(r.lat)||!isFinite(r.lon)) continue;
-    has=true;
-    if(r.lat<minLat) minLat=r.lat; if(r.lat>maxLat) maxLat=r.lat;
-    if(r.lon<minLon) minLon=r.lon; if(r.lon>maxLon) maxLon=r.lon;
+    const radiusFn = z => (z<=8?30:z<=10?26:z<=12?22:z<=14?18:14);
+    cluster = L.markerClusterGroup({
+      maxClusterRadius: radiusFn,
+      disableClusteringAtZoom: 17,
+      chunkedLoading: true,
+      showCoverageOnHover: false,
+      spiderfyOnEveryZoom: false
+    });
+    map.addLayer(cluster);
   }
-  if(!has){ map.setView([52,19],6); return; }
-  map.fitBounds([[minLat,minLon],[maxLat,maxLon]], { padding:[20,20] });
-}
+  function fitToData(arr){
+    let minLat=90, maxLat=-90, minLon=180, maxLon=-180, has=false;
+    for(const r of arr){
+      if(!isFinite(r.lat)||!isFinite(r.lon)) continue;
+      has=true;
+      if(r.lat<minLat) minLat=r.lat; if(r.lat>maxLat) maxLat=r.lat;
+      if(r.lon<minLon) minLon=r.lon; if(r.lon>maxLon) maxLon=r.lon;
+    }
+    if(!has){ map.setView([52,19],6); return; }
+    map.fitBounds([[minLat,minLon],[maxLat,maxLon]], { padding:[20,20] });
+  }
   function renderLegend(){
     const body = document.querySelector("#legend .legend-body");
     let html="";
@@ -395,79 +390,78 @@ function canonPH(s){
   }
 
   function addOneMarker(rec){
-  const m = L.marker([rec.lat, rec.lon], { icon: makeIcon(rec) });
+    const m = L.marker([rec.lat, rec.lon], { icon: makeIcon(rec) });
 
-  // pusta ramka popupu – wypełnimy przy otwarciu
-  m.bindPopup("", { maxWidth: 420 });
+    // pusty popup – uzupełniamy przy otwarciu
+    m.bindPopup("", { maxWidth: 420 });
 
-  m.on('popupopen', e=>{
-    // wypełnij treść dopiero teraz
-    e.popup.setContent(buildPopup(rec));
+    m.on('popupopen', e=>{
+      e.popup.setContent(buildPopup(rec));
 
-    const el = e.popup.getElement()?.querySelector('.leaflet-popup-content');
-    if(!el) return;
+      const el = e.popup.getElement()?.querySelector('.leaflet-popup-content');
+      if(!el) return;
 
-    const stSel = el.querySelector('#stSel');
-    const reasonRow = el.querySelector('#reasonRow');
-    stSel?.addEventListener('change', ()=>{
-      const st = (stSel.value || '').trim();
-      reasonRow.style.display = (st === "Odmowa klienta") ? 'flex' : 'none';
-    });
-
-    el.querySelector('#savePHST')?.addEventListener('click', async ()=>{
-      const ph = el.querySelector('#phSel')?.value || "";
-      const st = el.querySelector('#stSel')?.value || "";
-      const reason = (st === "Odmowa klienta") ? (el.querySelector('#reasonSel')?.value || "") : "";
-      if(st === "Odmowa klienta" && !reason){ alert("Wybierz Powód odmowy."); return; }
-      try{
-        setStatus("Zapis do Excela…");
-        await savePhStatus(rec, ph, st, reason);
-        rec.PH = ph; rec.Status = st; rec.PowodOdmowy = reason;
-        m.setIcon(makeIcon(rec));
-        m.setPopupContent(buildPopup(rec));
-        m.openPopup();
-        setStatus("Zapisano.", { autoClearMs: 2500 });
-      }catch(err){ showError("Błąd zapisu: " + (err.message||err)); setStatus("Błąd zapisu."); }
-    });
-
-    el.querySelectorAll('a[data-quick]').forEach(a=>{
-      a.addEventListener('click', ev=>{
-        ev.preventDefault();
-        if(a.getAttribute('data-quick')==="me"){
-          const phSel = el.querySelector('#phSel');
-          const me = (account && (account.name||"")) || "";
-          if(me && PH_LIST.includes(me)) phSel.value = me;
-          else if(PH_LIST.length){ phSel.value = PH_LIST[0]; }
-        }
+      const stSel = el.querySelector('#stSel');
+      const reasonRow = el.querySelector('#reasonRow');
+      stSel?.addEventListener('change', ()=>{
+        const st = (stSel.value || '').trim();
+        reasonRow.style.display = (st === "Odmowa klienta") ? 'flex' : 'none';
       });
-    });
 
-    const noteBtn = el.querySelector('#saveNote');
-    if(noteBtn){
-      noteBtn.addEventListener('click', async ()=>{
-        const text = (el.querySelector('#noteText')?.value || "").trim();
+      el.querySelector('#savePHST')?.addEventListener('click', async ()=>{
+        const ph = el.querySelector('#phSel')?.value || "";
+        const st = el.querySelector('#stSel')?.value || "";
+        const reason = (st === "Odmowa klienta") ? (el.querySelector('#reasonSel')?.value || "") : "";
+        if(st === "Odmowa klienta" && !reason){ alert("Wybierz Powód odmowy."); return; }
         try{
-          setStatus("Zapisuję uwagi…");
-          await saveUwagi(rec, text);
-          rec.Uwagi = text;
+          setStatus("Zapis do Excela…");
+          await savePhStatus(rec, ph, st, reason);
+          rec.PH = ph; rec.Status = st; rec.PowodOdmowy = reason;
+          m.setIcon(makeIcon(rec));
           m.setPopupContent(buildPopup(rec));
           m.openPopup();
-          setStatus("Zapisano uwagi.", { autoClearMs: 2000 });
-        }catch(err){ showError("Błąd zapisu uwag: " + (err.message||err)); setStatus("Błąd zapisu."); }
+          setStatus("Zapisano.", { autoClearMs: 2500 });
+        }catch(err){ showError("Błąd zapisu: " + (err.message||err)); setStatus("Błąd zapisu."); }
       });
-    }
 
-    el.querySelectorAll('a[data-mail]').forEach(a=>{
-      a.addEventListener('click', ev=>{
-        ev.preventDefault();
-        const t = mailTemplates(rec)[a.getAttribute('data-mail')];
-        composeAndSend(t.to, t.subject, t.body);
+      el.querySelectorAll('a[data-quick]').forEach(a=>{
+        a.addEventListener('click', ev=>{
+          ev.preventDefault();
+          if(a.getAttribute('data-quick')==="me"){
+            const phSel = el.querySelector('#phSel');
+            const me = (account && (account.name||"")) || "";
+            if(me && PH_LIST.includes(me)) phSel.value = me;
+            else if(PH_LIST.length){ phSel.value = PH_LIST[0]; }
+          }
+        });
+      });
+
+      const noteBtn = el.querySelector('#saveNote');
+      if(noteBtn){
+        noteBtn.addEventListener('click', async ()=>{
+          const text = (el.querySelector('#noteText')?.value || "").trim();
+          try{
+            setStatus("Zapisuję uwagi…");
+            await saveUwagi(rec, text);
+            rec.Uwagi = text;
+            m.setPopupContent(buildPopup(rec));
+            m.openPopup();
+            setStatus("Zapisano uwagi.", { autoClearMs: 2000 });
+          }catch(err){ showError("Błąd zapisu uwag: " + (err.message||err)); setStatus("Błąd zapisu."); }
+        });
+      }
+
+      el.querySelectorAll('a[data-mail]').forEach(a=>{
+        a.addEventListener('click', ev=>{
+          ev.preventDefault();
+          const t = mailTemplates(rec)[a.getAttribute('data-mail')];
+          composeAndSend(t.to, t.subject, t.body);
+        });
       });
     });
-  });
 
-  cluster.addLayer(m);
-}
+    cluster.addLayer(m);
+  }
 
   function rebuild(){
     cluster.clearLayers();
@@ -589,8 +583,11 @@ Pozostałe informacje jak w ofercie standardowej.
 
   /* =========================== MSAL / GRAPH =========================== */
   const msalApp = new msal.PublicClientApplication({
-    auth: { clientId: CONFIG.clientId, authority: "https://login.microsoftonline.com/" + CONFIG.tenantId,
-            redirectUri: window.location.origin + window.location.pathname },
+    auth: {
+      clientId: CONFIG.clientId,
+      authority: "https://login.microsoftonline.com/" + CONFIG.tenantId,
+      redirectUri: window.location.origin + window.location.pathname
+    },
     cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false },
     system: { loggerOptions: { loggerCallback: (l, m)=>console.log("[MSAL]", m) } }
   });
@@ -660,7 +657,7 @@ Pozostałe informacje jak w ofercie standardowej.
     return gfetch("PATCH", url, { values: values2d });
   }
 
-  /* ===== AuditLog (stabilny dopis) ===== */
+  /* ===== AuditLog ===== */
   const AUDIT_HEADERS = ["ts","user","action","itemId","adres_pelny","old","new","note"];
 
   async function ensureAuditHeaders(){
@@ -675,7 +672,6 @@ Pozostałe informacje jak w ofercie standardowej.
   async function getNextLogRow(){
     const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
     const wsq = CONFIG.logSheet.replace(/'/g,"''");
-    // szybkie sprawdzenie, a jeśli zajęte – skan kolumny A
     let next = 2;
     try{
       const used = await usedRange(CONFIG.logSheet);
@@ -742,7 +738,7 @@ Pozostałe informacje jak w ofercie standardowej.
         createdAt: toDate(get(r,H.created)),
         lat, lon, adres_pelny: adr||"",
         PH: canonPH(get(r,H.ph)),
-		Status: canonStatus(String(get(r,H.st)||"")),
+        Status: canonStatus(String(get(r,H.st)||"")),
         telefon: String(get(r,H.tel)||""),
         email: String(get(r,H.mail)||""),
         nazwa: String(get(r,H.nazwa)||""),
@@ -768,11 +764,7 @@ Pozostałe informacje jak w ofercie standardowej.
     if(!values.length){ setStatus("Arkusz pusty."); rows=[]; frows=[]; return; }
     rows = parseRows(values);
 
-    // uzupełnij PH_LIST realnymi wartościami z danych
-    const phFromData = [...new Set(rows.map(r => (r.PH||"").trim()).filter(Boolean))];
-    let changed=false; for(const ph of phFromData){ if(!PH_LIST.includes(ph)){ PH_LIST.push(ph); changed=true; } }
-    if(changed){ PH_COLOR_MAP = buildPhColorMap(PH_LIST); renderLegend(); }
-
+    // UWAGA: nie rozszerzamy PH_LIST o wartości z Excela – tylko z lists.json
     fillMiniFilters();
     frows = rows.slice();
     setStatus(`Załadowano ${rows.length} wierszy z arkusza „${CONFIG.dataSheet}”.`);
