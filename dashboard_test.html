@@ -8,28 +8,33 @@
 <style>
   :root {
     --card:#fff; --muted:#64748b; --line:#e5e7eb; --bg:#f6f7fb;
-    --ink:#0f172a; --accent:#3b82f6; --chip:#eef2ff;
+    --ink:#0f172a; --chip:#eef2ff;
   }
-  * { box-sizing: border-box; }
+  *{box-sizing:border-box}
   html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--ink)}
   .wrap{max-width:1280px;margin:20px auto;padding:0 16px}
   .topbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}
   .auth{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
-  .auth button, .linkbtn{padding:8px 10px;border:1px solid #d1d5db;border-radius:10px;background:#fff;cursor:pointer}
+  .auth button,.linkbtn{padding:8px 10px;border:1px solid #d1d5db;border-radius:10px;background:#fff;cursor:pointer}
   .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
   .filters{display:flex;flex-wrap:wrap;gap:14px;align-items:end}
   .filters .f{display:flex;flex-direction:column;font-size:13px}
   .filters input,.filters select{padding:9px 11px;border:1px solid #d1d5db;border-radius:10px;background:#fff;font:inherit}
   .filters button{padding:10px 13px;border:1px solid #cbd5e1;border-radius:10px;background:var(--chip);cursor:pointer}
+
   .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
-  .tile{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;overflow:hidden}
+  .tile{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;overflow:hidden;min-width:0} /* <-- ważne */
   .tile .k{font-size:28px;font-weight:800;margin-top:6px}
   .tile .l{font-size:12px;color:var(--muted)}
+
   .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
   .charts-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
-  .chartbox{position:relative;height:280px;}
-  .chartbox--sm{position:relative;height:240px;}
-  .chartbox > canvas{position:absolute;inset:0;display:block;width:100% !important;height:100% !important;}
+
+  /* Stabilna wysokość kontenerów wykresów */
+  .chartbox{height:280px}
+  .chartbox--sm{height:240px}
+  .chartbox canvas{display:block;width:100%;height:100%}
+
   .status{margin-top:12px;font-size:12px;color:var(--muted)}
   .error{position:fixed;left:0;right:0;top:0;background:#fff3f3;border-bottom:1px solid #f0caca;color:#8b0000;padding:10px 14px;display:none;z-index:9999}
   .tablewrap{margin-top:12px}
@@ -273,7 +278,7 @@ function parseDane(values){
   const H = values[0].map(h=>String(h||"").trim());
   const body = values.slice(1);
   const COL = {
-    created: H[0], // A: Data zgłoszenia
+    created: H[0],
     ph:      pickHeader(H,["ph"]),
     status:  pickHeader(H,["status"]),
     reason:  pickHeader(H,["powód","powod","reason","powód odmowy","powod odmowy"]),
@@ -292,8 +297,7 @@ function parseDane(values){
       const m = COL.msc   ? String(r[idx(COL.msc)]||"").trim()   : "";
       adres = (u&&n&&m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
     }
-    const stRaw = COL.status ? (r[idx(COL.status)]||"") : "";
-    const st = canonStatus(stRaw);
+    const st = canonStatus(COL.status ? (r[idx(COL.status)]||"") : "");
     return {
       createdAt: toDate(r[idx(COL.created)]),
       PH: String(COL.ph ? (r[idx(COL.ph)]||"") : ""),
@@ -344,23 +348,16 @@ function applyFilters(allRows, from, to, selPH, selST){
   const stOk = r => !selST.length || selST.includes(r.Status||"");
   return allRows.filter(r=>inRange(r)&&phOk(r)&&stOk(r));
 }
-
 function firstStatusTsByAddr(logs, status){
-  const map=new Map();
-  const target = (s)=> (String(s||"").toLowerCase().trim()===status.toLowerCase());
+  const map=new Map(); const target = s=>String(s||"").toLowerCase().trim()===status.toLowerCase();
   const sorted=[...logs].sort((a,b)=>a.ts-b.ts);
-  for(const e of sorted){
-    if(target(e.newStatus) && !map.has(e.addr)) map.set(e.addr, e.ts);
-  }
+  for(const e of sorted){ if(target(e.newStatus) && !map.has(e.addr)) map.set(e.addr,e.ts); }
   return map;
 }
 function firstStatusWithReasonByAddr(logs, status){
-  const map=new Map();
-  const target = (s)=> (String(s||"").toLowerCase().trim()===status.toLowerCase());
+  const map=new Map(); const target = s=>String(s||"").toLowerCase().trim()===status.toLowerCase();
   const sorted=[...logs].sort((a,b)=>a.ts-b.ts);
-  for(const e of sorted){
-    if(target(e.newStatus) && !map.has(e.addr)) map.set(e.addr, {ts:e.ts, reason:e.newReason||""});
-  }
+  for(const e of sorted){ if(target(e.newStatus) && !map.has(e.addr)) map.set(e.addr,{ts:e.ts,reason:e.newReason||""}); }
   return map;
 }
 function weeklyKey(d){
@@ -369,7 +366,6 @@ function weeklyKey(d){
   const w=Math.ceil((((dt-onejan)/86400000)+onejan.getDay()+1)/7);
   return `${dt.getFullYear()}-W${String(w).padStart(2,'0')}`;
 }
-
 function computeKPI(rows, logs, from, to, selPH, selST){
   const filteredFull = applyFilters(rows, from, to, selPH, selST);
   const filteredKPI  = filteredFull.filter(r=>!EXCLUDED_STATUSES.has(r.Status));
@@ -401,17 +397,10 @@ function computeKPI(rows, logs, from, to, selPH, selST){
     if(tsOffer) nOffer++;
     if(tsClose){ nClosed++; if(tsAccept && tsAccept===tsClose) nAcc++; if(tsReject && tsReject===tsClose) nRej++; }
 
-    if(r.createdAt && tsQuote && tsQuote>=r.createdAt){
-      tLeadQuote.push(diffDays(r.createdAt, tsQuote));
-    }
-    if(tsQuote && tsOffer && tsOffer>=tsQuote){
-      tQuoteOffer.push(diffDays(tsQuote, tsOffer));
-    }
-    if(tsOffer && tsClose && tsClose>=tsOffer){
-      tOfferClose.push(diffDays(tsOffer, tsClose));
-    }
+    if(r.createdAt && tsQuote && tsQuote>=r.createdAt){ tLeadQuote.push(diffDays(r.createdAt, tsQuote)); }
+    if(tsQuote && tsOffer && tsOffer>=tsQuote){ tQuoteOffer.push(diffDays(tsQuote, tsOffer)); }
+    if(tsOffer && tsClose && tsClose>=tsOffer){ tOfferClose.push(diffDays(tsOffer, tsClose)); }
   }
-
   const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : NaN;
 
   const trend = {};
@@ -449,27 +438,25 @@ function computeKPI(rows, logs, from, to, selPH, selST){
 
   return {
     counts:{
-      leads:nLeads,
-      phPct: nLeads? Math.round(nPHassigned/nLeads*100):0,
-      unassigned: nUnassigned,
-      quotes:nQuote,
-      offers:nOffer,
-      closed:nClosed,
-      acc:nAcc, rej:nRej,
-      convPct: nLeads? Math.round(nAcc/nLeads*100):0,
-      tLeadQuote: avg(tLeadQuote),
-      tQuoteOffer:  avg(tQuoteOffer),
-      tOfferClose:  avg(tOfferClose),
+      leads:nLeads, phPct: nLeads? Math.round(nPHassigned/nLeads*100):0, unassigned:nUnassigned,
+      quotes:nQuote, offers:nOffer, closed:nClosed, acc:nAcc, rej:nRej,
+      tLeadQuote: avg(tLeadQuote), tQuoteOffer: avg(tQuoteOffer), tOfferClose: avg(tOfferClose)
     },
-    trend,
-    phCats, stCats, phMatrix, phTotals,
-    reasons: reasonsMap
+    trend, phCats, stCats, phMatrix, phTotals, reasons: reasonsMap
   };
 }
 
 /* =========================== WYKRESY/TABLE =========================== */
 let chartTrend=null, chartPH=null, chartReasons=null;
 function renderCharts(kpi){
+  // Uspokojenie resize'ów
+  if(window.Chart){
+    Chart.defaults.responsive = true;
+    Chart.defaults.maintainAspectRatio = false;
+    Chart.defaults.animation = false;
+    Chart.defaults.devicePixelRatio = Math.min(window.devicePixelRatio||1, 1.5);
+  }
+
   // Trend
   const keys = Object.keys(kpi.trend).sort();
   const leads  = keys.map(k=>kpi.trend[k].leads);
@@ -477,7 +464,7 @@ function renderCharts(kpi){
   const offers = keys.map(k=>kpi.trend[k].offers);
   const closes = keys.map(k=>kpi.trend[k].closes);
   if(chartTrend) chartTrend.destroy();
-  chartTrend = new Chart($("#chTrend"),{
+  chartTrend = new Chart(document.getElementById('chTrend'),{
     type:'line',
     data:{ labels:keys, datasets:[
       { label:'Leady', data:leads, tension:.3 },
@@ -485,12 +472,12 @@ function renderCharts(kpi){
       { label:'Oferty', data:offers, tension:.3 },
       { label:'Zamknięcia', data:closes, tension:.3 },
     ]},
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
+    options:{ plugins:{legend:{position:'bottom'}} }
   });
 
   // PH x Status
   if(chartPH) chartPH.destroy();
-  chartPH = new Chart($("#chPH"),{
+  chartPH = new Chart(document.getElementById('chPH'),{
     type:'bar',
     data:{
       labels:kpi.phCats,
@@ -500,22 +487,22 @@ function renderCharts(kpi){
         stack:'st'
       }))
     },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}, scales:{x:{stacked:true}, y:{stacked:true}} }
+    options:{ plugins:{legend:{position:'bottom'}}, scales:{x:{stacked:true}, y:{stacked:true}} }
   });
 
   // Powody odmowy
   const labels = [...kpi.reasons.keys()];
   const data   = labels.map(l=>kpi.reasons.get(l));
   if(chartReasons) chartReasons.destroy();
-  chartReasons = new Chart($("#chReasons"),{
+  chartReasons = new Chart(document.getElementById('chReasons'),{
     type:'doughnut',
     data:{ labels, datasets:[{ data }] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
+    options:{ plugins:{legend:{position:'bottom'}} }
   });
 }
 
 function renderTable(kpi){
-  const tbl=$("#tblPH");
+  const tbl=document.getElementById('tblPH');
   const head = `<tr>
     <th>PH</th>
     <th>Razem</th>
@@ -538,39 +525,39 @@ function renderTable(kpi){
 let FROM=null, TO=null, SEL_PH=[], SEL_ST=[];
 
 function fillFilters(){
-  const phSel=$("#fPH"); phSel.innerHTML="";
+  const phSel=document.getElementById('fPH'); phSel.innerHTML="";
   const mk = (v,t)=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; return o; };
   phSel.appendChild(mk(PH_ALL, PH_ALL));
   for(const ph of PH_LIST.filter(x=>x)){ phSel.appendChild(mk(ph, ph)); }
   phSel.appendChild(mk(PH_NONE, PH_NONE));
   phSel.options[0].selected = true;
 
-  const stSel=$("#fStatus"); stSel.innerHTML="";
+  const stSel=document.getElementById('fStatus'); stSel.innerHTML="";
   for(const st of STATUS_LIST){ const opt=document.createElement('option'); opt.value=st; opt.textContent=st; stSel.appendChild(opt); }
 
   const today=new Date(); const from=new Date(today); from.setDate(today.getDate()-30);
-  $("#fFrom").value = from.toISOString().slice(0,10);
-  $("#fTo").value   = today.toISOString().slice(0,10);
+  document.getElementById('fFrom').value = from.toISOString().slice(0,10);
+  document.getElementById('fTo').value   = today.toISOString().slice(0,10);
 }
 function readFilters(){
-  FROM = $("#fFrom").value ? new Date($("#fFrom").value+"T00:00:00") : null;
-  TO   = $("#fTo").value   ? new Date($("#fTo").value+"T23:59:59") : null;
-  const sel = [...$("#fPH").selectedOptions].map(o=>o.value);
+  FROM = document.getElementById('fFrom').value ? new Date(document.getElementById('fFrom').value+"T00:00:00") : null;
+  TO   = document.getElementById('fTo').value   ? new Date(document.getElementById('fTo').value+"T23:59:59") : null;
+  const sel = [...document.getElementById('fPH').selectedOptions].map(o=>o.value);
   SEL_PH = (!sel.length || sel.includes(PH_ALL)) ? [] : sel;
-  SEL_ST = [...$("#fStatus").selectedOptions].map(o=>o.value);
+  SEL_ST = [...document.getElementById('fStatus').selectedOptions].map(o=>o.value);
 }
 function renderTiles(kpi){
-  $("#kLeads").textContent = kpi.counts.leads;
-  $("#kPH").textContent    = `${kpi.counts.phPct}%`;
-  $("#kUnassigned").textContent = kpi.counts.unassigned;
-  $("#kQuotes").textContent = kpi.counts.quotes;
-  $("#kOffers").textContent = kpi.counts.offers;
-  $("#kClosed").textContent = kpi.counts.closed;
-  $("#kAcc").textContent    = kpi.counts.acc;
-  $("#kRej").textContent    = kpi.counts.rej;
-  $("#kT01").textContent    = fmtDays(kpi.counts.tLeadQuote);
-  $("#kT02").textContent    = fmtDays(kpi.counts.tQuoteOffer);
-  $("#kT03").textContent    = fmtDays(kpi.counts.tOfferClose);
+  document.getElementById('kLeads').textContent = kpi.counts.leads;
+  document.getElementById('kPH').textContent    = `${kpi.counts.phPct}%`;
+  document.getElementById('kUnassigned').textContent = kpi.counts.unassigned;
+  document.getElementById('kQuotes').textContent = kpi.counts.quotes;
+  document.getElementById('kOffers').textContent = kpi.counts.offers;
+  document.getElementById('kClosed').textContent = kpi.counts.closed;
+  document.getElementById('kAcc').textContent    = kpi.counts.acc;
+  document.getElementById('kRej').textContent    = kpi.counts.rej;
+  document.getElementById('kT01').textContent    = fmtDays(kpi.counts.tLeadQuote);
+  document.getElementById('kT02').textContent    = fmtDays(kpi.counts.tQuoteOffer);
+  document.getElementById('kT03').textContent    = fmtDays(kpi.counts.tOfferClose);
 }
 
 async function loadAll(){
