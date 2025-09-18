@@ -1,9 +1,23 @@
 {
   "ph": [
     "Adrian Daniel","Robert Kaźmierczak","Mariusz Kielczyk",
-    "Inga Kaźmierczak","Jacek Trybuchowski","Tomasz Józefowicz",
-    "Duplikat","MOICO","SEEV"
+    "Inga Kaźmierczak","Jacek Trybuchowski","Tomasz Józefowicz","MOICO","SEEV","Duplikat"
   ],
+
+  "phAliases": {
+    "ad":"Adrian Daniel","rk":"Robert Kaźmierczak","mk":"Mariusz Kielczyk",
+    "ik":"Inga Kaźmierczak","jt":"Jacek Trybuchowski","tj":"Tomasz Józefowicz",
+    "moico":"MOICO","seev":"SEEV","duplikat":"Duplikat"
+  },
+
+  "phUsers": {
+    "Adrian Daniel": "...",
+    "Robert Kaźmierczak": "…",
+    "Mariusz Kielczyk": "…",
+    "Inga Kaźmierczak": "…",
+    "Jacek Trybuchowski": "…",
+    "Tomasz Józefowicz": "…"
+  },
 
   "status": [
     "Wycena Inwestycji","Oferta wysłana","Odmowa klienta","Akceptacja klienta",

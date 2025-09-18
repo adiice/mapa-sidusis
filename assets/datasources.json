@@ -1,0 +1,45 @@
+{
+  "sources": [
+    {
+      "id": "sidusis_main",
+      "name": "SIDUSIS (główny)",
+      "type": "excel_sharepoint",
+      "readWrite": true,
+      "owner": true,
+      "connection": {
+        "host": "internetunion.sharepoint.com",
+        "sitePath": "PHTheNetwork",
+        "filePath": "/General/Kopia pliku Lista - SIDUSIS - PEŁNA - od 08-2025 - kopia do mapy.xlsx",
+        "sheet": "Dane",
+        "table": "dane_sidusis"
+      },
+      "mapping": {
+        "CreatedAt": "Data zgłoszenia",
+        "AssignedAt": "AssignedAt",               // jeżeli nie masz – zostaw, nie będzie użyte
+        "PH": "PH",
+        "Status": "Status",
+        "PowodOdmowy": "Powód odmowy",
+        "Uwagi": "uwagi",
+        "lat": "Szerokość geograficzna",
+        "lon": "Długość geograficzna",
+        "adres_pelny": "adres_pelny",
+        "miejscowosc": "Miejscowość",
+        "telefon": "Numer telefonu",
+        "email": "Adres e-mail",
+
+        "Priority": "Priority",
+        "NextContactAt": "NextContactAt",
+        "LastTouchAt": "LastTouchAt",
+        "ReminderSentAt": "ReminderSentAt",
+        "ReminderTaskId": "ReminderTaskId",
+        "OptOut": "OptOut",
+        "Source": "Source",
+        "SourceRowId": "SourceRowId"
+      },
+      "log": {
+        "sheet": "AuditLog",
+        "table": "logi_sidusis"
+      }
+    }
+  ]
+}
