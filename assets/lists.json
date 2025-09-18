@@ -1,0 +1,45 @@
+{
+  "ph": [
+    "Adrian Daniel","Robert Kaźmierczak","Mariusz Kielczyk",
+    "Inga Kaźmierczak","Jacek Trybuchowski","Tomasz Józefowicz",
+    "Duplikat","MOICO","SEEV"
+  ],
+
+  "status": [
+    "Wycena Inwestycji","Oferta wysłana","Odmowa klienta","Akceptacja klienta",
+    "Poza Zasięgiem","KPO","MOICO","Duplikat","SEEV"
+  ],
+
+  "statusAliases": {
+    "zapytanie o wycenę": "Wycena Inwestycji",
+    "zapytanie o wycene": "Wycena Inwestycji",
+    "wycena inwestycji":  "Wycena Inwestycji",
+    "oferta wysłana":     "Oferta wysłana",
+    "odmowa klienta":     "Odmowa klienta",
+    "akceptacja klienta": "Akceptacja klienta",
+    "poza zasięgiem":     "Poza Zasięgiem",
+    "kpo":                "KPO",
+    "duplikat":           "Duplikat",
+    "moico":              "MOICO",
+    "seev":               "SEEV"
+  },
+
+  "statusColors": {
+    "Wycena Inwestycji":"#607D8B",
+    "Oferta wysłana":"#2196F3",
+    "Odmowa klienta":"#F44336",
+    "Akceptacja klienta":"#4CAF50",
+    "Poza Zasięgiem":"#000000",
+    "KPO":"#FF9800",
+    "MOICO":"#8E24AA",
+    "Duplikat":"#9E9E9E",
+    "SEEV":"#00BCD4"
+  },
+
+  "excluded": ["KPO","Poza Zasięgiem","MOICO","Duplikat","SEEV"],
+
+  "rejectionReasons": [
+    "Zbyt droga instalacja","Drogi abonament","Lepsza oferta konkurencji",
+    "Brak możliwości technicznych","Nieaktualny kontakt","Inne"
+  ]
+}

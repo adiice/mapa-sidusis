@@ -193,19 +193,60 @@
   };
 
   /* =========================== UI/MAPA =========================== */
-  const PH_LIST = ["Adrian Daniel","Robert Kaźmierczak","Mariusz Kielczyk","Inga Kaźmierczak","Jacek Trybuchowski","Tomasz Józefowicz","Duplikat","MOICO","SEEV"];
-  const STATUS_LIST = ["Wycena Inwestycji","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO","Duplikat","MOICO","SEEV"];
-  const PH_COLORS = ["#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2","#7f7f7f","#bcbd22","#17becf"];
-  const PH_COLOR_MAP = Object.fromEntries(PH_LIST.map((ph,i)=>[ph,PH_COLORS[i%PH_COLORS.length]]));
-  const STATUS_COLOR_MAP = {"Wycena Inwestycji":"#607D8B","Oferta wysłana":"#2196F3","Odmowa klienta":"#F44336","Akceptacja klienta":"#4CAF50","Poza Zasięgiem":"#000000","KPO":"#FF9800"};
-  const REJECTION_REASONS = [
-    "Zbyt droga instalacja",
-    "Drogi abonament",
-    "Lepsza oferta konkurencji",
-    "Brak możliwości technicznych",
-    "Nieaktualny kontakt",
-    "Inne"
-  ];
+  // ===== WSPÓLNE LISTY PH/STATUS z pliku JSON (jak w dashboardzie) =====
+const DEFAULT_LISTS = {
+  ph: [],
+  status: ["Wycena Inwestycji","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO","MOICO","Duplikat","SEEV"],
+  statusAliases: {
+    "zapytanie o wycenę":"Wycena Inwestycji","zapytanie o wycene":"Wycena Inwestycji","wycena inwestycji":"Wycena Inwestycji",
+    "oferta wysłana":"Oferta wysłana","odmowa klienta":"Odmowa klienta","akceptacja klienta":"Akceptacja klienta",
+    "poza zasięgiem":"Poza Zasięgiem","kpo":"KPO","duplikat":"Duplikat","moico":"MOICO","seev":"SEEV"
+  },
+  statusColors: {
+    "Wycena Inwestycji":"#607D8B","Oferta wysłana":"#2196F3","Odmowa klienta":"#F44336",
+    "Akceptacja klienta":"#4CAF50","Poza Zasięgiem":"#000000","KPO":"#FF9800",
+    "MOICO":"#8E24AA","Duplikat":"#9E9E9E","SEEV":"#00BCD4"
+  },
+  excluded: ["KPO","Poza Zasięgiem","MOICO","Duplikat","SEEV"],
+  rejectionReasons: [
+    "Zbyt droga instalacja","Drogi abonament","Lepsza oferta konkurencji",
+    "Brak możliwości technicznych","Nieaktualny kontakt","Inne"
+  ]
+};
+
+let LISTS = DEFAULT_LISTS;
+
+async function loadLists(){
+  try{
+    const resp = await fetch('assets/lists.json?v=' + Date.now(), {cache:'no-store'});
+    if(!resp.ok) throw new Error(String(resp.status));
+    const js = await resp.json();
+    LISTS = {
+      ph: Array.isArray(js.ph)? js.ph : DEFAULT_LISTS.ph,
+      status: Array.isArray(js.status)? js.status : DEFAULT_LISTS.status,
+      statusAliases: js.statusAliases || DEFAULT_LISTS.statusAliases,
+      statusColors: js.statusColors || DEFAULT_LISTS.statusColors,
+      excluded: Array.isArray(js.excluded)? js.excluded : DEFAULT_LISTS.excluded,
+      rejectionReasons: Array.isArray(js.rejectionReasons)? js.rejectionReasons : DEFAULT_LISTS.rejectionReasons
+    };
+  }catch(e){
+    console.warn('lists.json – używam domyślnych list:', e);
+    LISTS = DEFAULT_LISTS;
+  }
+}
+
+// Krótkie aliasy jak dotąd:
+const get PH_LIST(){ return LISTS.ph; }
+const get STATUS_LIST(){ return LISTS.status; }
+const STATUS_COLOR_MAP = new Proxy({}, { get:(_,k)=> LISTS.statusColors[k] });
+const REJECTION_REASONS = new Proxy([], { get:(_,k)=> LISTS.rejectionReasons[k] });
+const EXCLUDED_STATUSES = new Set(LISTS.excluded);
+
+// (opcjonalnie) funkcja kanonizacji statusu przy wczytywaniu danych:
+function canonStatus(s){
+  const k = String(s||"").toLowerCase().trim();
+  return (LISTS.statusAliases && LISTS.statusAliases[k]) ? LISTS.statusAliases[k] : (s||"");
+}
   const DEFAULT_PH_COLOR="#455A64", DEFAULT_STATUS_COLOR="#9E9E9E";
 
   /* =========================== STAN/UTIL =========================== */
@@ -270,7 +311,7 @@
       saveUiState();
     });
   }
-
+await loadLists();
   /* =========================== MAPA =========================== */
   function initMap(){
     if(map) map.remove();
