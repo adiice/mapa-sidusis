@@ -6,22 +6,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
 <style>
-  :root { --card:#fff; --muted:#6b7280; --line:#e5e7eb; --bg:#f6f7fb; }
-  html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,Roboto,Arial;background:var(--bg);}
-  .wrap{max-width:1200px;margin:20px auto;padding:0 16px;}
+  :root {
+    --card:#fff; --muted:#64748b; --line:#e5e7eb; --bg:#f6f7fb;
+    --ink:#0f172a; --accent:#3b82f6; --chip:#eef2ff;
+  }
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--ink)}
+  .wrap{max-width:1280px;margin:20px auto;padding:0 16px}
   .topbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}
   .auth{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
-  .auth button{padding:8px 10px;border:1px solid #d1d5db;border-radius:10px;background:#fff;cursor:pointer}
+  .auth button, .linkbtn{padding:8px 10px;border:1px solid #d1d5db;border-radius:10px;background:#fff;cursor:pointer}
   .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
-  .filters{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+  .filters{display:flex;flex-wrap:wrap;gap:14px;align-items:end}
   .filters .f{display:flex;flex-direction:column;font-size:13px}
-  .filters input,.filters select{padding:8px 10px;border:1px solid #d1d5db;border-radius:10px;background:#fff;font:inherit}
-  .filters button{padding:9px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#eef2ff;cursor:pointer}
+  .filters input,.filters select{padding:9px 11px;border:1px solid #d1d5db;border-radius:10px;background:#fff;font:inherit}
+  .filters button{padding:10px 13px;border:1px solid #cbd5e1;border-radius:10px;background:var(--chip);cursor:pointer}
   .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
   .tile{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px}
-  .tile .k{font-size:28px;font-weight:700;margin-top:6px}
+  .tile .k{font-size:28px;font-weight:800;margin-top:6px}
   .tile .l{font-size:12px;color:var(--muted)}
   .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  .charts-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
   .status{margin-top:12px;font-size:12px;color:var(--muted)}
   .error{position:fixed;left:0;right:0;top:0;background:#fff3f3;border-bottom:1px solid #f0caca;color:#8b0000;padding:10px 14px;display:none;z-index:9999}
   .tablewrap{margin-top:12px}
@@ -29,16 +33,16 @@
   th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right}
   th:first-child,td:first-child{text-align:left}
   tfoot td{font-weight:700;background:#f8fafc}
-  .chip{display:inline-block;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:2px 8px;font-size:12px}
-  @media (max-width:960px){ .grid{grid-template-columns:repeat(2,1fr)} .charts{grid-template-columns:1fr} }
+  .chip{display:inline-block;background:var(--chip);border:1px solid #e2e8f0;border-radius:999px;padding:2px 8px;font-size:12px}
+  @media (max-width:1024px){ .grid{grid-template-columns:repeat(2,1fr)} .charts,.charts-2{grid-template-columns:1fr} }
   @media (max-width:640px){ .grid{grid-template-columns:1fr} }
 
   .credit{
-  position:fixed; right:10px; bottom:8px; z-index:9999;
-  background:#ffffffd9; backdrop-filter: blur(4px);
-  border:1px solid #e5e7eb; border-radius:999px;
-  padding:6px 10px; font-size:12px; color:#374151;
-}
+    position:fixed; right:10px; bottom:8px; z-index:9999;
+    background:#ffffffd9; backdrop-filter: blur(4px);
+    border:1px solid #e5e7eb; border-radius:999px;
+    padding:6px 10px; font-size:12px; color:#374151;
+  }
 </style>
 
 <!-- MSAL (3 CDN fallbacki) -->
@@ -73,7 +77,7 @@
       <span id="who">Nie zalogowano.</span>
       <button id="btnLogin">Zaloguj</button>
       <button id="btnLogout">Wyloguj</button>
-      <a href="mapa_test.html" style="margin-left:6px;text-decoration:none;border:1px solid #d1d5db;border-radius:10px;padding:8px 10px;background:#fff">↩︎ Mapa</a>
+      <a href="mapa_test.html" class="linkbtn" style="text-decoration:none">↩︎ Mapa</a>
     </div>
   </div>
 
@@ -106,24 +110,28 @@
     <div class="status" id="status">Załaduj dane…</div>
   </div>
 
+  <!-- KPI tiles -->
   <div class="grid">
-    <div class="tile"><div class="l">Nowe leady</div><div class="k" id="kLeads">–</div></div>
+    <div class="tile"><div class="l">Leady (okres)</div><div class="k" id="kLeads">–</div></div>
     <div class="tile"><div class="l">Przypisane PH</div><div class="k"><span id="kPH">–</span> <span class="l">/ nieprzypisane: <span class="chip" id="kUnassigned">–</span></span></div></div>
-    <div class="tile"><div class="l">Oferta wysłana (leady z okresu)</div><div class="k" id="kOffers">–</div></div>
-    <div class="tile"><div class="l">Akceptacje (konwersja)</div><div class="k" id="kAcc">–</div></div>
-    <div class="tile"><div class="l">Śr. czas: Lead → Oferta</div><div class="k" id="kT1">–</div></div>
-    <div class="tile"><div class="l">Śr. czas: Oferta → Akceptacja</div><div class="k" id="kT2">–</div></div>
+    <div class="tile"><div class="l">Wyceny (pierwsze wystąpienia)</div><div class="k" id="kQuotes">–</div></div>
+    <div class="tile"><div class="l">Oferty wysłane</div><div class="k" id="kOffers">–</div></div>
+    <div class="tile"><div class="l">Zamknięcia (Akc/Odr)</div><div class="k" id="kClosed">–</div><div class="l">Akc: <span id="kAcc">–</span> / Odr: <span id="kRej">–</span></div></div>
+    <div class="tile"><div class="l">Śr. czas: Lead → Wycena</div><div class="k" id="kT01">–</div></div>
+    <div class="tile"><div class="l">Śr. czas: Wycena → Oferta</div><div class="k" id="kT02">–</div></div>
+    <div class="tile"><div class="l">Śr. czas: Oferta → Zamknięcie</div><div class="k" id="kT03">–</div></div>
   </div>
 
+  <!-- Charts -->
   <div class="charts">
-    <div class="tile"><canvas id="chTrend" height="140"></canvas></div>
-    <div class="tile"><canvas id="chPH" height="140"></canvas></div>
+    <div class="tile"><h4 style="margin:0 0 8px 0">Trend tygodniowy</h4><canvas id="chTrend" height="140"></canvas></div>
+    <div class="tile"><h4 style="margin:0 0 8px 0">PH × Status (stack)</h4><canvas id="chPH" height="140"></canvas></div>
   </div>
-
-  <div class="tablewrap">
+  <div class="charts-2">
+    <div class="tile"><h4 style="margin:0 0 8px 0">Powody odmowy</h4><canvas id="chReasons" height="160"></canvas></div>
     <div class="tile">
-      <h3 style="margin:0 0 10px 0">Leady wg PH i Statusu</h3>
-      <div style="overflow:auto">
+      <h4 style="margin:0 0 8px 0">Leady wg PH i Statusu</h4>
+      <div style="overflow:auto;max-height:380px">
         <table id="tblPH"></table>
       </div>
     </div>
@@ -143,8 +151,27 @@ const CONFIG = {
   logSheet:  "AuditLog",
 };
 
-// Statusy (stringi jak w Excelu)
-const STATUS_LIST = ["Zapytanie o wycenę","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO"];
+// Statusy – kanon + aliasy
+const STATUS_ALIASES = {
+  "zapytanie o wycenę":"Wycena Inwestycji",
+  "zapytanie o wycene":"Wycena Inwestycji",
+  "wycena inwestycji":"Wycena Inwestycji",
+  "oferta wysłana":"Oferta wysłana",
+  "odmowa klienta":"Odmowa klienta",
+  "akceptacja klienta":"Akceptacja klienta",
+  "poza zasięgiem":"Poza Zasięgiem",
+  "kpo":"KPO",
+  "duplikat":"Duplikat",
+  "moico":"MOICO",
+  "seev":"SEEV"
+};
+function canonStatus(s){
+  const k=String(s||"").toLowerCase().trim();
+  return STATUS_ALIASES[k] || (s||"");
+}
+const STATUS_LIST = ["Wycena Inwestycji","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO"];
+const EXCLUDED_STATUSES = new Set(["KPO","Poza Zasięgiem","MOICO","Duplikat","SEEV"]);
+
 const PH_ALL = "(Wszyscy PH)";
 const PH_NONE = "(Brak PH)";
 
@@ -162,7 +189,7 @@ function toDate(v){
   if(m){ const [_,dd,mm,yy]=m; return new Date(Number(yy.length===2?("20"+yy):yy), Number(mm)-1, Number(dd)); }
   return null;
 }
-function fmtDays(n){ return isFinite(n)? (n.toFixed(1)+" d") : "–"; }
+function fmtDays(n){ return (n!=null && isFinite(n))? (n.toFixed(1)+" d") : "–"; }
 function diffDays(a,b){ return (b-a)/86400000; }
 function normAddr(s){
   return String(s||"").toLowerCase()
@@ -236,14 +263,15 @@ function parseDane(values){
     created: H[0], // A: Data zgłoszenia
     ph:      pickHeader(H,["ph"]),
     status:  pickHeader(H,["status"]),
+    reason:  pickHeader(H,["powód","powod","reason","powód odmowy","powod odmowy"]),
     addr:    pickHeader(H,["adres_pelny","adres pełny","adres pelny"]),
     ulica:   pickHeader(H,["ulica","adres"]),
     nr:      pickHeader(H,["nr budynku","numer","nr","nr domu"]),
     msc:     pickHeader(H,["miejscowość","miejscowosc","miasto"])
   };
 
+  const idx = name => H.indexOf(name);
   const out = body.map(r=>{
-    const idx = name => H.indexOf(name);
     let adres = COL.addr ? String(r[idx(COL.addr)]||"") : "";
     if(!adres){
       const u = COL.ulica ? String(r[idx(COL.ulica)]||"").trim() : "";
@@ -251,10 +279,13 @@ function parseDane(values){
       const m = COL.msc   ? String(r[idx(COL.msc)]||"").trim()   : "";
       adres = (u&&n&&m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
     }
+    const stRaw = COL.status ? (r[idx(COL.status)]||"") : "";
+    const st = canonStatus(stRaw);
     return {
       createdAt: toDate(r[idx(COL.created)]),
       PH: String(COL.ph ? (r[idx(COL.ph)]||"") : ""),
-      Status: String(COL.status ? (r[idx(COL.status)]||"") : ""),
+      Status: st,
+      Reason: (st==="Odmowa klienta" && COL.reason) ? String(r[idx(COL.reason)]||"") : "",
       adres_pelny: adres,
       key: normAddr(adres)
     };
@@ -281,9 +312,12 @@ function parseLog(values){
     const addr = normAddr(String(r[idxAddr]||""));
     const old = String(r[idxOld]||"");
     const nw  = String(r[idxNew]||"");
-    const oldStatus = old.split("|")[1]||"";
-    const newStatus = nw.split("|")[1]||"";
-    return { ts, addr, action:String(r[idxAct]||""), oldStatus, newStatus };
+    const partsOld = old.split("|");
+    const partsNew = nw.split("|");
+    const oldStatus = canonStatus(partsOld[1]||"");
+    const newStatus = canonStatus(partsNew[1]||"");
+    const newReason = (newStatus==="Odmowa klienta") ? (partsNew[2]||"") : "";
+    return { ts, addr, action:String(r[idxAct]||""), oldStatus, newStatus, newReason };
   }).filter(x=>x.addr && !isNaN(x.ts));
 }
 
@@ -292,7 +326,6 @@ function applyFilters(allRows, from, to, selPH, selST){
   const inRange = r => (!from || r.createdAt>=from) && (!to || r.createdAt<=to);
   const phOk = r => {
     if(!selPH.length) return true;                        // (Wszyscy PH)
-    // Zamieniamy "(Brak PH)" na pusty string gdy filtrujemy
     const wanted = selPH.map(x=> x===PH_NONE ? "" : x);
     return wanted.includes(r.PH||"");
   };
@@ -309,6 +342,15 @@ function firstStatusTsByAddr(logs, status){
   }
   return map;
 }
+function firstStatusWithReasonByAddr(logs, status){
+  const map=new Map();
+  const target = (s)=> (String(s||"").toLowerCase().trim()===status.toLowerCase());
+  const sorted=[...logs].sort((a,b)=>a.ts-b.ts);
+  for(const e of sorted){
+    if(target(e.newStatus) && !map.has(e.addr)) map.set(e.addr, {ts:e.ts, reason:e.newReason||""});
+  }
+  return map;
+}
 function weeklyKey(d){
   const dt=new Date(d.getFullYear(),d.getMonth(),d.getDate());
   const onejan=new Date(dt.getFullYear(),0,1);
@@ -317,62 +359,84 @@ function weeklyKey(d){
 }
 
 function computeKPI(rows, logs, from, to, selPH, selST){
-  const filtered = applyFilters(rows, from, to, selPH, selST);
+  const filteredFull = applyFilters(rows, from, to, selPH, selST); // do tabel i wykresów
+  const filteredKPI  = filteredFull.filter(r=>!EXCLUDED_STATUSES.has(r.Status)); // KPI bez wykluczeń
 
-  const firstOffer = firstStatusTsByAddr(logs,"Oferta wysłana");
-  const firstAccept= firstStatusTsByAddr(logs,"Akceptacja klienta");
+  // mapy "pierwszych" statusów
+  const firstQuote  = firstStatusTsByAddr(logs,"Wycena Inwestycji");
+  const firstOffer  = firstStatusTsByAddr(logs,"Oferta wysłana");
+  const firstAccept = firstStatusTsByAddr(logs,"Akceptacja klienta");
+  const firstReject = firstStatusWithReasonByAddr(logs,"Odmowa klienta");
 
-  let nLeads=filtered.length;
-  let nPHassigned=filtered.filter(r=> (r.PH||"").trim()).length;
+  let nLeads=filteredKPI.length;
+  let nPHassigned=filteredKPI.filter(r=> (r.PH||"").trim()).length;
   let nUnassigned = nLeads - nPHassigned;
 
-  let nOffer=0, nAcc=0;
-  let tLeadOffer=[], tOfferAcc=[];
+  let nQuote=0, nOffer=0, nClosed=0, nAcc=0, nRej=0;
+  let tLeadQuote=[], tQuoteOffer=[], tOfferClose=[];
 
-  for(const r of filtered){
+  for(const r of filteredKPI){
     const key=r.key;
-    const tsOffer = firstOffer.get(key)||null;
-    const tsAcc   = firstAccept.get(key)||null;
+    const tsQuote  = firstQuote.get(key)||null;
+    const tsOffer  = firstOffer.get(key)||null;
+    const tsAccept = firstAccept.get(key)||null;
+    const rejObj   = firstReject.get(key)||null;
+    const tsReject = rejObj ? rejObj.ts : null;
 
+    const tsClose = tsAccept && tsReject ? (tsAccept < tsReject ? tsAccept : tsReject)
+                  : tsAccept || tsReject || null;
+
+    if(tsQuote) nQuote++;
     if(tsOffer) nOffer++;
-    if(tsAcc) nAcc++;
+    if(tsClose){ nClosed++; if(tsAccept && tsAccept===tsClose) nAcc++; if(tsReject && tsReject===tsClose) nRej++; }
 
-    if(r.createdAt && tsOffer && tsOffer>=r.createdAt){
-      tLeadOffer.push(diffDays(r.createdAt, tsOffer));
+    if(r.createdAt && tsQuote && tsQuote>=r.createdAt){
+      tLeadQuote.push(diffDays(r.createdAt, tsQuote));
     }
-    if(tsOffer && tsAcc && tsAcc>=tsOffer){
-      tOfferAcc.push(diffDays(tsOffer, tsAcc));
+    if(tsQuote && tsOffer && tsOffer>=tsQuote){
+      tQuoteOffer.push(diffDays(tsQuote, tsOffer));
+    }
+    if(tsOffer && tsClose && tsClose>=tsOffer){
+      tOfferClose.push(diffDays(tsOffer, tsClose));
     }
   }
 
   const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : NaN;
 
-  // trend (tygodnie)
+  // trend (tygodnie, wg createdAt; punkty: leads/quotes/offers/closes)
   const trend = {};
-  for(const r of filtered){
+  for(const r of filteredKPI){
     if(!r.createdAt) continue;
     const k=weeklyKey(r.createdAt);
-    trend[k]=(trend[k]||{leads:0,offers:0,acc:0});
+    trend[k]=(trend[k]||{leads:0,quotes:0,offers:0,closes:0});
     trend[k].leads++;
-  }
-  for(const r of filtered){
-    const k = r.createdAt ? weeklyKey(r.createdAt) : null;
-    if(!k) continue;
+    if(firstQuote.get(r.key)) trend[k].quotes++;
     if(firstOffer.get(r.key)) trend[k].offers++;
-    if(firstAccept.get(r.key)) trend[k].acc++;
+    if(firstAccept.get(r.key) || firstReject.get(r.key)) trend[k].closes++;
   }
 
-  // macierz PH x Status (stan bieżący)
-  const phCatsRaw = [...new Set(filtered.map(r=> (r.PH||"") ))].sort();
+  // macierz PH x Status – na pełnym filtrze (również wykluczenia, bo to widok)
+  const phCatsRaw = [...new Set(filteredFull.map(r=> (r.PH||"") ))].sort();
   const phCats = phCatsRaw.map(x=> x||PH_NONE); // puste -> "(Brak PH)"
   const stCats = STATUS_LIST;
   const phMatrix = phCatsRaw.map(()=> stCats.map(()=>0));
   const phTotals = phCatsRaw.map(()=>0);
-
-  for(const r of filtered){
+  for(const r of filteredFull){
     const pi = phCatsRaw.indexOf(r.PH||"");
     const si = stCats.indexOf(r.Status||"");
     if(pi>=0){ phTotals[pi]++; if(si>=0) phMatrix[pi][si]++; }
+  }
+
+  // powody odmowy – pierwsze wystąpienie (z LOG), fallback: Reason z danych
+  const reasonsMap = new Map();
+  for(const r of filteredKPI){
+    const key=r.key;
+    let reason="";
+    const fr = firstReject.get(key);
+    if(fr) reason = fr.reason || "";
+    else if(r.Status==="Odmowa klienta") reason = r.Reason || "";
+    reason = String(reason||"Brak powodu").trim();
+    const n = reasonsMap.get(reason)||0; reasonsMap.set(reason, n+1);
   }
 
   return {
@@ -380,35 +444,43 @@ function computeKPI(rows, logs, from, to, selPH, selST){
       leads:nLeads,
       phPct: nLeads? Math.round(nPHassigned/nLeads*100):0,
       unassigned: nUnassigned,
+      quotes:nQuote,
       offers:nOffer,
-      acc: nAcc,
+      closed:nClosed,
+      acc:nAcc, rej:nRej,
       convPct: nLeads? Math.round(nAcc/nLeads*100):0,
-      tLeadOffer: avg(tLeadOffer),
-      tOfferAcc:  avg(tOfferAcc),
+      tLeadQuote: avg(tLeadQuote),
+      tQuoteOffer:  avg(tQuoteOffer),
+      tOfferClose:  avg(tOfferClose),
     },
     trend,
-    phCats, stCats, phMatrix, phTotals
+    phCats, stCats, phMatrix, phTotals,
+    reasons: reasonsMap
   };
 }
 
-/* =========================== WYKRESY/TABLE =========================== */
-let chartTrend=null, chartPH=null;
+/* =========================== WYKRESy/TABLE =========================== */
+let chartTrend=null, chartPH=null, chartReasons=null;
 function renderCharts(kpi){
+  // Trend
   const keys = Object.keys(kpi.trend).sort();
-  const leads = keys.map(k=>kpi.trend[k].leads);
-  const offers= keys.map(k=>kpi.trend[k].offers);
-  const acc   = keys.map(k=>kpi.trend[k].acc);
+  const leads  = keys.map(k=>kpi.trend[k].leads);
+  const quotes = keys.map(k=>kpi.trend[k].quotes);
+  const offers = keys.map(k=>kpi.trend[k].offers);
+  const closes = keys.map(k=>kpi.trend[k].closes);
   if(chartTrend) chartTrend.destroy();
   chartTrend = new Chart($("#chTrend"),{
     type:'line',
     data:{ labels:keys, datasets:[
-      { label:'Leady', data:leads },
-      { label:'Oferty', data:offers },
-      { label:'Akceptacje', data:acc },
+      { label:'Leady', data:leads, tension:.3 },
+      { label:'Wyceny', data:quotes, tension:.3 },
+      { label:'Oferty', data:offers, tension:.3 },
+      { label:'Zamknięcia', data:closes, tension:.3 },
     ]},
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
   });
 
+  // PH x Status
   if(chartPH) chartPH.destroy();
   chartPH = new Chart($("#chPH"),{
     type:'bar',
@@ -421,6 +493,16 @@ function renderCharts(kpi){
       }))
     },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}, scales:{x:{stacked:true}, y:{stacked:true}} }
+  });
+
+  // Powody odmowy
+  const labels = [...kpi.reasons.keys()];
+  const data   = labels.map(l=>kpi.reasons.get(l));
+  if(chartReasons) chartReasons.destroy();
+  chartReasons = new Chart($("#chReasons"),{
+    type:'doughnut',
+    data:{ labels, datasets:[{ data }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
   });
 }
 
@@ -454,14 +536,13 @@ function fillFilters(){
   phSel.appendChild(mk(PH_ALL, PH_ALL));
   for(const ph of PH_LIST.filter(x=>x)){ phSel.appendChild(mk(ph, ph)); }
   phSel.appendChild(mk(PH_NONE, PH_NONE));
-  // domyślnie zaznaczamy (Wszyscy PH)
   phSel.options[0].selected = true;
 
-  // Status
+  // Status – kanon
   const stSel=$("#fStatus"); stSel.innerHTML="";
   for(const st of STATUS_LIST){ const opt=document.createElement('option'); opt.value=st; opt.textContent=st; stSel.appendChild(opt); }
 
-  // domyślny zakres: ostatnie 30 dni (z możliwością poszerzenia)
+  // domyślny zakres: ostatnie 30 dni
   const today=new Date(); const from=new Date(today); from.setDate(today.getDate()-30);
   $("#fFrom").value = from.toISOString().slice(0,10);
   $("#fTo").value   = today.toISOString().slice(0,10);
@@ -470,7 +551,6 @@ function readFilters(){
   FROM = $("#fFrom").value ? new Date($("#fFrom").value+"T00:00:00") : null;
   TO   = $("#fTo").value   ? new Date($("#fTo").value+"T23:59:59") : null;
   const sel = [...$("#fPH").selectedOptions].map(o=>o.value);
-  // jeśli wybrano "(Wszyscy PH)" albo nic – traktuj jak brak filtru
   SEL_PH = (!sel.length || sel.includes(PH_ALL)) ? [] : sel;
   SEL_ST = [...$("#fStatus").selectedOptions].map(o=>o.value);
 }
@@ -478,10 +558,14 @@ function renderTiles(kpi){
   $("#kLeads").textContent = kpi.counts.leads;
   $("#kPH").textContent    = `${kpi.counts.phPct}%`;
   $("#kUnassigned").textContent = kpi.counts.unassigned;
-  $("#kOffers").textContent= kpi.counts.offers;
-  $("#kAcc").textContent   = `${kpi.counts.acc} (${kpi.counts.convPct}%)`;
-  $("#kT1").textContent    = fmtDays(kpi.counts.tLeadOffer);
-  $("#kT2").textContent    = fmtDays(kpi.counts.tOfferAcc);
+  $("#kQuotes").textContent = kpi.counts.quotes;
+  $("#kOffers").textContent = kpi.counts.offers;
+  $("#kClosed").textContent = kpi.counts.closed;
+  $("#kAcc").textContent    = kpi.counts.acc;
+  $("#kRej").textContent    = kpi.counts.rej;
+  $("#kT01").textContent    = fmtDays(kpi.counts.tLeadQuote);
+  $("#kT02").textContent    = fmtDays(kpi.counts.tQuoteOffer);
+  $("#kT03").textContent    = fmtDays(kpi.counts.tOfferClose);
 }
 
 async function loadAll(){
