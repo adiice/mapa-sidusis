@@ -758,91 +758,184 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     await patchRange(CONFIG.logSheet, a1, [row]);
   }
 
-  /* =========================== DANE z Excela =========================== */
-  function pickHeader(headers, tokens){
-    const lc=headers.map(h=>String(h||"").toLowerCase());
-    for(const t of tokens){ const i = lc.findIndex(n=>n.includes(t)); if(i>=0) return headers[i]; }
-    return null;
+/* =========================== DANE z Excela =========================== */
+function pickHeader(headers, tokens){
+  const lc = headers.map(h => String(h||"").toLowerCase());
+  for(const t of tokens){
+    const i = lc.findIndex(n => n.includes(t));
+    if(i>=0) return headers[i];
   }
-  function parseRows(values){
-    if(!values || !values.length) return [];
-    const headers = (values[0]||[]).map(h=>String(h||"").trim());
-    const body = values.slice(1);
-    const H = {
-      created: headers[0],
-      lat:  pickHeader(headers,["lat","latitude","szerokość","szerokosc"]),
-      lon:  pickHeader(headers,["lon","longitude","długość","dlugosc"]),
-      tel:  pickHeader(headers,["telefon","tel"]),
-      mail: pickHeader(headers,["email","e-mail","mail"]),
-      ph:   pickHeader(headers,["ph"]),
-      st:   pickHeader(headers,["status"]),
-      ulica:pickHeader(headers,["ulica","adres"]),
-      nr:   pickHeader(headers,["nr budynku","numer","nr","nr domu"]),
-      msc:  pickHeader(headers,["miejscowość","miejscowosc","miasto"]),
-      nazwa:pickHeader(headers,["zgłaszający","zglaszajacy","nazwa","imię","imie","nazwisko","klient","firma"]),
-      adresPelny: pickHeader(headers,["adres_pelny","adres pełny","adres pelny"]),
-      powod: pickHeader(headers,["powód","powod","reason","powód odmowy","powod odmowy"]),
-	  notes: pickHeader(headers,["uwagi ph","uwagi","uwaga","notatki","note","notes"]),
-    };
-    const get = (r, col) => { const idx=headers.indexOf(col); return idx>=0 ? r[idx] : ""; };
+  return null;
+}
 
-    let out = body.map((r, idx) => {
-      let lat = toNum(get(r,H.lat)); 
-      let lon = toNum(get(r,H.lon));
-      let adr = get(r,H.adresPelny) || "";
-      if(!adr){
-        const u = String(get(r,H.ulica)||"").trim();
-        const n = String(get(r,H.nr)||"").trim();
-        const m = String(get(r,H.msc)||"").trim();
-        adr = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
-      }
-      return {
-        _row1: idx + 2,
-        createdAt: toDate(get(r,H.created)),
-        lat, lon, adres_pelny: adr||"",
-        PH: String(get(r,H.ph)||""),
-        Status: String(get(r,H.st)||""),
-        telefon: String(get(r,H.tel)||""),
-        email: String(get(r,H.mail)||""),
-        nazwa: String(get(r,H.nazwa)||""),
-        miejscowosc: String(get(r,H.msc)||""),
-        PowodOdmowy: String(get(r,H.powod)||"")
-		Uwagi: String(get(r, H.notes) || "")
-      };
+function parseRows(values){
+  if(!values || !values.length) return [];
+  const headers = (values[0]||[]).map(h=>String(h||"").trim());
+  const body = values.slice(1);
+  const H = {
+    created: headers[0],
+    lat:  pickHeader(headers,["lat","latitude","szerokość","szerokosc"]),
+    lon:  pickHeader(headers,["lon","longitude","długość","dlugosc"]),
+    tel:  pickHeader(headers,["telefon","tel"]),
+    mail: pickHeader(headers,["email","e-mail","mail"]),
+    ph:   pickHeader(headers,["ph"]),
+    st:   pickHeader(headers,["status"]),
+    ulica:pickHeader(headers,["ulica","adres"]),
+    nr:   pickHeader(headers,["nr budynku","numer","nr","nr domu"]),
+    msc:  pickHeader(headers,["miejscowość","miejscowosc","miasto"]),
+    nazwa:pickHeader(headers,["zgłaszający","zglaszajacy","nazwa","imię","imie","nazwisko","klient","firma"]),
+    adresPelny: pickHeader(headers,["adres_pelny","adres pełny","adres pelny"]),
+    powod: pickHeader(headers,["powód","powod","reason","powód odmowy","powod odmowy"]),
+    notes: pickHeader(headers,["uwagi ph","uwagi","uwaga","notatki","note","notes"])
+  };
+  const get = (r, col) => { const idx=headers.indexOf(col); return idx>=0 ? r[idx] : ""; };
+
+  let out = body.map((r, idx) => {
+    let lat = toNum(get(r,H.lat));
+    let lon = toNum(get(r,H.lon));
+    let adr = get(r,H.adresPelny) || "";
+    if(!adr){
+      const u = String(get(r,H.ulica)||"").trim();
+      const n = String(get(r,H.nr)||"").trim();
+      const m = String(get(r,H.msc)||"").trim();
+      adr = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
+    }
+    return {
+      _row1: idx + 2,
+      createdAt: toDate(get(r,H.created)),
+      lat, lon, adres_pelny: adr||"",
+      PH: String(get(r,H.ph)||""),
+      Status: String(get(r,H.st)||""),
+      telefon: String(get(r,H.tel)||""),
+      email: String(get(r,H.mail)||""),
+      nazwa: String(get(r,H.nazwa)||""),
+      miejscowosc: String(get(r,H.msc)||""),
+      PowodOdmowy: String(get(r,H.powod)||""),   // ⬅ brakujący przecinek był tutaj
+      Uwagi: String(get(r,H.notes)||"")
+    };
+  });
+
+  const validLat=v=>isFinite(v)&&v>=-90&&v<=90;
+  const validLon=v=>isFinite(v)&&v>=-180&&v<=180;
+  const okNormal = out.filter(o=>validLat(o.lat)&&validLon(o.lon)).length;
+  const okSwapped= out.filter(o=>validLat(o.lon)&&validLon(o.lat)).length;
+  if(okSwapped>okNormal){ out = out.map(o=>({ ...o, lat:o.lon, lon:o.lat })); }
+  out = out.filter(o=>validLat(o.lat)&&validLon(o.lon));
+  return out;
+}
+
+async function loadDataFromExcel(){
+  setStatus("Ładowanie danych z Excela (Graph)…");
+  const used = await usedRange(CONFIG.dataSheet);
+  const values = used.values || [];
+  if(!values.length){ setStatus("Arkusz pusty."); rows=[]; frows=[]; return; }
+  rows = parseRows(values);
+  fillMiniFilters();
+  frows = rows.slice();
+  setStatus(`Załadowano ${rows.length} wierszy z arkusza „${CONFIG.dataSheet}”.`);
+}
+function addOneMarker(rec){
+  const m = L.marker([rec.lat, rec.lon], { icon: makeIcon(rec) });
+
+  m.bindPopup(buildPopup(rec));
+
+  m.on('popupopen', e=>{
+    const el = e.popup.getElement()?.querySelector('.leaflet-popup-content');
+    if(!el) return;
+
+    // Sterowanie widocznością powodu odmowy
+    const stSel = el.querySelector('#stSel');
+    const reasonRow = el.querySelector('#reasonRow');
+    stSel?.addEventListener('change', ()=>{
+      const st = (stSel.value || '').trim();
+      reasonRow.style.display = (st === "Odmowa klienta") ? 'flex' : 'none';
     });
 
-    const validLat=v=>isFinite(v)&&v>=-90&&v<=90;
-    const validLon=v=>isFinite(v)&&v>=-180&&v<=180;
-    const okNormal = out.filter(o=>validLat(o.lat)&&validLon(o.lon)).length;
-    const okSwapped= out.filter(o=>validLat(o.lon)&&validLon(o.lat)).length;
-    if(okSwapped>okNormal){ out = out.map(o=>({ ...o, lat:o.lon, lon:o.lat })); }
-    out = out.filter(o=>validLat(o.lat)&&validLon(o.lon));
-    return out;
-  }
+    // Zapis PH/Status (+ ew. powód)
+    el.querySelector('#savePHST')?.addEventListener('click', async ()=>{
+      const ph = el.querySelector('#phSel')?.value || "";
+      const st = el.querySelector('#stSel')?.value || "";
+      const reason = (st === "Odmowa klienta") ? (el.querySelector('#reasonSel')?.value || "") : "";
 
-  async function loadDataFromExcel(){
-    setStatus("Ładowanie danych z Excela (Graph)…");
-    const used = await usedRange(CONFIG.dataSheet);
-    const values = used.values || [];
-    if(!values.length){ setStatus("Arkusz pusty."); rows=[]; frows=[]; return; }
-    rows = parseRows(values);
-    fillMiniFilters();
-    frows = rows.slice();
-    setStatus(`Załadowano ${rows.length} wierszy z arkusza „${CONFIG.dataSheet}”.`);
-  }
+      if(st === "Odmowa klienta" && !reason){
+        alert("Wybierz Powód odmowy.");
+        return;
+      }
 
-  // zapis zmian (PH/Status + ewentualnie Powód odmowy)
-  async function savePhStatus(rec, newPH, newStatus, newReason){
-  // zapis Uwag PH + wpis do AuditLog
-async function saveUwagi(rec, newNotes){
-  // 1) Pobierz nagłówki/ciało
+      try{
+        setStatus("Zapis do Excela…");
+        await savePhStatus(rec, ph, st, reason);
+        rec.PH = ph; rec.Status = st; rec.PowodOdmowy = reason;
+
+        m.setIcon(makeIcon(rec));
+        m.setPopupContent(buildPopup(rec));
+        m.openPopup();
+
+        setStatus("Zapisano.", { autoClearMs: 2500 });
+      }catch(err){
+        console.error(err);
+        showError("Błąd zapisu: " + err.message);
+        setStatus("Błąd zapisu.");
+      }
+    });
+
+    // Szybkie akcje – tylko „Przypisz mnie”
+    el.querySelectorAll('a[data-quick]').forEach(a=>{
+      a.addEventListener('click', ev=>{
+        ev.preventDefault();
+        const kind = a.getAttribute('data-quick');
+        if(kind === "me"){
+          const phSel = el.querySelector('#phSel');
+          const me = (account && (account.name||"")) || "";
+          if(me && PH_LIST.includes(me)) phSel.value = me;
+          else if(PH_LIST.length){ phSel.value = PH_LIST[0]; }
+        }
+      });
+    });
+
+    // Zapis „Uwagi PH”
+    const noteBtn = el.querySelector('#saveNote');
+    if(noteBtn){
+      noteBtn.addEventListener('click', async ()=>{
+        const text = (el.querySelector('#noteText')?.value || "").trim();
+        try{
+          setStatus("Zapisuję uwagi…");
+          await saveUwagi(rec, text);
+          rec.Uwagi = text;
+
+          m.setPopupContent(buildPopup(rec));
+          m.openPopup();
+
+          setStatus("Zapisano uwagi.", { autoClearMs: 2000 });
+        }catch(err){
+          console.error(err);
+          showError("Błąd zapisu uwag: " + err.message);
+          setStatus("Błąd zapisu.");
+        }
+      });
+    }
+
+    // Linki mailowe
+    el.querySelectorAll('a[data-mail]').forEach(a=>{
+      a.addEventListener('click', ev=>{
+        ev.preventDefault();
+        const kind = a.getAttribute('data-mail');
+        const t = mailTemplates(rec)[kind];
+        composeAndSend(t.to, t.subject, t.body);
+      });
+    });
+  });
+
+  cluster.addLayer(m);
+}
+// zapis zmian (PH/Status + ewentualnie Powód odmowy)
+async function savePhStatus(rec, newPH, newStatus, newReason){
   const used = await usedRange(CONFIG.dataSheet);
   const vals = used.values || [];
   if(!vals.length) throw new Error("Arkusz pusty.");
   const headers = (vals[0]||[]).map(h=>String(h||"").trim());
   const body = vals.slice(1);
 
-  // 2) Mapowanie kolumn (dopasowanie rekordu + "Uwagi")
   const H = {
     adresPelny: pickHeader(headers,["adres_pelny","adres pełny","adres pelny"]),
     ulica:      pickHeader(headers,["ulica","adres"]),
@@ -850,22 +943,28 @@ async function saveUwagi(rec, newNotes){
     msc:        pickHeader(headers,["miejscowość","miejscowosc","miasto"]),
     lat:        pickHeader(headers,["lat","latitude","szerokość","szerokosc","punkt (y)","y"]),
     lon:        pickHeader(headers,["lon","longitude","długość","dlugosc","punkt (x)","x"]),
-    notes:      pickHeader(headers,["uwagi ph","uwagi","uwaga","notatki","note","notes"])
+    ph:         pickHeader(headers,["ph"]),
+    st:         pickHeader(headers,["status"]),
+    reason:     pickHeader(headers,["powód","powod","reason","powód odmowy","powod odmowy"])
   };
 
-  // 3) Zapewnij kolumnę "Uwagi"
-  let idxNotes = (H.notes ? headers.indexOf(H.notes) : -1);
-  if(idxNotes < 0){
-    idxNotes = headers.length;
-    headers.push("Uwagi");
-    await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]);
+  // zapewnij PH/Status, a dla odmowy – kolumnę powodu
+  let idxPH = headers.findIndex(h=>String(h).toLowerCase().trim()==="ph");
+  if(idxPH<0){ idxPH = headers.length; headers.push("PH"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+  let idxST = headers.findIndex(h=>String(h).toLowerCase().trim()==="status");
+  if(idxST<0){ idxST = headers.length; headers.push("Status"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+  let idxRS = -1;
+  if(newStatus==="Odmowa klienta"){
+    if(!H.reason){ H.reason="Powód odmowy"; headers.push(H.reason); idxRS = headers.length-1; await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+    else idxRS = headers.indexOf(H.reason);
   }
 
-  // 4) Znajdź wiersz rekordu (numer 1-based); zapamiętaj stare uwagi
-  let row1 = Number(rec._row1) || -1, oldNotes = "";
-  if(row1 > 0){
+  // dopasowanie wiersza
+  let row1 = Number(rec._row1) || -1, oldPH="", oldST="";
+  if(row1>0){
     const row = body[row1-2] || [];
-    oldNotes = String(row[idxNotes]||"");
+    oldPH = idxPH>=0 ? String(row[idxPH]||"") : "";
+    oldST = idxST>=0 ? String(row[idxST]||"") : "";
   }else{
     const wantAddr = normAddr(rec.adres_pelny||"");
     for(let r=0; r<body.length; r++){
@@ -888,43 +987,65 @@ async function saveUwagi(rec, newNotes){
         const latR = toNum(row[iLat]); const lonR = toNum(row[iLon]);
         if(near(latR, rec.lat) && near(lonR, rec.lon)){ row1 = r+2; }
       }
-      if(row1 > 0){
-        oldNotes = String(row[idxNotes]||"");
+      if(row1>0){
+        oldPH = idxPH>=0 ? String(row[idxPH]||"") : "";
+        oldST = idxST>=0 ? String(row[idxST]||"") : "";
         break;
       }
     }
-    if(row1 < 0) throw new Error("Nie znaleziono pozycji w Excelu (dopasowanie po adresie i/lub współrzędnych).");
+    if(row1<0) throw new Error("Nie znaleziono pozycji w Excelu (dopasowanie po adresie i/lub współrzędnych).");
     rec._row1 = row1;
   }
 
-  // 5) Przygotuj $batch: zapis komórki + dopis do AuditLog
+  // --- [BATCH] PH, Status, (opcjonalnie) Powód + AuditLog ---
   const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
   const wsqData = CONFIG.dataSheet.replace(/'/g,"''");
-  const a1NOTE  = `${colLetter(idxNotes+1)}${row1}`;
+
+  const a1PH     = `${colLetter(idxPH+1)}${row1}`;
+  const a1ST     = `${colLetter(idxST+1)}${row1}`;
+  const a1REASON = (idxRS>=0) ? `${colLetter(idxRS+1)}${row1}` : null;
 
   await ensureAuditHeaders();
   const nextLog = await getNextLogRow();
   const logA1   = `A${nextLog}:${colLetter(AUDIT_HEADERS.length)}${nextLog}`;
   const now     = new Date().toISOString();
   const upn     = (account && (account.username||account.homeAccountId)) || "";
-  const logRow  = [ now, upn, "UpdateUwagi", "", rec.adres_pelny||"", oldNotes, newNotes||"", "" ];
+  const logRow  = [ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}|${newReason||""}`, "" ];
 
   const requests = [
     {
-      id: "notes",
+      id: "ph",
       method: "PATCH",
-      url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1NOTE}')`,
+      url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1PH}')`,
       headers: { "Content-Type": "application/json" },
-      body: { values: [[ newNotes || "" ]] }
+      body: { values: [[ newPH || "" ]] }
     },
     {
-      id: "log",
+      id: "st",
       method: "PATCH",
-      url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${CONFIG.logSheet.replace(/'/g,"''")}')/range(address='${logA1}')`,
+      url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1ST}')`,
       headers: { "Content-Type": "application/json" },
-      body: { values: [ logRow ] }
+      body: { values: [[ newStatus || "" ]] }
     }
   ];
+  if (a1REASON){
+    requests.push({
+      id: "reason",
+      method: "PATCH",
+      url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1REASON}')`,
+      headers: { "Content-Type": "application/json" },
+      body: { values: [[ newReason || "" ]] }
+    });
+  }
+
+  const wsqLog = CONFIG.logSheet.replace(/'/g,"''");
+  requests.push({
+    id: "log",
+    method: "PATCH",
+    url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqLog}')/range(address='${logA1}')`,
+    headers: { "Content-Type": "application/json" },
+    body: { values: [ logRow ] }
+  });
 
   await gBatch(requests);
 }
@@ -964,8 +1085,7 @@ async function saveUwagi(rec, newNotes){
   }else{
     const wantAddr = normAddr(rec.adres_pelny||"");
     for(let r=0; r<body.length; r++){
-      const row = body[r]||[];
-      let adrRow = "";
+      const row = body[r]||[]; let adrRow = "";
       if(H.adresPelny){
         const i = headers.indexOf(H.adresPelny);
         adrRow = String(row[i]||"");
@@ -975,24 +1095,20 @@ async function saveUwagi(rec, newNotes){
         const m = H.msc   ? String(row[headers.indexOf(H.msc)]||"").trim()   : "";
         adrRow = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
       }
-      if(wantAddr && normAddr(adrRow) === wantAddr){
-        row1 = r+2;
-      } else if(H.lat && H.lon && isFinite(rec.lat) && isFinite(rec.lon)){
+      if(wantAddr && normAddr(adrRow) === wantAddr){ row1 = r+2; }
+      else if(H.lat && H.lon && isFinite(rec.lat) && isFinite(rec.lon)){
         const iLat = headers.indexOf(H.lat);
         const iLon = headers.indexOf(H.lon);
         const latR = toNum(row[iLat]); const lonR = toNum(row[iLon]);
         if(near(latR, rec.lat) && near(lonR, rec.lon)){ row1 = r+2; }
       }
-      if(row1 > 0){
-        oldNotes = String(row[idxNotes]||"");
-        break;
-      }
+      if(row1 > 0){ oldNotes = String(row[idxNotes]||""); break; }
     }
     if(row1 < 0) throw new Error("Nie znaleziono pozycji w Excelu (dopasowanie po adresie i/lub współrzędnych).");
     rec._row1 = row1;
   }
 
-  // 5) Przygotuj $batch: zapis komórki + dopis do AuditLog
+  // 5) $batch: zapis komórki + dopis do AuditLog
   const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
   const wsqData = CONFIG.dataSheet.replace(/'/g,"''");
   const a1NOTE  = `${colLetter(idxNotes+1)}${row1}`;
