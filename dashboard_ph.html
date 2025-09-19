@@ -1,272 +1,804 @@
-<!-- --- START: dashboard_ph.html (PH dashboard w stylistyce dashboard_test) --- -->
 <!DOCTYPE html>
 <html lang="pl">
 <head>
 <meta charset="utf-8" />
-<title>SIDUSIS – PH Dashboard (ONLINE)</title>
+<title>SIDUSIS – Dashboard PH (ONLINE: MSAL + Graph + Excel)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+
 <style>
-  :root { --card:#fff; --muted:#6b7280; --line:#e5e7eb; --bg:#f6f7fb; }
-  html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,Roboto,Arial;background:var(--bg);}
-  .wrap{max-width:1200px;margin:20px auto;padding:0 16px;}
-  .topbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}
-  .auth{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
-  .auth button{padding:8px 10px;border:1px solid #d1d5db;border-radius:10px;background:#fff;cursor:pointer}
-  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
-  .filters{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
-  .filters .f{display:flex;flex-direction:column;font-size:13px}
-  .filters input,.filters select{padding:8px 10px;border:1px solid #d1d5db;border-radius:10px;background:#fff;font:inherit}
-  .filters button{padding:9px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#eef2ff;cursor:pointer}
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
-  .tile{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px}
-  .tile .k{font-size:28px;font-weight:700;margin-top:6px}
-  .tile .l{font-size:12px;color:var(--muted)}
-  .error{position:fixed;left:0;right:0;top:0;background:#fff3f3;border-bottom:1px solid #f0caca;color:#8b0000;padding:10px 14px;display:none;z-index:9999}
-  .tablewrap{margin-top:12px}
-  table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
-  th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
-  th:nth-child(1), td:nth-child(1){white-space:nowrap}
-  td.nowrap{white-space:nowrap}
-  .right{ text-align:right }
-  .btn{padding:6px 8px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;cursor:pointer;font-size:12px}
-  .btn.primary{background:#eef2ff}
-  .row-actions{display:flex;gap:6px;flex-wrap:wrap}
-  .muted{color:#64748b}
-  @media (max-width:960px){ .grid{grid-template-columns:1fr} }
+  :root{
+    --bg:#0b1220; --panel:#11182a; --panel-2:#0d1424; --muted:#7f8aa3; --text:#e6ecff;
+    --green:#27ae60; --red:#e74c3c; --amber:#f39c12; --blue:#3498db; --card:#0f1730;
+    --br:14px;
+  }
+  *{ box-sizing:border-box }
+  html,body{ height:100%; margin:0; font-family:system-ui, Segoe UI, Roboto, Arial; color:var(--text); background:linear-gradient(180deg,#050b18 0%,#0a1122 100%); }
+  a{ color:#9cc4ff; text-decoration:none }
+  a:hover{ text-decoration:underline }
+
+  .toolbar{
+    position:sticky; top:0; z-index:50; backdrop-filter:saturate(140%) blur(6px);
+    background:#0a1122cc; border-bottom:1px solid #1b2540;
+  }
+  .toolbar .row{
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    padding:10px 14px;
+  }
+  .toolbar select,.toolbar input,.toolbar button{
+    background:#0f1730; color:var(--text); border:1px solid #243055; border-radius:10px; padding:8px 10px; font:inherit;
+  }
+  .toolbar button{ cursor:pointer }
+  .who{ font-size:12px; color:var(--muted) }
+
+  .wrap{ max-width:1200px; margin:16px auto; padding:0 14px }
+  .cards{ display:grid; grid-template-columns:repeat(3,minmax(220px,1fr)); gap:12px; }
+  .card{
+    background:linear-gradient(180deg,#0f1730 0%, #0b1224 100%); border:1px solid #1b2540; border-radius:var(--br);
+    padding:14px; min-height:96px; box-shadow:0 10px 30px rgba(0,0,0,.18), inset 0 1px 0 #1c2646;
+  }
+  .card h3{ margin:0 0 6px; font-size:14px; color:#9fb3d9 }
+  .kpi{ font-size:28px; font-weight:700; letter-spacing:.3px }
+  .kpi.bad{ color:var(--amber) } .kpi.verybad{ color:var(--red) } .kpi.good{ color:var(--green) }
+
+  .panel{
+    margin-top:16px; background:linear-gradient(180deg,#0f1730 0%, #0b1224 100%);
+    border:1px solid #1b2540; border-radius:var(--br);
+  }
+  .panel .hd{ padding:12px 14px; border-bottom:1px solid #1b2540; display:flex; justify-content:space-between; align-items:center }
+  .panel .hd h2{ margin:0; font-size:16px; color:#c9d7ff }
+  .panel .hd .tools{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .panel .bd{ padding:12px 14px }
+
+  .table{ width:100%; border-collapse:separate; border-spacing:0 8px; }
+  .table th{ text-align:left; font-size:12px; color:#98a6c9; font-weight:600; padding:0 8px 6px }
+  .table td{
+    background:var(--card); border:1px solid #1a2446; padding:8px; vertical-align:top;
+  }
+  .table tr td:first-child{ border-top-left-radius:10px; border-bottom-left-radius:10px }
+  .table tr td:last-child{ border-top-right-radius:10px; border-bottom-right-radius:10px }
+  .pill{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid #2a355f; background:#0b1533; color:#cfe0ff }
+  .pill.red{ border-color:#5a2630; background:#2a0f16; color:#ffb3b3 }
+  .pill.amber{ border-color:#5a4930; background:#2a200f; color:#ffd89c }
+  .pill.green{ border-color:#285a3b; background:#0f2a1a; color:#a6f3c4 }
+
+  .muted{ color:#9fb3d9 } .small{ font-size:12px }
+  .statusbar{ margin:10px 14px 0; font-size:12px; color:#9fb3d9 }
+  .error{ display:none; margin:10px 14px 0; padding:10px 12px; border:1px solid #6b2330; background:#2a0f16; color:#ffc9c9; border-radius:10px }
+
+  .grid-2{ display:grid; grid-template-columns:2fr 1fr; gap:12px }
+  .controls input,.controls select, .controls button{ background:#0f1730; color:var(--text); border:1px solid #243055; border-radius:8px; padding:6px 8px; font:inherit; }
+  .controls{ display:flex; gap:8px; flex-wrap:wrap }
+  .btn{ background:#15224a; border-color:#2a3a73 } .btn:hover{ filter:brightness(1.1) }
+  .btn-primary{ background:#21316a; border-color:#3951a6 }
+  .btn-danger{ background:#3b1a22; border-color:#6b2330 }
+  .btn-ghost{ background:transparent; border-color:#29406f }
+
+  /* DODANO – styl wielokrotnego wyboru statusów */
+  .status-multi{ min-width:220px; height:94px; }
+  .row-actions{ display:flex; gap:6px; flex-wrap:wrap }
+  .btn-compact{ padding:4px 6px; font-size:11px; }
+  @media (max-width:980px){
+    .cards{ grid-template-columns:repeat(2,minmax(220px,1fr)) }
+  }
+  @media (max-width:640px){
+    .cards{ grid-template-columns:1fr }
+  }
 </style>
+
+<!-- MSAL dynamic loader with fallbacks -->
 <script>
-  function loadScriptSequential(urls){return new Promise((res,rej)=>{let i=0;const go=()=>{if(i>=urls.length) return rej(new Error('MSAL nie wstał')); const s=document.createElement('script'); s.src=urls[i++]; s.async=true; s.onload=()=>res(); s.onerror=()=>go(); document.head.appendChild(s);}; go();});}
-  const MSAL_CDNS=['https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js','https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js','https://unpkg.com/@azure/msal-browser@2.38.3/lib/msal-browser.min.js'];
+  function loadScriptSequential(urls) {
+    return new Promise((resolve, reject) => {
+      let i = 0;
+      const tryNext = () => {
+        if (i >= urls.length) return reject(new Error('Nie udało się załadować msal-browser z żadnego CDN.'));
+        const s = document.createElement('script');
+        s.src = urls[i++]; s.async = true;
+        s.onload = () => resolve();
+        s.onerror = () => tryNext();
+        document.head.appendChild(s);
+      };
+      tryNext();
+    });
+  }
+  const MSAL_CDNS = [
+    'https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js',
+    'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js',
+    'https://unpkg.com/@azure/msal-browser@2.38.3/lib/msal-browser.min.js'
+  ];
 </script>
 </head>
 <body>
-<div class="error" id="errorBar"></div>
-<div class="wrap">
-  <div class="topbar">
-    <h2 style="margin:0">SIDUSIS – Dashboard PH</h2>
-    <div class="auth">
-      <span id="who">Nie zalogowano.</span>
-      <button id="btnLogin">Zaloguj</button>
-      <button id="btnLogout">Wyloguj</button>
-      <a href="mapa_test.html" style="margin-left:6px;text-decoration:none;border:1px solid #d1d5db;border-radius:10px;padding:8px 10px;background:#fff">↩︎ Mapa</a>
-    </div>
-  </div>
 
-  <div class="panel">
-    <div class="filters">
-      <div class="f"><label>Zakres od</label><input type="date" id="fFrom"></div>
-      <div class="f"><label>…do</label><input type="date" id="fTo"></div>
-      <div class="f"><label>PH</label><select id="fPH"></select></div>
-      <div class="f"><label>Status (wiele)</label><select id="fStatus" multiple size="4" style="min-width:220px"></select></div>
-      <div class="f"><button id="btnApply">Zastosuj</button></div>
-      <div class="f" style="margin-left:auto"><button id="btnReload">Odśwież dane</button></div>
-    </div>
-    <div class="grid">
-      <div class="tile"><div class="l">Moje leady (po filtrze)</div><div class="k" id="kLeads">–</div></div>
-      <div class="tile"><div class="l">Nieprzydzielone w filtrze</div><div class="k" id="kUnassigned">–</div></div>
-      <div class="tile"><div class="l">Nadchodzące kontakty ≤ 7 dni</div><div class="k" id="kUpcoming">–</div></div>
-    </div>
-  </div>
-
-  <div class="tablewrap">
-    <div class="tile">
-      <h3 style="margin:0 0 10px 0">Moje leady</h3>
-      <div style="overflow:auto">
-        <table id="tbl"><thead></thead><tbody></tbody></table>
-      </div>
-      <div class="muted" style="margin-top:8px">„OptOut” wyłącza przypomnienia/automaty. „Zapisz” utrwala zmiany (NextContactAt, OptOut) i ustawia LastTouchAt.</div>
-    </div>
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="row">
+    <strong>SIDUSIS – Dashboard PH</strong>
+    <span class="who" id="who"></span>
+    <span style="flex:1"></span>
+    <label class="small muted">Źródło danych:</label>
+    <select id="dsSelect" title="assets/datasources.json (opcjonalnie) – wybór bazy"></select>
+    <button id="btnLogin" class="btn">Zaloguj</button>
+    <button id="btnLogout" class="btn">Wyloguj</button>
+    <button id="btnReload" class="btn btn-primary">Odśwież</button>
   </div>
 </div>
 
+<div class="wrap">
+  <!-- KPI CARDS -->
+  <div class="cards">
+    <div class="card">
+      <h3>Nieprzydzielone leady (wykl. KPO/MOICO/itd.)</h3>
+      <div class="kpi" id="kpiUnassigned">—</div>
+      <div class="small muted">Kliknij „Odśwież”, aby przeliczyć.</div>
+    </div>
+    <div class="card">
+      <h3>Nowe nieprzydzielone – poprzedni dzień roboczy</h3>
+      <div class="kpi" id="kpiNewPrev">—</div>
+      <div class="small muted" id="prevRangeLabel"></div>
+    </div>
+    <div class="card">
+      <h3>Moje pilne (przeterminowane / dziś)</h3>
+      <div class="kpi" id="kpiMyDue" title="Liczba moich wpisów, gdzie NextContactAt ≤ dziś i nie OptOut">—</div>
+      <div class="small muted" id="myNameLabel"></div>
+    </div>
+  </div>
+
+  <!-- MY QUEUE -->
+  <div class="panel">
+    <div class="hd">
+      <h2>Moje leady</h2>
+      <div class="tools controls">
+        <label class="small muted">Filtr:</label>
+        <select id="fltScope">
+          <option value="due">Do kontaktu (≤ dziś)</option>
+          <option value="all">Wszystkie przypisane do mnie</option>
+          <option value="none">Tylko nieprzydzielone</option>
+        </select>
+
+        <!-- DODANO – filtr statusów (multi) -->
+        <select id="fltStatus" class="status-multi" multiple title="Przytrzymaj Ctrl/⌘ aby zaznaczyć wiele"></select>
+
+        <input type="text" id="fltQuery" placeholder="szukaj: miasto / ulica / nazwa" />
+        <button id="btnApply" class="btn">Filtruj</button>
+        <a class="btn btn-ghost" href="mapa_test.html" target="_blank">Przejdź do mapy →</a>
+      </div>
+    </div>
+    <div class="bd">
+      <table class="table" id="tbl">
+        <thead>
+          <tr>
+            <th>Data zgł.</th>
+            <th>Klient / adres</th>
+            <th class="small">Kontakt</th>
+            <th>Status</th>
+            <th>Next contact</th>
+            <th>OptOut</th>
+            <th>Uwagi</th>
+            <th>Akcje</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="small muted" id="countInfo"></div>
+    </div>
+  </div>
+
+  <div class="statusbar" id="statusbar">Kliknij „Zaloguj”, a potem „Odśwież”.</div>
+  <div class="error" id="errorBar"></div>
+</div>
+
 <script>
-(async function(){
-  /* === KONFIG (jak w mapie/KPI) === */
-  const CONFIG={ clientId:"2c5a0274-30c0-4efa-b13c-7ce1e0768cf9", tenantId:"e44d0310-65ed-4096-a024-dac77110765a", spHost:"internetunion.sharepoint.com", spSitePath:"PHTheNetwork", filePath:"/General/Kopia pliku Lista - SIDUSIS - PEŁNA - od 08-2025 - kopia do mapy.xlsx", dataSheet:"Dane", logSheet:"AuditLog" };
-  const STATUS_LIST=["Wycena Inwestycji","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO","Duplikat","MOICO","SEEV"];
-  const PH_LIST=["(tylko ja)","(wszyscy)","Adrian Daniel","Robert Kaźmierczak","Mariusz Kielczyk","Inga Kaźmierczak","Jacek Trybuchowski","Tomasz Józefowicz","Duplikat","MOICO","SEEV"];
+(async function main(){
+  /* ==================== KONFIG DOMYŚLNY (nadpisywalny datasources.json) ==================== */
+  const CONFIG = {
+    clientId: "2c5a0274-30c0-4efa-b13c-7ce1e0768cf9",
+    tenantId: "e44d0310-65ed-4096-a024-dac77110765a",
+    spHost: "internetunion.sharepoint.com",
+    spSitePath: "PHTheNetwork",
+    filePath: "/General/Kopia pliku Lista - SIDUSIS - PEŁNA - od 08-2025 - kopia do mapy.xlsx",
+    dataSheet: "Dane",
+    logSheet: "AuditLog"
+  };
 
-  /* === UI helpers === */
-  const $=s=>document.querySelector(s); const who=$("#who"), err=$("#errorBar");
-  function showError(t){ err.textContent=t; err.style.display='block'; setTimeout(()=>err.style.display='none',7000); }
-  function toDate(v){ if(v==null||v==="") return null; if(typeof v==="number"){ const d=new Date(Date.UTC(1899,11,30)); d.setUTCDate(d.getUTCDate()+Math.floor(v)); return d; } const s=String(v).trim(); const d1=new Date(s); if(!isNaN(d1))return d1; const m=s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/); if(m){ const[_,dd,mm,yy]=m; return new Date(Number(yy.length===2?("20"+yy):yy), Number(mm)-1, Number(dd)); } return null; }
-  function normAddr(s){ return String(s||"").toLowerCase().replace(/\s+/g,' ').replace(/^\s*(ul\.?\s*){2,}/i,'ul. ').replace(/^\s*ul\b\.?/i,'ul. ').replace(/\s*,\s*/g,', ').trim(); }
+  const LS_KEY_DS = "sidusis_ds_key";
 
-  /* === MSAL === */
-  await loadScriptSequential(MSAL_CDNS);
-  if(typeof msal==='undefined'||!msal.PublicClientApplication){ alert('MSAL nie wstał.'); return; }
-  const app=new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:"https://login.microsoftonline.com/"+CONFIG.tenantId,redirectUri:window.location.origin+window.location.pathname},cache:{cacheLocation:"localStorage"}});
-  const scopes=["openid","profile","offline_access","Files.ReadWrite.All","Sites.Read.All"];
+  /* ==================== LISTY / SŁOWNIKI ==================== */
+  const DEFAULT_LISTS = {
+    ph: [],
+    phAliases: {},
+    phUsers: {},
+
+    status: ["Wycena Inwestycji","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO","MOICO","Duplikat","SEEV"],
+    statusAliases: {
+      "zapytanie o wycenę":"Wycena Inwestycji","zapytanie o wycene":"Wycena Inwestycji","wycena inwestycji":"Wycena Inwestycji",
+      "oferta wysłana":"Oferta wysłana","odmowa klienta":"Odmowa klienta","akceptacja klienta":"Akceptacja klienta",
+      "poza zasięgiem":"Poza Zasięgiem","kpo":"KPO","duplikat":"Duplikat","moico":"MOICO","seev":"SEEV"
+    },
+    statusColors: {
+      "Wycena Inwestycji":"#607D8B","Oferta wysłana":"#2196F3","Odmowa klienta":"#F44336",
+      "Akceptacja klienta":"#4CAF50","Poza Zasięgiem":"#000000","KPO":"#FF9800",
+      "MOICO":"#8E24AA","Duplikat":"#9E9E9E","SEEV":"#00BCD4"
+    },
+    excluded: ["KPO","Poza Zasięgiem","MOICO","Duplikat","SEEV"],
+    rejectionReasons: [
+      "Zbyt droga instalacja","Drogi abonament","Lepsza oferta konkurencji",
+      "Brak możliwości technicznych","Nieaktualny kontakt","Inne"
+    ]
+  };
+
+  let LISTS = DEFAULT_LISTS;
+  let PH_LIST = [], PH_ALIASES = {}, PH_USERS = {};
+  let STATUS_LIST = [], STATUS_COLOR_MAP = {}, EXCLUDED_STATUSES = new Set();
+
+  function normLower(s){ return String(s||"").toLowerCase().trim(); }
+
+  async function loadLists(){
+    try{
+      const r = await fetch("assets/lists.json?v="+Date.now(), {cache:"no-store"});
+      if(r.ok){
+        const js = await r.json();
+        LISTS = { ...DEFAULT_LISTS, ...js };
+      }
+    }catch(e){ console.warn("lists.json fallback", e); LISTS = DEFAULT_LISTS; }
+
+    PH_LIST = Array.isArray(LISTS.ph) ? LISTS.ph.slice() : [];
+    PH_ALIASES = Object.fromEntries(Object.entries(LISTS.phAliases||{}).map(([k,v])=>[normLower(k), v]));
+    PH_USERS = LISTS.phUsers || {};
+    STATUS_LIST = Array.isArray(LISTS.status) ? LISTS.status.slice() : DEFAULT_LISTS.status;
+    STATUS_COLOR_MAP = { ...DEFAULT_LISTS.statusColors, ...(LISTS.statusColors||{}) };
+    EXCLUDED_STATUSES = new Set(Array.isArray(LISTS.excluded)? LISTS.excluded : DEFAULT_LISTS.excluded);
+
+    // DODANO – zasyp filtr statusów
+    const stSel = document.getElementById("fltStatus");
+    stSel.innerHTML = STATUS_LIST.map(s=>`<option>${s}</option>`).join("");
+  }
+  function canonStatus(s){
+    const k = normLower(s);
+    return (LISTS.statusAliases && LISTS.statusAliases[k]) ? LISTS.statusAliases[k] : (s||"");
+  }
+  function canonPH(s){
+    const raw = String(s||"").trim();
+    const a = PH_ALIASES[normLower(raw)] || raw;
+    return PH_LIST.includes(a) ? a : raw; // nie wycinaj – pokaż jak w źródle
+  }
+
+  /* ==================== STAN/UTIL ==================== */
   let account=null, siteId=null, fileId=null;
-  async function ensureLogin(){ const accs=app.getAllAccounts(); if(accs.length){ account=accs[0]; who.textContent="Zalogowano: "+(account.username||account.homeAccountId); return; } const r=await app.loginPopup({scopes}); account=r.account; who.textContent="Zalogowano: "+(account.username||account.homeAccountId); }
-  async function getToken(){ await ensureLogin(); try{ const r=await app.acquireTokenSilent({scopes,account}); return r.accessToken; }catch{ const r=await app.acquireTokenPopup({scopes}); return r.accessToken; } }
-  async function gfetch(method,url,body){ const token=await getToken(); const resp=await fetch(url,{method,headers:{Authorization:"Bearer "+token,Accept:"application/json","Content-Type":"application/json"}, body: body? JSON.stringify(body):undefined}); if(!resp.ok){ const txt=await resp.text().catch(()=>String(resp.status)); throw new Error(`${method} ${url} -> ${resp.status} ${txt}`); } return resp.status===204? null : resp.json(); }
-  async function gBatch(requests){ const token=await getToken(); const resp=await fetch("https://graph.microsoft.com/v1.0/$batch",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({requests})}); const js=await resp.json(); if(!resp.ok) throw new Error((js.error&&js.error.message)||"Batch error"); const bad=(js.responses||[]).find(r=>r.status<200||r.status>=300); if(bad) throw new Error("Batch subrequest failed: "+bad.status); return js; }
-  async function site(){ if(siteId) return siteId; siteId=(await gfetch("GET",`https://graph.microsoft.com/v1.0/sites/${CONFIG.spHost}:/sites/${CONFIG.spSitePath}`)).id; return siteId; }
-  async function file(){ if(fileId) return fileId; const sid=await site(); fileId=(await gfetch("GET",`https://graph.microsoft.com/v1.0/sites/${sid}/drive/root:${encodeURI(CONFIG.filePath)}`)).id; return fileId; }
-  async function usedRange(ws){ const [sid,iid]=await Promise.all([site(),file()]); const wsq=ws.replace(/'/g,"''"); return gfetch("GET",`https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/usedRange(valuesOnly=true)`); }
-  async function patchRange(ws,a1,values){ const [sid,iid]=await Promise.all([site(),file()]); const wsq=ws.replace(/'/g,"''"); return gfetch("PATCH",`https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='${a1}')`,{values}); }
+  let rows=[], frows=[];
 
-  /* === Dane === */
-  let ROWS=[];
-  function pickHeader(headers,tokens){ const lc=headers.map(h=>String(h||"").toLowerCase()); for(const t of tokens){ const i=lc.findIndex(n=>n.includes(t)); if(i>=0) return headers[i]; } return null; }
-  function parse(values){
-    if(!values||!values.length) return [];
-    const H=(values[0]||[]).map(h=>String(h||"").trim()); const body=values.slice(1);
-    const C={
-      created:H[0],
-      ph: pickHeader(H,["ph"]),
-      st: pickHeader(H,["status"]),
-      addr: pickHeader(H,["adres_pelny","adres pełny","adres pelny"]),
-      ulica: pickHeader(H,["ulica","adres"]),
-      nr: pickHeader(H,["nr budynku","numer","nr","nr domu"]),
-      msc: pickHeader(H,["miejscowość","miejscowosc","miasto"]),
-      nazwa: pickHeader(H,["zgłaszający","zglaszajacy","nazwa","imię","imie","nazwisko","klient","firma"]),
-      mail: pickHeader(H,["email","e-mail","mail"]),
-      tel: pickHeader(H,["telefon","tel"]),
-      next: pickHeader(H,["nextcontactat"]),
-      last: pickHeader(H,["lasttouchat"]),
-      opt:  pickHeader(H,["optout"]),
+  const $ = s=>document.querySelector(s);
+  const dsSelect = $("#dsSelect");
+  const who=$("#who"), statusbar=$("#statusbar"), errorBar=$("#errorBar");
+  const tbody=$("#tbody"), countInfo=$("#countInfo");
+  const kpiUnassigned=$("#kpiUnassigned"), kpiNewPrev=$("#kpiNewPrev"), prevRangeLabel=$("#prevRangeLabel"), kpiMyDue=$("#kpiMyDue"), myNameLabel=$("#myNameLabel");
+
+  function setStatus(msg){ statusbar.textContent = String(msg||""); }
+  function showError(msg){ errorBar.textContent=String(msg||""); errorBar.style.display='block'; setTimeout(()=>errorBar.style.display='none', 8000); }
+
+  function toNum(v){ if(v==null) return NaN; const s=String(v).replace(",", ".").replace(/[^\d.\-+Ee]/g,"").trim(); return parseFloat(s); }
+  function toDate(v){
+    if(v==null || v==="") return null;
+    if(typeof v==="number"){ const d = new Date(Date.UTC(1899,11,30)); d.setUTCDate(d.getUTCDate()+Math.floor(v)); return d; }
+    const s=String(v).trim(); const d1 = new Date(s); if(!isNaN(d1)) return d1;
+    const m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+    if(m){ const [_,dd,mm,yy]=m; return new Date(Number(yy.length===2?("20"+yy):yy), Number(mm)-1, Number(dd)); }
+    return null;
+  }
+  function fmtDateLocal(d){
+    if(!d) return "";
+    const y=d.getFullYear(), m=("0"+(d.getMonth()+1)).slice(-2), dd=("0"+d.getDate()).slice(-2);
+    return `${y}-${m}-${dd}`;
+  }
+  function todayLocal(){
+    const now = new Date(); return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+  function prevBusinessRange(){
+    const d = todayLocal(); const dow = d.getDay(); // 0=nd,1=pn,...6=sb
+    let start, end;
+    if(dow===1){ // pn -> (pt..nd)
+      const fri = new Date(d); fri.setDate(d.getDate()-3);
+      start = new Date(fri); end = new Date(d); end.setDate(d.getDate()-1);
+    }else{
+      start = new Date(d); start.setDate(d.getDate()-1);
+      end = new Date(start);
+    }
+    start.setHours(0,0,0,0); end.setHours(23,59,59,999);
+    return {start,end};
+  }
+
+  /* ============== Wybór źródła (assets/datasources.json – opcjonalnie) ============== */
+  let DS = {}; // key -> { spHost, spSitePath, filePath, title }
+  let CURRENT_DS_KEY = "default";
+
+  async function loadDatasources(){
+    DS = { default: { title:"Domyślne (CONFIG)", spHost:CONFIG.spHost, spSitePath:CONFIG.spSitePath, filePath:CONFIG.filePath } };
+    try{
+      const r = await fetch("assets/datasources.json?v="+Date.now(), {cache:"no-store"});
+      if(r.ok){
+        const js = await r.json();
+        for(const it of (js||[])){
+          if(it && it.key && it.spHost && it.spSitePath && it.filePath){
+            DS[it.key] = { title: it.title || it.key, spHost: it.spHost, spSitePath: it.spSitePath, filePath: it.filePath };
+          }
+        }
+      }
+    }catch(e){ console.warn("datasources.json missing or invalid", e); }
+    dsSelect.innerHTML = "";
+    for(const [k,v] of Object.entries(DS)){
+      const opt = document.createElement("option");
+      opt.value = k; opt.textContent = v.title + " — " + v.filePath.split("/").pop();
+      dsSelect.appendChild(opt);
+    }
+    const saved = localStorage.getItem(LS_KEY_DS);
+    if(saved && DS[saved]) CURRENT_DS_KEY = saved;
+    dsSelect.value = CURRENT_DS_KEY;
+    applyDatasource(CURRENT_DS_KEY);
+    dsSelect.addEventListener("change", ()=>{
+      CURRENT_DS_KEY = dsSelect.value;
+      localStorage.setItem(LS_KEY_DS, CURRENT_DS_KEY);
+      applyDatasource(CURRENT_DS_KEY);
+      siteId=null; fileId=null; // wymuś ponowne pobranie ID
+      setStatus("Zmieniono źródło. Kliknij „Odśwież”.");
+    });
+  }
+  function applyDatasource(key){
+    const d = DS[key] || DS.default;
+    CONFIG.spHost = d.spHost; CONFIG.spSitePath = d.spSitePath; CONFIG.filePath = d.filePath;
+  }
+
+  /* ==================== MSAL / GRAPH ==================== */
+  try { await loadScriptSequential(MSAL_CDNS); }
+  catch(e){ alert('Nie udało się załadować msal-browser (alcdn/jsDelivr/unpkg).'); console.error(e); return; }
+  if (typeof msal === 'undefined' || !msal.PublicClientApplication){ alert('MSAL nie jest dostępny.'); return; }
+
+  const msalApp = new msal.PublicClientApplication({
+    auth: { clientId: CONFIG.clientId, authority: "https://login.microsoftonline.com/" + CONFIG.tenantId,
+            redirectUri: window.location.origin + window.location.pathname },
+    cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false }
+  });
+  const graphScopes = ["openid","profile","offline_access","Files.ReadWrite.All","Sites.Read.All"];
+
+  async function ensureLogin(){
+    const accs = msalApp.getAllAccounts();
+    if(accs.length){ account=accs[0]; who.textContent = "Zalogowano: " + (account.username||account.homeAccountId); return; }
+    const r = await msalApp.loginPopup({ scopes: graphScopes });
+    account = r.account; who.textContent = "Zalogowano: " + (account.username||account.homeAccountId);
+  }
+  async function getToken(){
+    await ensureLogin();
+    try{ const r=await msalApp.acquireTokenSilent({ scopes: graphScopes, account }); return r.accessToken; }
+    catch{ const r=await msalApp.acquireTokenPopup({ scopes: graphScopes }); return r.accessToken; }
+  }
+  async function gfetch(method, url, body){
+    const token = await getToken();
+    const resp = await fetch(url, {
+      method,
+      headers: { "Authorization":"Bearer " + token, "Accept":"application/json", "Content-Type":"application/json" },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    if(!resp.ok){
+      const txt=await resp.text().catch(()=>String(resp.status));
+      throw new Error(`${method} ${url} -> ${resp.status} ${txt}`);
+    }
+    return resp.status===204 ? null : resp.json();
+  }
+  async function getSiteId(){
+    if(siteId) return siteId;
+    const url = `https://graph.microsoft.com/v1.0/sites/${CONFIG.spHost}:/sites/${CONFIG.spSitePath}`;
+    const js = await gfetch("GET", url); siteId = js.id; return siteId;
+  }
+  async function getFileItemId(){
+    if(fileId) return fileId;
+    const sid = await getSiteId();
+    const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/root:${encodeURI(CONFIG.filePath)}`;
+    const js = await gfetch("GET", url); fileId = js.id; return fileId;
+  }
+  async function usedRange(wsName){
+    const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
+    const wsq = wsName.replace(/'/g,"''");
+    const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/usedRange(valuesOnly=true)`;
+    return gfetch("GET", url);
+  }
+  async function patchRange(wsName, a1, values2d){
+    const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
+    const wsq = wsName.replace(/'/g,"''");
+    const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='${a1}')`;
+    return gfetch("PATCH", url, { values: values2d });
+  }
+  function colLetter(n){ let s="",x=n; while(x>0){x--; s=String.fromCharCode(65+(x%26))+s; x=Math.floor(x/26);} return s; }
+
+  /* ==================== PARSE DANYCH ==================== */
+  function pickHeader(headers, tokens){
+    const lc = headers.map(h => String(h||"").toLowerCase());
+    for(const t of tokens){ const i = lc.findIndex(n => n.includes(t)); if(i>=0) return headers[i]; }
+    return null;
+  }
+
+  function parseRows(values){
+    if(!values || !values.length) return [];
+    const headers = (values[0]||[]).map(h=>String(h||"").trim());
+    const body = values.slice(1);
+
+    const H = {
+      created: headers[0],
+      lat:  pickHeader(headers,["szerokość","szerokosc","lat","latitude"]),
+      lon:  pickHeader(headers,["długość","dlugosc","lon","longitude"]),
+      tel:  pickHeader(headers,["telefon","tel"]),
+      mail: pickHeader(headers,["email","e-mail","mail"]),
+      ph:   pickHeader(headers,["ph"]),
+      st:   pickHeader(headers,["status"]),
+      ulica:pickHeader(headers,["ulica","adres"]),
+      nr:   pickHeader(headers,["nr budynku","numer","nr","nr domu"]),
+      msc:  pickHeader(headers,["miejscowość","miejscowosc","miasto"]),
+      nazwa:pickHeader(headers,["zgłaszający","zglaszajacy","nazwa","imię","imie","nazwisko","klient","firma"]),
+      adresPelny: pickHeader(headers,["adres_pelny","adres pełny","adres pelny"]),
+      powod: pickHeader(headers,["powód","powod","reason","powód odmowy","powod odmowy"]),
+      notes: pickHeader(headers,["uwagi ph","uwagi","uwaga","notatki","note","notes"]),
+      next:  pickHeader(headers,["nextcontactat","następny kontakt","nastepny kontakt"]),
+      last:  pickHeader(headers,["lasttouchat","lasttoucha","ostatni kontakt"]),
+      rSent: pickHeader(headers,["remindersentat"]),
+      rId:   pickHeader(headers,["remindertaskid"]),
+      opt:   pickHeader(headers,["optout"]),
+      src:   pickHeader(headers,["source"]),
+      srcId: pickHeader(headers,["sourcerowid"]),
     };
-    const idx=n=>H.indexOf(n);
-    const out=body.map((r,i)=>{
-      let adres = C.addr? String(r[idx(C.addr)]||""):"";
-      if(!adres){ const u=C.ulica?String(r[idx(C.ulica)]||"").trim():""; const n=C.nr?String(r[idx(C.nr)]||"").trim():""; const m=C.msc?String(r[idx(C.msc)]||"").trim():""; adres=(u&&n&&m)? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim()||m; }
+    const get = (r, col) => { const idx=headers.indexOf(col); return idx>=0 ? r[idx] : ""; };
+
+    let out = body.map((r, idx) => {
+      let lat = toNum(get(r,H.lat)), lon = toNum(get(r,H.lon));
+      let adr = get(r,H.adresPelny) || "";
+      if(!adr){
+        const u = String(get(r,H.ulica)||"").trim();
+        const n = String(get(r,H.nr)||"").trim();
+        const m = String(get(r,H.msc)||"").trim();
+        adr = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
+      }
       return {
-        _row1: i+2, createdAt: toDate(r[idx(C.created)]),
-        PH: String(C.ph? (r[idx(C.ph)]||""):""), Status: String(C.st? (r[idx(C.st)]||""):""),
-        nazwa: String(C.nazwa? (r[idx(C.nazwa)]||""):""), adres_pelny: adres,
-        email: String(C.mail? (r[idx(C.mail)]||""):""), telefon: String(C.tel? (r[idx(C.tel)]||""):""),
-        NextContactAt: C.next? String(r[idx(C.next)]||"") : "",
-        LastTouchAt:   C.last? String(r[idx(C.last)]||"") : "",
-        OptOut: String(C.opt? (r[idx(C.opt)]||""):"").toLowerCase()==="true" || String(C.opt? (r[idx(C.opt)]||""):"").toLowerCase()==="x",
-        _H: H
+        _row1: idx + 2,
+        createdAt: toDate(get(r,H.created)),
+        lat, lon, adres_pelny: adr||"",
+        PH: canonPH(get(r,H.ph)),
+        Status: canonStatus(String(get(r,H.st)||"")),
+        telefon: String(get(r,H.tel)||""),
+        email: String(get(r,H.mail)||""),
+        nazwa: String(get(r,H.nazwa)||""),
+        miejscowosc: String(get(r,H.msc)||""),
+        PowodOdmowy: String(get(r,H.powod)||""),
+        Uwagi: String(get(r,H.notes)||""),
+        NextContactAt: toDate(get(r,H.next)),
+        LastTouchAt: toDate(get(r,H.last)),
+        ReminderSentAt: toDate(get(r,H.rSent)),
+        ReminderTaskId: String(get(r,H.rId)||""),
+        OptOut: String(get(r,H.opt)||""),     // w Excelu: "" lub "1"/"TRUE"/"X"
+        Source: String(get(r,H.src)||""),
+        SourceRowId: String(get(r,H.srcId)||"")
       };
     });
+
+    // sanity dla współrzędnych
+    const validLat=v=>isFinite(v)&&v>=-90&&v<=90;
+    const validLon=v=>isFinite(v)&&v>=-180&&v<=180;
+    const okNormal = out.filter(o=>validLat(o.lat)&&validLon(o.lon)).length;
+    const okSwapped= out.filter(o=>validLat(o.lon)&&validLon(o.lat)).length;
+    if(okSwapped>okNormal){ out = out.map(o=>({ ...o, lat:o.lon, lon:o.lat })); }
     return out;
   }
 
-  /* === Mail === */
-  function mailTemplates(rec){ /* to samo co w mapie (skrócone treści) */ 
-    const nazwa=rec.nazwa||""; const miasto=""; let adres=(rec.adres_pelny||"").trim(); const tel=rec.telefon||""; const email=rec.email||"";
+  /* ==================== KPI / FILTRY / RENDER ==================== */
+  function isUnassigned(rec){
+    const ph = (rec.PH||"").trim();
+    const st = (rec.Status||"").trim();
+    return (!ph || !PH_LIST.includes(ph)) && !EXCLUDED_STATUSES.has(st);
+  }
+  function inPrevBusiness(rec){
+    if(!rec.createdAt) return false;
+    const {start,end} = prevBusinessRange();
+    return rec.createdAt >= start && rec.createdAt <= end;
+  }
+  function isDueForMe(rec, me){
+    if((rec.PH||"").trim() !== (me||"").trim()) return false;
+    const opt = String(rec.OptOut||"").toLowerCase();
+    if(opt==="1" || opt==="true" || opt==="x") return false;
+    if(!rec.NextContactAt) return false;
+    const d = todayLocal();
+    return rec.NextContactAt <= new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23,59,59,999);
+  }
+
+  function scoreKPIs(me){
+    const unassigned = rows.filter(isUnassigned).length;
+    const newPrev = rows.filter(r=>isUnassigned(r)&&inPrevBusiness(r)).length;
+    const myDue = rows.filter(r=>isDueForMe(r, me)).length;
+
+    kpiUnassigned.textContent = unassigned;
+    kpiUnassigned.className = "kpi " + (unassigned>50?"verybad":unassigned>10?"bad":"");
+    kpiNewPrev.textContent = newPrev;
+    const {start,end} = prevBusinessRange();
+    prevRangeLabel.textContent = "Zakres: " + fmtDateLocal(start) + (fmtDateLocal(start)!==fmtDateLocal(end) ? " – " + fmtDateLocal(end) : "");
+    kpiMyDue.textContent = myDue;
+    kpiMyDue.className = "kpi " + (myDue===0?"good":myDue>10?"verybad":"bad");
+  }
+
+  function applyFilters(){
+    const scope = document.getElementById("fltScope").value;
+    const q = (document.getElementById("fltQuery").value||"").toLowerCase().trim();
+    const me = (account && (account.name||"")) || "";
+
+    // DODANO – odczyt statusów (multi)
+    const selStatus = document.getElementById("fltStatus");
+    const WANT_ST = [...selStatus.selectedOptions].map(o=>o.value);
+
+    frows = rows.filter(r=>{
+      let pass=true;
+      if(scope==="due") pass = isDueForMe(r, me);
+      else if(scope==="all") pass = (r.PH||"").trim() === (me||"").trim();
+      else if(scope==="none") pass = isUnassigned(r);
+      if(!pass) return false;
+
+      // filtr po statusach
+      if(WANT_ST.length && !WANT_ST.includes(r.Status||"")) return false;
+
+      if(q){
+        const hay = [
+          r.miejscowosc||"", r.adres_pelny||"", r.nazwa||"", r.telefon||"", r.email||""
+        ].join(" ").toLowerCase();
+        if(!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    // sort: due first (overdue -> today -> future), then createdAt asc
+    const today = todayLocal();
+    frows.sort((a,b)=>{
+      const da = a.NextContactAt ? (a.NextContactAt - today) : 9e15;
+      const db = b.NextContactAt ? (b.NextContactAt - today) : 9e15;
+      if(da!==db) return da - db;
+      const ca = a.createdAt ? a.createdAt.getTime() : 0;
+      const cb = b.createdAt ? b.createdAt.getTime() : 0;
+      return ca - cb;
+    });
+  }
+
+  function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function colorForStatus(st){ return STATUS_COLOR_MAP[st] || "#9E9E9E"; }
+
+  // DODANO – szablony maili jak w mapie
+  function mailTemplates(rec){
+    const nazwa=rec.nazwa||""; let adres=(rec.adres_pelny||"").trim(); const tel=rec.telefon||""; const email=rec.email||"";
     const subj_inv=`Zapytanie o wycenę - ${adres} - SIDUSIS`;
     const subj_cli=`Internet światłowodowy - The Network - ${adres}`;
     const body_inv=`Proszę o wycenę podłączenia klienta:\nNazwa: ${nazwa}\nAdres: ${adres}\nTelefon: ${tel}\nE-mail: ${email}\n`;
-    const body_cli=`Dzień dobry ${nazwa},\n\nDziękujemy za zgłoszenie – wrócę z informacją.\n`;
-    const body_std=`Dzień dobry,\n\nOferta standard…\n`;
-    const body_dev=`Dzień dobry,\n\nOferta deweloperska…\n`;
-    return { INV:{to:"inwestycje@internetunion.pl",subject:subj_inv,body:body_inv}, CLI:{to:email,subject:subj_cli,body:body_cli}, STD:{to:email,subject:subj_cli,body:body_std}, DEV:{to:email,subject:subj_cli,body:body_dev} };
+    const body_cli=`Dzień dobry ${nazwa},\n\nSerdecznie dziękujemy za przesłane zgłoszenie. Wrócę z informacją.\n`;
+    const body_std=`Dzień dobry,\n\nW odpowiedzi na zgłoszenie – oferta standardowa…\n`;
+    const body_dev=`Dzień dobry,\n\nW odpowiedzi na zgłoszenie – oferta deweloperska…\n`;
+    return {
+      INV:{to:"inwestycje@internetunion.pl",subject:subj_inv,body:body_inv},
+      CLI:{to:email,subject:subj_cli,body:body_cli},
+      STD:{to:email,subject:subj_cli,body:body_std},
+      DEV:{to:email,subject:subj_cli,body:body_dev}
+    };
   }
-  function composeAndSend(to,subject,body){ const base="mailto:"+encodeURIComponent(to||"")+"?subject="+encodeURIComponent(subject||""); const full=base+"&body="+encodeURIComponent(body||""); if(full.length<=1500){ location.href=full; } else if(navigator.clipboard?.writeText){ navigator.clipboard.writeText(body).then(()=>{ location.href=base; alert("Treść zbyt długa – skopiowano do schowka."); }); } else { location.href=base; } }
-
-  /* === UI/Filtry === */
-  let FROM=null, TO=null, SEL_PH="(tylko ja)", SEL_ST=[];
-  function fillFilters(){
-    const today=new Date(); const from=new Date(today); from.setDate(today.getDate()-30);
-    $("#fFrom").value=from.toISOString().slice(0,10); $("#fTo").value=today.toISOString().slice(0,10);
-    const ph=$("#fPH"); ph.innerHTML=PH_LIST.map(v=>`<option>${v}</option>`).join(""); ph.value="(tylko ja)";
-    const st=$("#fStatus"); st.innerHTML=STATUS_LIST.map(v=>`<option>${v}</option>`).join("");
-  }
-  function readFilters(){
-    FROM=$("#fFrom").value? new Date($("#fFrom").value+"T00:00:00"):null;
-    TO=$("#fTo").value? new Date($("#fTo").value+"T23:59:59"):null;
-    SEL_PH=$("#fPH").value;
-    SEL_ST=[...$("#fStatus").selectedOptions].map(o=>o.value);
-  }
-  function applyFilters(all){
-    const me=(account&&(account.name||""))||"";
-    return all.filter(r=>{
-      if(FROM && r.createdAt && r.createdAt<FROM) return false;
-      if(TO   && r.createdAt && r.createdAt>TO)   return false;
-      if(SEL_PH==="(tylko ja)" && (r.PH||"")!==me) return false;
-      if(SEL_PH!=="(tylko ja)" && SEL_PH!=="(wszyscy)" && (r.PH||"")!==SEL_PH) return false;
-      if(SEL_ST.length && !SEL_ST.includes(r.Status||"")) return false;
-      return true;
-    });
+  function composeAndSend(to,subject,body){
+    const base="mailto:"+encodeURIComponent(to||"")+"?subject="+encodeURIComponent(subject||"");
+    const full=base+"&body="+encodeURIComponent(body||"");
+    if(full.length<=1500){ location.href=full; }
+    else if(navigator.clipboard?.writeText){
+      navigator.clipboard.writeText(body||"").then(()=>{ location.href=base; alert("Treść zbyt długa – skopiowano do schowka. Wklej w oknie poczty (Ctrl+V)."); });
+    }else{ location.href=base; }
   }
 
-  /* === Render tabeli === */
-  function renderTable(data){
-    const thead=$("#tbl thead"); const tbody=$("#tbl tbody");
-    thead.innerHTML=`<tr><th>Data</th><th>Klient / Adres</th><th>Status</th><th>Nast. kontakt</th><th>OptOut</th><th class="right">Akcje</th></tr>`;
-    tbody.innerHTML="";
-    data.forEach((r,i)=>{
-      const tr=document.createElement('tr');
-      const nextVal = r.NextContactAt ? new Date(r.NextContactAt).toISOString().slice(0,16) : "";
-      tr.innerHTML=`<td class="nowrap">${r.createdAt? r.createdAt.toISOString().slice(0,10):""}</td>
-        <td><b>${r.nazwa||""}</b><br><span class="muted">${r.adres_pelny||""}</span></td>
-        <td>${r.Status||""}</td>
-        <td><input type="datetime-local" value="${nextVal}" data-k="next" style="width:210px"></td>
-        <td><input type="checkbox" data-k="opt" ${r.OptOut?'checked':''}></td>
-        <td class="right">
-          <div class="row-actions">
-            <button class="btn" data-mail="INV">INV</button>
-            <button class="btn" data-mail="CLI">CLI</button>
-            <button class="btn" data-mail="STD">STD</button>
-            <button class="btn" data-mail="DEV">DEV</button>
-            <button class="btn primary" data-save>Zapisz</button>
+  function renderTable(){
+    tbody.innerHTML = "";
+    for(const rec of frows.slice(0,800)){ // prosty limit bezpieczeństwa
+      const tr = document.createElement("tr");
+
+      const over = rec.NextContactAt && rec.NextContactAt < todayLocal();
+      const dueToday = rec.NextContactAt && fmtDateLocal(rec.NextContactAt)===fmtDateLocal(todayLocal());
+      const badgeClass = over ? "pill red" : dueToday ? "pill amber" : "pill";
+
+      const stColor = colorForStatus(rec.Status);
+
+      tr.innerHTML = `
+        <td class="small muted">${rec.createdAt?fmtDateLocal(rec.createdAt):""}</td>
+        <td>
+          <div><strong>${esc(rec.nazwa||"")}</strong> <span class="pill" style="border-color:#2a355f;background:#0b1533">${esc(rec.PH||"-")}</span></div>
+          <div class="muted small">${esc(rec.adres_pelny||"")}</div>
+          <div class="small"><span class="${badgeClass}">${rec.NextContactAt?("Kontakt: "+fmtDateLocal(rec.NextContactAt)):"brak terminu"}</span></div>
+        </td>
+        <td class="small">
+          ${esc(rec.email||"")}<br/>
+          ${esc(rec.telefon||"")}
+        </td>
+        <td>
+          <select class="selStatus" style="border-left:4px solid ${stColor}">
+            ${["", ...STATUS_LIST].map(st=>`<option ${st===(rec.Status||"")?"selected":""}>${esc(st)}</option>`).join("")}
+          </select>
+        </td>
+        <td><input type="date" class="inpNext" value="${rec.NextContactAt?fmtDateLocal(rec.NextContactAt):""}" /></td>
+        <td style="text-align:center"><input type="checkbox" class="chkOpt" ${(["1","true","TRUE","x","X"].includes(String(rec.OptOut||"")))?"checked":""} /></td>
+        <td><textarea class="taUwagi" rows="2" style="width:220px">${esc(rec.Uwagi||"")}</textarea></td>
+        <td class="small">
+          <div class="row-actions" style="margin-bottom:6px">
+            <button class="btn btn-compact" data-mail="INV" title="Prośba o wycenę">INV</button>
+            <button class="btn btn-compact" data-mail="CLI" title="Mail do klienta">CLI</button>
+            <button class="btn btn-compact" data-mail="STD" title="Oferta standardowa">STD</button>
+            <button class="btn btn-compact" data-mail="DEV" title="Oferta deweloperska">DEV</button>
           </div>
-        </td>`;
-      const inputs=tr.querySelectorAll('input');
+          <div class="row-actions">
+            <button class="btn btn-primary btnSave">Zapisz</button>
+            <button class="btn btn-ghost btnTouch">Dotknij</button>
+          </div>
+        </td>
+      `;
+
+      // podpięcia – maile
       tr.querySelectorAll('button[data-mail]').forEach(b=>{
-        b.addEventListener('click',()=>{ const t=mailTemplates(r)[b.getAttribute('data-mail')]; composeAndSend(t.to,t.subject,t.body); });
+        b.addEventListener('click',()=>{
+          const t=mailTemplates(rec)[b.getAttribute('data-mail')];
+          composeAndSend(t.to,t.subject,t.body);
+        });
       });
-      tr.querySelector('button[data-save]').addEventListener('click', async ()=>{
-        const next=tr.querySelector('input[data-k="next"]').value || "";
-        const opt = tr.querySelector('input[data-k="opt"]').checked;
-        try{ await saveFollowup(r, next, opt); alert("Zapisano."); }catch(e){ showError(e.message); }
+
+      // podpięcia – kolor statusu przy zmianie
+      const selStatus = tr.querySelector(".selStatus");
+      selStatus.addEventListener("change", ()=> selStatus.style.borderLeftColor = colorForStatus(selStatus.value||""));
+
+      tr.querySelector(".btnSave").addEventListener("click", async ()=>{
+        try{
+          const newSt = tr.querySelector(".selStatus").value || "";
+          const newNext = tr.querySelector(".inpNext").value ? new Date(tr.querySelector(".inpNext").value+"T00:00:00") : null;
+          const newOpt = tr.querySelector(".chkOpt").checked ? "1" : "";
+          const newUw = tr.querySelector(".taUwagi").value || "";
+
+          await saveFields(rec, {
+            Status: newSt,
+            NextContactAt: newNext,
+            OptOut: newOpt,
+            Uwagi: newUw
+          });
+          // aktualizacja w pamięci
+          rec.Status = newSt; rec.NextContactAt = newNext; rec.OptOut = newOpt; rec.Uwagi = newUw;
+          setStatus("Zapisano zmiany.");
+          scoreKPIs((account && account.name)||"");
+        }catch(e){ showError("Błąd zapisu: " + (e.message||e)); }
       });
+
+      tr.querySelector(".btnTouch").addEventListener("click", async ()=>{
+        try{
+          const now = new Date();
+          await saveFields(rec, { LastTouchAt: now });
+          rec.LastTouchAt = now;
+          setStatus("Zapisano LastTouchAt = teraz.");
+        }catch(e){ showError("Błąd zapisu: " + (e.message||e)); }
+      });
+
       tbody.appendChild(tr);
-    });
+    }
+    countInfo.textContent = `Widoczne: ${frows.length} / Wszystkich: ${rows.length}`;
   }
 
-  /* === Zapis follow-up (Excel) === */
-  async function saveFollowup(rec, nextAtStr, optOut){
-    const used=await usedRange(CONFIG.dataSheet); const headers=(used.values?.[0]||[]).map(h=>String(h||"").trim()); const body=(used.values||[]).slice(1);
-    const must=(name)=>{ let i=headers.findIndex(h=>String(h).toLowerCase().trim()===name.toLowerCase()); if(i<0){ i=headers.length; headers.push(name); await patchRange(CONFIG.dataSheet,`A1:${colLetter(headers.length)}1`,[headers]); } return i; };
-    function colLetter(n){ let s="",x=n; while(x>0){x--; s=String.fromCharCode(65+(x%26))+s; x=Math.floor(x/26);} return s; }
-    const idxNext=must("NextContactAt"), idxOpt=must("OptOut"), idxLast=must("LastTouchAt");
-    let row1=Number(rec._row1)||-1, row=row1>0? body[row1-2]:null;
-    if(row1<0){ const iAddr=headers.findIndex(h=>String(h).toLowerCase().trim()==="adres_pelny"); const want=normAddr(rec.adres_pelny||""); for(let r=0;r<body.length;r++){ const adr=iAddr>=0? String((body[r]||[])[iAddr]||""):""; if(adr && normAddr(adr)===want){ row1=r+2; row=body[r]; break; } } if(row1<0) throw new Error("Nie znaleziono rekordu."); rec._row1=row1; }
-    const nowIso=new Date().toISOString(); const [sid,iid]=await Promise.all([site(),file()]); const wsq=CONFIG.dataSheet.replace(/'/g,"''");
-    await gBatch([
-      {id:"next",method:"PATCH",url:`/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='${colLetter(idxNext+1)}${row1}')`,headers:{"Content-Type":"application/json"},body:{values:[[ nextAtStr || "" ]]}},
-      {id:"opt", method:"PATCH",url:`/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='${colLetter(idxOpt+1)}${row1}')`, headers:{"Content-Type":"application/json"},body:{values:[[ optOut? "TRUE":"FALSE" ]]}},
-      {id:"last",method:"PATCH",url:`/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='${colLetter(idxLast+1)}${row1}')`,headers:{"Content-Type":"application/json"},body:{values:[[ nowIso ]]}}
-    ]);
+  /* ==================== ZAPIS DO EXCELA + AUDITLOG ==================== */
+  const AUDIT_HEADERS = ["ts","user","action","itemId","adres_pelny","old","new","note"];
+
+  async function ensureAuditHeaders(){
+    const used = await usedRange(CONFIG.logSheet);
+    const have = (used.values && used.values[0]) ? used.values[0].map(v=>String(v||"").trim()) : [];
+    const need = AUDIT_HEADERS.some((h,i)=> (have[i]||"") !== h);
+    if (need){
+      const a1 = `A1:${colLetter(AUDIT_HEADERS.length)}1`;
+      await patchRange(CONFIG.logSheet, a1, [AUDIT_HEADERS]);
+    }
+  }
+  async function getNextLogRow(){
+    const used = await usedRange(CONFIG.logSheet);
+    const values = used.values || [];
+    return Math.max(2, values.length + 1);
+  }
+  async function appendLog(row){
+    await ensureAuditHeaders();
+    const next = await getNextLogRow();
+    const a1 = `A${next}:${colLetter(AUDIT_HEADERS.length)}${next}`;
+    await patchRange(CONFIG.logSheet, a1, [row]);
   }
 
-  /* === Kolumna index helper do colLetter === */
-  function colLetter(n){ let s="",x=n; while(x>0){x--; s=String.fromCharCode(65+(x%26))+s; x=Math.floor(x/26);} return s; }
+  // zapis pól (Status, NextContactAt, LastTouchAt, OptOut, Uwagi) + opcjonalnie Reminder* (pod PA)
+  async function saveFields(rec, patchObj){
+    const used = await usedRange(CONFIG.dataSheet);
+    const vals = used.values || [];
+    if(!vals.length) throw new Error("Arkusz pusty.");
+    const headers = (vals[0]||[]).map(h=>String(h||"").trim());
 
-  /* === Ładowanie === */
-  async function loadAll(){
-    try{
-      await ensureLogin();
-      const used = await usedRange(CONFIG.dataSheet);
-      ROWS = parse(used.values||[]);
-      fillFilters(); readFilters();
-      const data = applyFilters(ROWS);
-      // KPI
-      const me=(account&&(account.name||""))||"";
-      $("#kLeads").textContent = data.length;
-      $("#kUnassigned").textContent = data.filter(r=>!r.PH).length;
-      const soon = new Date(); soon.setDate(soon.getDate()+7);
-      $("#kUpcoming").textContent = data.filter(r=> r.NextContactAt && new Date(r.NextContactAt)<=soon && !r.OptOut).length;
-      // tabela
-      renderTable(data);
-    }catch(e){ showError(e.message); }
+    function needCol(title){
+      let idx = headers.findIndex(h=>String(h).toLowerCase().trim()===title.toLowerCase());
+      if(idx<0){ idx = headers.length; headers.push(title); }
+      return idx;
+    }
+    const idxStatus = needCol("Status");
+    const idxNext   = needCol("NextContactAt");
+    const idxLast   = needCol("LastTouchAt");
+    const idxOpt    = needCol("OptOut");
+    // uwagi – wyszukaj jakąś istniejącą, inaczej dodaj
+    const idxUwagi  = (()=>{ let i = headers.findIndex(h=>normLower(h).includes("uwagi")); if(i<0){ i = headers.length; headers.push("Uwagi"); } return i; })();
+
+    // DODANO – pod Power Automate (brak UI, ale umożliwiamy zapis)
+    const idxRSent  = needCol("ReminderSentAt");
+    const idxRTask  = needCol("ReminderTaskId");
+
+    // walidacja wskaźnika wiersza
+    let row1 = Number(rec._row1)||-1;
+    if(row1<0){ throw new Error("Brak wskaźnika wiersza. Odśwież dane."); }
+
+    const toA1 = (idx)=> `${colLetter(idx+1)}${row1}`;
+
+    const old = { Status: rec.Status, NextContactAt: rec.NextContactAt, LastTouchAt: rec.LastTouchAt, OptOut: rec.OptOut, Uwagi: rec.Uwagi, ReminderSentAt: rec.ReminderSentAt, ReminderTaskId: rec.ReminderTaskId };
+    const neu = { ...old, ...patchObj };
+
+    // jeśli dodaliśmy nowe nagłówki – zapisz je
+    if(headers.length !== (vals[0]||[]).length){
+      await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]);
+    }
+
+    // zapis wartości (pojedyncze range PATCH – trzymamy się Twojej bazy)
+    const writes = [];
+    if("Status" in patchObj)       writes.push({ a1: toA1(idxStatus), val: [[ String(neu.Status||"") ]] });
+    if("NextContactAt" in patchObj)writes.push({ a1: toA1(idxNext),   val: [[ neu.NextContactAt? fmtDateLocal(neu.NextContactAt): "" ]] });
+    if("LastTouchAt" in patchObj)  writes.push({ a1: toA1(idxLast),   val: [[ neu.LastTouchAt? fmtDateLocal(neu.LastTouchAt): "" ]] });
+    if("OptOut" in patchObj)       writes.push({ a1: toA1(idxOpt),    val: [[ String(neu.OptOut||"") ]] });
+    if("Uwagi" in patchObj)        writes.push({ a1: toA1(idxUwagi),  val: [[ String(neu.Uwagi||"") ]] });
+    if("ReminderSentAt" in patchObj) writes.push({ a1: toA1(idxRSent), val: [[ neu.ReminderSentAt? fmtDateLocal(neu.ReminderSentAt): "" ]] });
+    if("ReminderTaskId" in patchObj) writes.push({ a1: toA1(idxRTask), val: [[ String(neu.ReminderTaskId||"") ]] });
+
+    for(const w of writes){ await patchRange(CONFIG.dataSheet, w.a1, w.val); }
+
+    // audit
+    const now = new Date().toISOString();
+    const upn = (account && (account.username||account.homeAccountId)) || "";
+    const logOld = [ old.Status||"", old.NextContactAt?fmtDateLocal(old.NextContactAt):"", old.LastTouchAt?fmtDateLocal(old.LastTouchAt):"", old.OptOut||"", (old.Uwagi||"").slice(0,150) ].join("|");
+    const logNew = [ neu.Status||"", neu.NextContactAt?fmtDateLocal(neu.NextContactAt):"", neu.LastTouchAt?fmtDateLocal(neu.LastTouchAt):"", neu.OptOut||"", (neu.Uwagi||"").slice(0,150) ].join("|");
+    await appendLog([ now, upn, "UpdatePHDashboard", "", rec.adres_pelny||"", logOld, logNew, "" ]);
   }
 
-  $("#btnLogin").addEventListener('click', ()=>ensureLogin().catch(e=>showError(e.message)));
-  $("#btnLogout").addEventListener('click', async ()=>{ try{ const acc=app.getAllAccounts()[0]; if(acc) await app.logoutPopup({account:acc}); who.textContent="Nie zalogowano."; }catch(e){ showError(e.message);} });
-  $("#btnReload").addEventListener('click', loadAll);
-  $("#btnApply").addEventListener('click', ()=>{ readFilters(); const data=applyFilters(ROWS); renderTable(data); const soon=new Date(); soon.setDate(soon.getDate()+7); $("#kLeads").textContent=data.length; $("#kUnassigned").textContent=data.filter(r=>!r.PH).length; $("#kUpcoming").textContent=data.filter(r=> r.NextContactAt && new Date(r.NextContactAt)<=soon && !r.OptOut).length; });
+  /* ==================== ŁADOWANIE / UI ==================== */
+  function scoreAndRender(){
+    const me = (account && (account.name||"")) || "";
+    myNameLabel.textContent = me ? ("Przypisane do: " + me) : "";
+    scoreKPIs(me);
+    applyFilters();
+    renderTable();
+  }
 
-  app.handleRedirectPromise().catch(()=>{});
-  loadAll();
+  async function loadData(){
+    setStatus("Ładowanie list i źródeł…");
+    await loadLists();
+    await loadDatasources();
+
+    setStatus("Ładowanie danych z Excela…");
+    const used = await usedRange(CONFIG.dataSheet);
+    const values = used.values || [];
+    if(!values.length){ rows=[]; frows=[]; setStatus("Arkusz „Dane” pusty."); renderTable(); scoreKPIs((account&&account.name)||""); return; }
+
+    rows = parseRows(values);
+    scoreAndRender();
+    setStatus("Gotowe.");
+  }
+
+  // --- przyciski
+  document.getElementById("btnLogin").addEventListener("click", async ()=>{ try{ await ensureLogin(); setStatus("Zalogowano."); }catch(e){ showError("Logowanie nieudane: " + (e.message||e)); } });
+  document.getElementById("btnLogout").addEventListener("click", async ()=>{
+    try{ const acc = msalApp.getAllAccounts()[0]; if(acc){ await msalApp.logoutPopup({ account: acc }); }
+      account=null; who.textContent=""; setStatus("Wylogowano."); }catch(e){ showError("Wylogowanie nieudane: " + (e.message||e)); }
+  });
+  document.getElementById("btnReload").addEventListener("click", async ()=>{
+    try{ await ensureLogin(); await loadData(); }catch(e){ showError(e.message||e); }
+  });
+  document.getElementById("btnApply").addEventListener("click", ()=>{ scoreAndRender(); });
+
+  // start
+  await loadLists();
+  await loadDatasources();
+  msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e));
+  setStatus("Kliknij „Zaloguj”, a potem „Odśwież”.");
 })();
 </script>
 </body>
 </html>
-<!-- --- END: dashboard_ph.html --- -->
