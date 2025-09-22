@@ -475,8 +475,11 @@
       el.querySelectorAll('a[data-mail]').forEach(a=>{
         a.addEventListener('click', ev=>{
           ev.preventDefault();
-          const t = mailTemplates(rec)[a.getAttribute('data-mail')];
-          composeAndSend(t.to, t.subject, t.body);
+          const key = a.getAttribute('data-mail');
+		  const t = mailTemplates(rec)[key];
+			if (!t) { alert("Nie mogę przygotować tego maila."); return; }
+			if (!t.to) { alert("Brak adresu e-mail odbiorcy."); return; }
+			composeAndSend(t.to, t.subject, t.body);
         });
       });
     });
@@ -512,6 +515,7 @@
 
     const adresBezMiasta = hasCityAtEnd ? adres.replace(reCityAtEnd,"").replace(/,\s*$/,"").trim() : adres;
     const adresZMiastem  = hasCityAtEnd ? adres : (miasto ? `${adres}, ${miasto}` : adres);
+	const cityPartForSubject = miasto ? `, ${miasto}` : "";
 
     const subj_inv = `Zapytanie o wycenę - ${adresZMiastem} - SIDUSIS`;
     const subj_cli = `Internet światłowodowy - The Network - ${adresZMiastem}`;
