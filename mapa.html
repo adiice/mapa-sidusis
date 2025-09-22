@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<title>SIDUSIS – mapa leadów (ONLINE: MSAL + Graph + Excel na SharePoint)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<!-- MarkerCluster -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+
+<style>
+  html, body { height:100%; margin:0; font-family:system-ui, Segoe UI, Roboto, Arial; }
+  #map { height:100%; }
+  .toolbar {
+    position: fixed; top: 12px; right: 12px; z-index: 10000;
+    background:#fff; border:1px solid #ddd; border-radius:12px; padding:10px 12px; box-shadow:0 4px 20px rgba(0,0,0,.08);
+    max-width: 680px;
+  }
+  .toolbar .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .toolbar button { font:13px/1.2 inherit; padding:8px 10px; border-radius:10px; border:1px solid #ccc; background:#f7f7f7; cursor:pointer; }
+  .toolbar .hint, .toolbar .small { font-size:12px; color:#666; }
+  .statusbar { margin-top:8px; padding:8px; background:#f9fafb; border:1px dashed #cbd5e1; border-radius:10px; font-size:12px; white-space:pre-wrap; }
+
+  .legend {
+    position: fixed; left: 12px; bottom: 16px; z-index: 10000;
+    background:#fff; border:1px solid #ddd; border-radius:12px; padding:10px 12px; box-shadow:0 4px 20px rgba(0,0,0,.08);
+    font-size:12px; line-height:1.35;
+  }
+  .legend .title { font-weight:700; margin:4px 0; }
+  .pill { display:inline-block; width:10px; height:10px; vertical-align:middle; margin-right:6px; border:1px solid #999; }
+  .status-pill { border-radius:50%; }
+
+  .popup h4 { margin:0 0 6px; font-size:14px; }
+  .popup .row { display:flex; gap:6px; align-items:center; margin:8px 0; flex-wrap:wrap; }
+  .popup select { border:1px solid #ccc; border-radius:8px; padding:6px 8px; font-size:13px; }
+  .popup button { border:1px solid #bbb; border-radius:8px; padding:6px 10px; background:#f6f6f6; cursor:pointer; font-size:13px; }
+  .popup .meta { font-size:12px; color:#555; margin:6px 0; }
+  .popup .actions a { display:block; margin:4px 0; text-decoration:none; }
+
+  .error {
+    position: fixed; inset: 0 0 auto 0; top:0; background:#fff3f3; border-bottom:1px solid #e99; color:#900; padding:10px 12px; z-index: 11000;
+    font-size:13px; display:none;
+  }
+
+  /* Mini-filtry */
+  .mini-filter{
+    position: fixed; left:12px; top:12px; z-index:10001;
+    display:flex; gap:6px; align-items:flex-end; flex-wrap:wrap;
+    background:#fff; border:1px solid #ddd; border-radius:12px; padding:10px 12px; box-shadow:0 4px 20px rgba(0,0,0,.08);
+    font-size:13px;
+  }
+  .mini-filter .f{ display:flex; flex-direction:column; }
+  .mini-filter input,.mini-filter select{ padding:6px 8px; border:1px solid #d1d5db; border-radius:8px; font:inherit; }
+  .mini-filter button{ padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#eef2ff; cursor:pointer; }
+  .mini-filter label{ font-size:12px; color:#64748b; margin-bottom:4px; }
+
+  /* Znacznik */
+  .dot{
+    width:18px; height:18px; border-radius:50%;
+    border:3px solid #999; box-sizing:border-box; background:#777;
+  }
+  .dot.badge::after{
+    content:"!"; position:absolute; top:-6px; right:-6px;
+    width:14px; height:14px; font-size:10px; color:#fff; background:#ef4444;
+    border-radius:50%; display:flex; align-items:center; justify-content:center;
+    border:1px solid rgba(0,0,0,.2);
+  }
+
+  /* Collapsibles */
+  .collapsible { display: inline-block; box-sizing: border-box; }
+  .collapsible .toggle{
+    position:absolute; top:6px; right:6px; width:24px; height:24px;
+    border:1px solid #cbd5e1; border-radius:999px; background:#f8fafc; cursor:pointer;
+    line-height:22px; font-size:14px; display:flex; align-items:center; justify-content:center;
+  }
+  .collapsible.is-collapsed{ display:inline-block !important; padding:6px; min-width:28px; min-height:28px; width:auto; height:auto; }
+  .collapsible.is-collapsed .toggle{ position: static; }
+  .collapsible.is-collapsed > :not(.toggle){ display:none !important; }
+
+  .credit{
+    position:fixed; right:10px; bottom:8px; z-index:9999;
+    background:#ffffffd9; backdrop-filter: blur(4px);
+    border:1px solid #e5e7eb; border-radius:999px;
+    padding:6px 10px; font-size:12px; color:#374151;
+  }
+</style>
+
+<!-- Leaflet + MarkerCluster -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+<!-- Loader z fallbackiem dla MSAL -->
+<script>
+  function loadScriptSequential(urls) {
+    return new Promise((resolve, reject) => {
+      let i = 0;
+      const tryNext = () => {
+        if (i >= urls.length) return reject(new Error('Nie udało się załadować msal-browser z żadnego CDN.'));
+        const s = document.createElement('script');
+        s.src = urls[i++]; s.async = true;
+        s.onload = () => resolve();
+        s.onerror = () => tryNext();
+        document.head.appendChild(s);
+      };
+      tryNext();
+    });
+  }
+  const MSAL_CDNS = [
+    'https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js',
+    'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js',
+    'https://unpkg.com/@azure/msal-browser@2.38.3/lib/msal-browser.min.js'
+  ];
+</script>
+</head>
+
+<body>
+<div id="map"></div>
+
+<!-- Panel narzędziowy -->
+<div class="toolbar collapsible" id="toolbarBox">
+  <button class="toggle" id="tgToolbar" title="Zwiń/rozwiń">⯅</button>
+  <div class="row">
+    <strong>SIDUSIS – Mapa leadów (ONLINE)</strong>
+    <span class="small" id="who"></span>
+  </div>
+  <div class="row">
+    <button id="btnLogin">Zaloguj</button>
+    <button id="btnLogout">Wyloguj</button>
+    <button id="btnReload">Odśwież dane z Excelem</button>
+  </div>
+  <div class="hint">Po zalogowaniu: kliknij pinezkę → wybierz PH/Status → „Zapisz” (zapis do Excela na SharePoint) • Poniżej status.</div>
+  <div class="statusbar" id="statusbar">Nie zalogowano.</div>
+</div>
+
+<!-- Mini-filtry -->
+<div class="mini-filter collapsible" id="filtersBox">
+  <button class="toggle" id="tgFilters" title="Zwiń/rozwiń">⯅</button>
+  <div class="f">
+    <label>PH</label>
+    <select id="mfPH"><option value="">(wszyscy)</option></select>
+  </div>
+  <div class="f">
+    <label>Status</label>
+    <select id="mfStatus"><option value="">(wszystkie)</option></select>
+  </div>
+  <div class="f">
+    <label>Miasto / ulica (zawiera)</label>
+    <input id="mfSearch" placeholder="np. Poznań lub Piłsudskiego" />
+  </div>
+  <div class="f">
+    <label>Zakres od</label>
+    <input type="date" id="mfFrom">
+  </div>
+  <div class="f">
+    <label>…do</label>
+    <input type="date" id="mfTo">
+  </div>
+  <div class="f">
+    <button id="mfApply">Filtruj</button>
+  </div>
+  <div class="f" style="margin-left:auto">
+    <button id="mfMassAssign">Masowo: Ustaw PH na mnie</button>
+  </div>
+</div>
+
+<div class="legend collapsible" id="legend">
+  <button class="toggle" id="tgLegend" title="Zwiń/rozwiń">⯅</button>
+  <div class="legend-body"></div>
+</div>
+<div class="error" id="errorBar"></div>
+
+<script>
+(async function main(){
+  /* =========================== KONFIG =========================== */
+  const CONFIG = {
+    clientId: "2c5a0274-30c0-4efa-b13c-7ce1e0768cf9",
+    tenantId: "e44d0310-65ed-4096-a024-dac77110765a",
+    spHost: "internetunion.sharepoint.com",
+    spSitePath: "PHTheNetwork",
+    filePath: "/General/Lista - SIDUSIS - PEŁNA - od 08-2025.xlsx",
+    dataSheet: "Dane",
+    logSheet: "AuditLog"
+  };
+
+  /* =========================== LISTY =========================== */
+  const DEFAULT_LISTS = {
+    ph: [
+      "Adrian Daniel","Robert Kaźmierczak","Mariusz Kielczyk","Inga Kaźmierczak","Jacek Trybuchowski","Tomasz Józefowicz"
+    ],
+    phAliases: {
+      "ad":"Adrian Daniel","rk":"Robert Kaźmierczak","mk":"Mariusz Kielczyk",
+      "ik":"Inga Kaźmierczak","jt":"Jacek Trybuchowski","tj":"Tomasz Józefowicz"
+    },
+    status: ["Wycena Inwestycji","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO","MOICO","Duplikat","SEEV"],
+    statusAliases: {
+      "zapytanie o wycenę":"Wycena Inwestycji","zapytanie o wycene":"Wycena Inwestycji","wycena inwestycji":"Wycena Inwestycji",
+      "oferta wysłana":"Oferta wysłana","odmowa klienta":"Odmowa klienta","akceptacja klienta":"Akceptacja klienta",
+      "poza zasięgiem":"Poza Zasięgiem","kpo":"KPO","duplikat":"Duplikat","moico":"MOICO","seev":"SEEV"
+    },
+    statusColors: {
+      "Wycena Inwestycji":"#607D8B","Oferta wysłana":"#2196F3","Odmowa klienta":"#F44336",
+      "Akceptacja klienta":"#4CAF50","Poza Zasięgiem":"#000000","KPO":"#FF9800",
+      "MOICO":"#8E24AA","Duplikat":"#9E9E9E","SEEV":"#00BCD4"
+    },
+    excluded: ["KPO","Poza Zasięgiem","MOICO","Duplikat","SEEV"],
+    rejectionReasons: [
+      "Zbyt droga instalacja","Drogi abonament","Lepsza oferta konkurencji",
+      "Brak możliwości technicznych","Nieaktualny kontakt","Inne"
+    ]
+  };
+
+  // >>> Uwaga: jedna, wspólna funkcja normStr (żeby nie było konfliktów nazw!)
+  const normStr = s => String(s||"").toLowerCase().replace(/\s+/g," ").trim();
+
+  let LISTS = DEFAULT_LISTS;
+  let PH_LIST = [], STATUS_LIST = [], REJECTION_REASONS = [];
+  let STATUS_COLOR_MAP = {};
+  let EXCLUDED_STATUSES = new Set();
+  let PH_ALIASES = {};
+  let PH_COLOR_MAP = {};
+
+  function buildPhColorMap(phList){
+    const palette = ['#1abc9c','#3498db','#9b59b6','#e67e22','#e74c3c','#2ecc71','#16a085','#2980b9','#8e44ad','#d35400','#c0392b','#27ae60','#7f8c8d'];
+    const map = {}; phList.forEach((ph,i)=>{ map[ph] = palette[i % palette.length]; });
+    return map;
+  }
+
+  async function loadLists(){
+    try{
+      const resp = await fetch('assets/lists.json?v=' + Date.now(), {cache:'no-store'});
+      if(resp.ok){ LISTS = { ...DEFAULT_LISTS, ...(await resp.json()) }; }
+    }catch(e){ console.warn('lists.json – fallback na domyślne:', e); LISTS = DEFAULT_LISTS; }
+
+    PH_LIST = Array.isArray(LISTS.ph) ? LISTS.ph.slice() : [];
+    PH_ALIASES = Object.fromEntries(Object.entries(LISTS.phAliases||{}).map(([k,v])=>[normStr(k), v]));
+    STATUS_LIST = Array.isArray(LISTS.status) ? LISTS.status.slice() : [];
+    STATUS_COLOR_MAP = { ...DEFAULT_LISTS.statusColors, ...(LISTS.statusColors||{}) };
+    REJECTION_REASONS = Array.isArray(LISTS.rejectionReasons) ? LISTS.rejectionReasons.slice() : DEFAULT_LISTS.rejectionReasons.slice();
+    EXCLUDED_STATUSES = new Set(Array.isArray(LISTS.excluded) ? LISTS.excluded : DEFAULT_LISTS.excluded);
+    PH_COLOR_MAP = buildPhColorMap(PH_LIST);
+  }
+
+  function canonStatus(s){
+    const k = normStr(s);
+    return (LISTS.statusAliases && LISTS.statusAliases[k]) ? LISTS.statusAliases[k] : (s||"");
+  }
+  function canonPH(s){
+    const raw = String(s||"").trim();
+    const a = PH_ALIASES[normStr(raw)] || raw;    // skrót -> pełne
+    return PH_LIST.includes(a) ? a : "";          // spoza listy = „brak”
+  }
+
+  /* =========================== STAN/UTIL =========================== */
+  let account=null, siteId=null, fileId=null;
+  let rows=[]; let frows=[];
+  let map, cluster;
+
+  const $ = s=>document.querySelector(s);
+  const statusbar=$("#statusbar"); const who=$("#who"); const errorBar=$("#errorBar");
+
+  const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const DEFAULT_STATUS = "Kliknij „Zaloguj”, a potem „Odśwież dane z Excelem”.";
+  function setStatus(msg, opts={}){ const {append=false,autoClearMs=0}=opts; statusbar.textContent = append ? (statusbar.textContent?(statusbar.textContent+"\n"):"") + (Array.isArray(msg)?msg.join("\n"):String(msg||"")) : (Array.isArray(msg)?msg.join("\n"):String(msg||"")); if(autoClearMs>0){ setTimeout(()=>statusbar.textContent="",autoClearMs);} }
+  function showError(msg){ console.error(msg); errorBar.textContent = String(msg||""); errorBar.style.display='block'; setTimeout(()=>{ errorBar.style.display='none'; }, 8000); }
+  function toNum(v){ if(v==null) return NaN; const s=String(v).replace(",", ".").replace(/[^\d\.\-+Ee]/g,"").trim(); return parseFloat(s); }
+  function colLetter(n){ let s="",x=n; while(x>0){x--; s=String.fromCharCode(65+(x%26))+s; x=Math.floor(x/26);} return s; }
+  const normAddr = s => normStr(s).replace(/^\s*(ul\.?\s*){2,}/i,"ul. ").replace(/^\s*ul\b\.?/i,"ul. ");
+  const near = (a,b,eps=0.0005)=> isFinite(a)&&isFinite(b)&&Math.abs(a-b)<=eps;
+
+  function toDate(v){
+    if(v==null || v==="") return null;
+    if(typeof v==="number"){ const d = new Date(Date.UTC(1899,11,30)); d.setUTCDate(d.getUTCDate()+Math.floor(v)); return d; }
+    const s=String(v).trim(); const d1 = new Date(s); if(!isNaN(d1)) return d1;
+    const m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+    if(m){ const [_,dd,mm,yy]=m; return new Date(Number(yy.length===2?("20"+yy):yy), Number(mm)-1, Number(dd)); }
+    return null;
+  }
+
+  /* === UI collapsibles === */
+  const UI_STATE_KEY = "uiCollapsed_v1";
+  const UI_STATE = (()=>{ try{ return JSON.parse(localStorage.getItem(UI_STATE_KEY)) || {toolbar:false, filters:false, legend:false}; } catch{ return {toolbar:false, filters:false, legend:false}; } })();
+  function saveUiState(){ localStorage.setItem(UI_STATE_KEY, JSON.stringify(UI_STATE)); }
+  function attachToggle(boxId, btnId, key){
+    const box = document.getElementById(boxId);
+    const btn = document.getElementById(btnId);
+    if(!box || !btn) return;
+    box.classList.toggle('is-collapsed', !!UI_STATE[key]);
+    btn.textContent = UI_STATE[key] ? "⯈" : "⯅";
+    btn.addEventListener('click', ()=>{
+      const now = !box.classList.contains('is-collapsed');
+      box.classList.toggle('is-collapsed', now);
+      btn.textContent = now ? "⯈" : "⯅";
+      UI_STATE[key] = now; saveUiState();
+    });
+  }
+
+  /* =========================== MAPA =========================== */
+  function initMap(){
+    if(map) map.remove();
+    map = L.map('map', { updateWhenZooming:false, updateWhenIdle:true, inertia:true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
+
+    const radiusFn = z => (z<=8?30:z<=10?26:z<=12?22:z<=14?18:14);
+    cluster = L.markerClusterGroup({
+      maxClusterRadius: radiusFn,
+      disableClusteringAtZoom: 17,
+      chunkedLoading: true,
+      showCoverageOnHover: false,
+      spiderfyOnEveryZoom: false
+    });
+    map.addLayer(cluster);
+  }
+  function fitToData(arr){
+    let minLat=90, maxLat=-90, minLon=180, maxLon=-180, has=false;
+    for(const r of arr){
+      if(!isFinite(r.lat)||!isFinite(r.lon)) continue;
+      has=true;
+      if(r.lat<minLat) minLat=r.lat; if(r.lat>maxLat) maxLat=r.lat;
+      if(r.lon<minLon) minLon=r.lon; if(r.lon>maxLon) maxLon=r.lon;
+    }
+    if(!has){ map.setView([52,19],6); return; }
+    map.fitBounds([[minLat,minLon],[maxLat,maxLon]], { padding:[20,20] });
+  }
+  function renderLegend(){
+    const body = document.querySelector("#legend .legend-body");
+    let html="";
+    html+=`<div class="title">PH (kolor wypełnienia)</div>`;
+    for(const ph of PH_LIST){ const col=PH_COLOR_MAP[ph]||"#455A64"; html+=`<div><span class="pill" style="background:${col}"></span>${esc(ph)}</div>`; }
+    html+=`<div style="margin:6px 0;border-top:1px solid #ddd"></div>`;
+    html+=`<div class="title">Status (kolor obrysu)</div>`;
+    for(const st of STATUS_LIST){ const col = STATUS_COLOR_MAP[st] || "#9E9E9E"; html+=`<div><span class="pill status-pill" style="background:${col};border-color:${col}"></span>${esc(st)}</div>`; }
+    body.innerHTML = html;
+  }
+  const DEFAULT_PH_COLOR="#455A64", DEFAULT_STATUS_COLOR="#9E9E9E";
+  function makeIcon(rec){
+    const fill = PH_COLOR_MAP[(rec.PH||"").trim()] || DEFAULT_PH_COLOR;
+    const stroke = STATUS_COLOR_MAP[(rec.Status||"").trim()] || DEFAULT_STATUS_COLOR;
+    const needsBadge = !(rec.PH||"").trim() || !(rec.Status||"").trim();
+    const html = `<div class="dot ${needsBadge?'badge':''}" style="background:${fill};border-color:${stroke}"></div>`;
+    return L.divIcon({ className:'', html, iconSize:[18,18], iconAnchor:[9,9] });
+  }
+
+  function buildPopup(rec){
+    const phOpts = ['<option value="">(brak)</option>'].concat(PH_LIST.map(ph=>`<option ${ph===rec.PH?'selected':''}>${esc(ph)}</option>`)).join("");
+    const stOpts = ['<option value="">(brak)</option>'].concat(STATUS_LIST.map(st=>`<option ${st===rec.Status?'selected':''}>${esc(st)}</option>`)).join("");
+    const reasonOpts = ['<option value="">(wybierz powód)</option>'].concat(REJECTION_REASONS.map(r=>`<option ${r===(rec.PowodOdmowy||'')?'selected':''}>${esc(r)}</option>`)).join("");
+
+    const actions=`
+      <div class="actions" style="margin-top:8px">
+        <a href="#" data-quick="me">👤 Przypisz mnie</a>
+        <a href="#" data-mail="INV">📩 Wyślij prośbę o wycenę (Inwestycje)</a>
+        <a href="#" data-mail="CLI">✉️ Wyślij wiadomość do klienta</a>
+        <a href="#" data-mail="STD">📄 Wyślij standardową ofertę</a>
+        <a href="#" data-mail="DEV">🏗️ Wyślij ofertę deweloperską</a>
+        <a href="tel:${encodeURIComponent(rec.telefon||'')}">📞 Zadzwoń do klienta</a>
+      </div>`;
+
+    const showReason = (rec.Status||"").trim()==="Odmowa klienta";
+    const reasonInfo = rec.PowodOdmowy ? (', Powód = <b>' + esc(rec.PowodOdmowy) + '</b>') : '';
+
+    return `<div class="popup">
+  <h4>${esc(rec.nazwa||'')}</h4>
+  ${esc(rec.adres_pelny||'')}<br/>
+  <div class="meta"><b>Email:</b> ${esc(rec.email||'')} &nbsp; <b>Telefon:</b> ${esc(rec.telefon||'')}</div>
+
+  <div class="row">
+    <label>PH:</label>
+    <select id="phSel">${phOpts}</select>
+    <label>Status:</label>
+    <select id="stSel">${stOpts}</select>
+    <button id="savePHST">Zapisz</button>
+  </div>
+
+  <div class="row" id="reasonRow" style="display:${showReason ? 'flex' : 'none'}">
+    <label>Powód odmowy:</label>
+    <select id="reasonSel" style="min-width:240px">${reasonOpts}</select>
+  </div>
+
+  <div class="meta"><b>Aktualnie:</b> PH = <b>${esc(rec.PH||'-')}</b>, Status = <b>${esc(rec.Status||'-')}</b>${reasonInfo}</div>
+  <div class="row" id="notesRow">
+    <label style="align-self:flex-start;">Uwagi PH:</label>
+    <textarea id="noteText" rows="3" style="flex:1;min-width:280px">${esc(rec.Uwagi||"")}</textarea>
+    <button id="saveNote">Zapisz uwagi</button>
+  </div>
+  ${rec.Uwagi ? '<div class="meta"><b>Ostatnie uwagi:</b> ' + esc(rec.Uwagi) + '</div>' : ''}
+  ${actions}
+</div>`;
+  }
+
+  function addOneMarker(rec){
+    const m = L.marker([rec.lat, rec.lon], { icon: makeIcon(rec) });
+
+    // pusty popup – uzupełniamy przy otwarciu
+    m.bindPopup("", { maxWidth: 420 });
+
+    m.on('popupopen', e=>{
+      e.popup.setContent(buildPopup(rec));
+
+      const el = e.popup.getElement()?.querySelector('.leaflet-popup-content');
+      if(!el) return;
+
+      const stSel = el.querySelector('#stSel');
+      const reasonRow = el.querySelector('#reasonRow');
+      stSel?.addEventListener('change', ()=>{
+        const st = (stSel.value || '').trim();
+        reasonRow.style.display = (st === "Odmowa klienta") ? 'flex' : 'none';
+      });
+
+      el.querySelector('#savePHST')?.addEventListener('click', async ()=>{
+        const ph = el.querySelector('#phSel')?.value || "";
+        const st = el.querySelector('#stSel')?.value || "";
+        const reason = (st === "Odmowa klienta") ? (el.querySelector('#reasonSel')?.value || "") : "";
+        if(st === "Odmowa klienta" && !reason){ alert("Wybierz Powód odmowy."); return; }
+        try{
+          setStatus("Zapis do Excela…");
+          await savePhStatus(rec, ph, st, reason);
+          rec.PH = ph; rec.Status = st; rec.PowodOdmowy = reason;
+          m.setIcon(makeIcon(rec));
+          m.setPopupContent(buildPopup(rec));
+          m.openPopup();
+          setStatus("Zapisano.", { autoClearMs: 2500 });
+        }catch(err){ showError("Błąd zapisu: " + (err.message||err)); setStatus("Błąd zapisu."); }
+      });
+
+      el.querySelectorAll('a[data-quick]').forEach(a=>{
+        a.addEventListener('click', ev=>{
+          ev.preventDefault();
+          if(a.getAttribute('data-quick')==="me"){
+            const phSel = el.querySelector('#phSel');
+            const me = (account && (account.name||"")) || "";
+            if(me && PH_LIST.includes(me)) phSel.value = me;
+            else if(PH_LIST.length){ phSel.value = PH_LIST[0]; }
+          }
+        });
+      });
+
+      const noteBtn = el.querySelector('#saveNote');
+      if(noteBtn){
+        noteBtn.addEventListener('click', async ()=>{
+          const text = (el.querySelector('#noteText')?.value || "").trim();
+          try{
+            setStatus("Zapisuję uwagi…");
+            await saveUwagi(rec, text);
+            rec.Uwagi = text;
+            m.setPopupContent(buildPopup(rec));
+            m.openPopup();
+            setStatus("Zapisano uwagi.", { autoClearMs: 2000 });
+          }catch(err){ showError("Błąd zapisu uwag: " + (err.message||err)); setStatus("Błąd zapisu."); }
+        });
+      }
+
+      el.querySelectorAll('a[data-mail]').forEach(a=>{
+        a.addEventListener('click', ev=>{
+          ev.preventDefault();
+          const t = mailTemplates(rec)[a.getAttribute('data-mail')];
+          composeAndSend(t.to, t.subject, t.body);
+        });
+      });
+    });
+
+    cluster.addLayer(m);
+  }
+
+  function rebuild(){
+    cluster.clearLayers();
+    let placed=0;
+    frows.forEach(rec=>{
+      if(!isFinite(rec.lat)||!isFinite(rec.lon)) return;
+      try{ addOneMarker(rec); placed++; }catch(err){ console.error("Render error for",rec,err); }
+    });
+    fitToData(frows);
+    const sample = frows.slice(0,2).map(r=>`(${r.lat.toFixed(5)}, ${r.lon.toFixed(5)})`).join(" ; ");
+    setStatus([`Widocznych na mapie: ${placed}`, `Przykładowe współrzędne: ${sample||"—"}`]);
+  }
+
+  /* ==================== MAIL – szablony ==================== */
+  function mailTemplates(rec){
+    const nazwa  = rec.nazwa || "";
+    const miasto = (rec.miejscowosc || "").trim();
+    let   adres  = (rec.adres_pelny || "").trim();
+    const tel    = rec.telefon || "";
+    const email  = rec.email || "";
+
+    adres = adres.replace(/\s+/g, " ").replace(/^\s*(ul\.?\s*){2,}/i, "ul. ").replace(/^\s*ul\b\.?/i, "ul. ");
+
+    const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const reCityAtEnd = miasto ? new RegExp(`(?:,\\s*)?\\b${reEsc(miasto)}\\b$`, "i") : null;
+    const hasCityAtEnd = miasto && reCityAtEnd.test(adres);
+
+    const adresBezMiasta = hasCityAtEnd ? adres.replace(reCityAtEnd,"").replace(/,\s*$/,"").trim() : adres;
+    const adresZMiastem  = hasCityAtEnd ? adres : (miasto ? `${adres}, ${miasto}` : adres);
+    const cityPartForSubject = miasto ? `, ${miasto}` : "";
+
+    const subj_inv = `Zapytanie o wycenę - ${adresZMiastem} - SIDUSIS`;
+    const subj_cli = `Internet światłowodowy - The Network - ${adresZMiastem}`;
+    const subj_std = subj_cli;
+    const subj_dev = subj_cli;
+
+    const body_inv =
+`Proszę o wycenę podłączenia klienta:
+Nazwa: ${nazwa}
+Miasto: ${miasto}
+Adres: ${adresBezMiasta}
+Telefon: ${tel}
+E-mail: ${email}
+`;
+
+    const body_cli =
+`Dzień dobry ${nazwa},
+
+Serdecznie dziękujemy za przesłanie zgłoszenia za pośrednictwem platformy SIDUSIS.
+
+Informujemy, że zapytanie dotyczące możliwości podłączenia Internetu w lokalizacji ${adresBezMiasta}${cityPartForSubject} zostało przekazane do Działu Inwestycji celem przygotowania indywidualnej wyceny.
+
+Odpowiedź prześlę nie później niż w ciągu 3 dni roboczych.
+
+W przypadku jakichkolwiek pytań – pozostaję do dyspozycji.
+
+Z wyrazami szacunku,
+`;
+
+    const body_std =
+`Dzień dobry,
+
+W odpowiedzi na przesłane zapytanie poniżej przesyłam ofertę na podłączenie Prywatnego Światłowodu The Network:
+
+Jednorazowy koszt instalacji wynosi 2500 zł (możliwość rozłożenia na 10 równych płatności po 250 zł)
+- Płatność po uruchomieniu usługi - Brak zaliczki / przedpłaty.
+
+Abonament miesięczny zależny jest od prędkości łącza:
+300/300Mbs - 125 zł
+1000/1000Mbs - 150 zł
+TV 82 - 10 zł
+TV 177 – 69 zł
+lista kanałów: https://thenetwork.pl/telewizja/
+
+- Światłowód wprowadzany jest do pierwszego możliwego punktu w domu,
+- W miejscu, do którego zostanie doprowadzony światłowód niezbędne jest zasilanie dla urządzenia optycznego ONU.
+- Infrastruktura wewnętrzna pozostaje w gestii właściciela posesji.
+Umowa: 24 miesiące.
+
+W przypadku akceptacji proszę o dane do umowy (Imię i nazwisko, adres, PESEL, e-mail, tel., pakiet TV, prędkość).
+`;
+
+    const body_dev =
+`Dzień dobry,
+
+W odpowiedzi na zapytanie – oferta deweloperska:
+Jednorazowy koszt instalacji: 1 zł
+Abonament: 300/300Mbs – 89 zł, 1000/1000Mbs – 114 zł
+TV 82 – 10 zł, TV 177 – 69 zł
+lista kanałów: https://thenetwork.pl/telewizja/
+
+Pozostałe informacje jak w ofercie standardowej.
+`;
+
+    return {
+      INV: { to: "inwestycje@internetunion.pl", subject: subj_inv, body: body_inv },
+      CLI: { to: email, subject: subj_cli, body: body_cli },
+      STD: { to: email, subject: subj_std, body: body_std },
+      DEV: { to: email, subject: subj_dev, body: body_dev }
+    };
+  }
+  function composeAndSend(to, subject, body){
+    const base = "mailto:"+encodeURIComponent(to||"")+"?subject="+encodeURIComponent(subject||"");
+    const full = base + "&body=" + encodeURIComponent(body||"");
+    if(full.length <= 1500){
+      window.location.href = full;
+    } else if(navigator.clipboard?.writeText){
+      navigator.clipboard.writeText(body||"").then(()=>{ window.location.href = base; alert("Treść zbyt długa – skopiowano do schowka. Wklej w oknie poczty (Ctrl+V)."); });
+    } else {
+      window.location.href = base;
+      alert("Treść zbyt długa – wklej ręcznie.");
+    }
+  }
+
+  /* =========================== ZAŁADUJ MSAL =========================== */
+  try { await loadScriptSequential(MSAL_CDNS); }
+  catch(e){ alert('Nie udało się załadować msal-browser (alcdn/jsDelivr/unpkg).'); console.error(e); return; }
+  if (typeof msal === 'undefined' || !msal.PublicClientApplication){ alert('MSAL nie jest dostępny.'); return; }
+
+  /* =========================== MSAL / GRAPH =========================== */
+  const msalApp = new msal.PublicClientApplication({
+    auth: {
+      clientId: CONFIG.clientId,
+      authority: "https://login.microsoftonline.com/" + CONFIG.tenantId,
+      redirectUri: window.location.origin + window.location.pathname
+    },
+    cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false },
+    system: { loggerOptions: { loggerCallback: (l, m)=>console.log("[MSAL]", m) } }
+  });
+  const graphScopes = ["openid","profile","offline_access","Files.ReadWrite.All","Sites.Read.All"];
+
+  async function ensureLogin(){
+    const accs = msalApp.getAllAccounts();
+    if(accs.length){ account=accs[0]; who.textContent = "Zalogowano: " + (account.username||account.homeAccountId); return; }
+    const r = await msalApp.loginPopup({ scopes: graphScopes });
+    account = r.account; who.textContent = "Zalogowano: " + (account.username||account.homeAccountId);
+  }
+  async function getToken(){
+    await ensureLogin();
+    try{ const r=await msalApp.acquireTokenSilent({ scopes: graphScopes, account }); return r.accessToken; }
+    catch{ const r=await msalApp.acquireTokenPopup({ scopes: graphScopes }); return r.accessToken; }
+  }
+  async function gfetch(method, url, body){
+    const token = await getToken();
+    const resp = await fetch(url, {
+      method,
+      headers: { "Authorization":"Bearer " + token, "Accept":"application/json", "Content-Type":"application/json" },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    if(!resp.ok){
+      const txt=await resp.text().catch(()=>String(resp.status));
+      throw new Error(`${method} ${url} -> ${resp.status} ${txt}`);
+    }
+    return resp.status===204 ? null : resp.json();
+  }
+  async function gBatch(requests){
+    const token = await getToken();
+    const resp = await fetch("https://graph.microsoft.com/v1.0/$batch", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ requests })
+    });
+    const js = await resp.json();
+    if (!resp.ok) {
+      const msg = (js && js.error && js.error.message) ? js.error.message : JSON.stringify(js);
+      throw new Error("Batch error: " + msg);
+    }
+    const bad = (js.responses || []).find(r => r.status < 200 || r.status >= 300);
+    if (bad) throw new Error("Batch subrequest failed: " + bad.status + " " + JSON.stringify(bad.body||{}));
+    return js;
+  }
+  async function getSiteId(){
+    if(siteId) return siteId;
+    const url = `https://graph.microsoft.com/v1.0/sites/${CONFIG.spHost}:/sites/${CONFIG.spSitePath}`;
+    const js = await gfetch("GET", url); siteId = js.id; return siteId;
+  }
+  async function getFileItemId(){
+    if(fileId) return fileId;
+    const sid = await getSiteId();
+    const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/root:${encodeURI(CONFIG.filePath)}`;
+    const js = await gfetch("GET", url); fileId = js.id; return fileId;
+  }
+  async function usedRange(wsName){
+    const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
+    const wsq = wsName.replace(/'/g,"''");
+    const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/usedRange(valuesOnly=true)`;
+    return gfetch("GET", url);
+  }
+  async function patchRange(wsName, a1, values2d){
+    const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
+    const wsq = wsName.replace(/'/g,"''");
+    const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='${a1}')`;
+    return gfetch("PATCH", url, { values: values2d });
+  }
+
+  /* ===== AuditLog ===== */
+  const AUDIT_HEADERS = ["ts","user","action","itemId","adres_pelny","old","new","note"];
+
+  async function ensureAuditHeaders(){
+    const used = await usedRange(CONFIG.logSheet);
+    const have = (used.values && used.values[0]) ? used.values[0].map(v=>String(v||"").trim()) : [];
+    const need = AUDIT_HEADERS.some((h,i)=> (have[i]||"") !== h);
+    if (need){
+      const a1 = `A1:${colLetter(AUDIT_HEADERS.length)}1`;
+      await patchRange(CONFIG.logSheet, a1, [AUDIT_HEADERS]);
+    }
+  }
+  async function getNextLogRow(){
+    const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
+    const wsq = CONFIG.logSheet.replace(/'/g,"''");
+    let next = 2;
+    try{
+      const used = await usedRange(CONFIG.logSheet);
+      next = Math.max(2, (used.values||[]).length + 1);
+      const probe = await gfetch("GET", `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='A${next-1}')?$select=values`);
+      const prevVal = (((probe||{}).values||[])[0]||[])[0];
+      if (prevVal && String(prevVal).trim() !== ""){
+        const scan = await gfetch("GET", `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='A1:A50000')?$select=values`);
+        const col = (scan.values||[]).map(r => String((r||[])[0] ?? "").trim());
+        let last = 1; for (let i=col.length-1;i>=0;i--){ if(col[i] !== ""){ last = i+1; break; } }
+        next = Math.max(2, last + 1);
+      }
+    }catch(e){ console.warn("getNextLogRow:", e); }
+    return next;
+  }
+  async function appendLog(row){
+    await ensureAuditHeaders();
+    const next = await getNextLogRow();
+    const a1 = `A${next}:${colLetter(AUDIT_HEADERS.length)}${next}`;
+    await patchRange(CONFIG.logSheet, a1, [row]);
+  }
+
+  /* =========================== DANE z Excela =========================== */
+  function pickHeader(headers, tokens){
+    const lc = headers.map(h => String(h||"").toLowerCase());
+    for(const t of tokens){ const i = lc.findIndex(n => n.includes(t)); if(i>=0) return headers[i]; }
+    return null;
+  }
+
+  function parseRows(values){
+    if(!values || !values.length) return [];
+    const headers = (values[0]||[]).map(h=>String(h||"").trim());
+    const body = values.slice(1);
+    const H = {
+      created: headers[0],
+      lat:  pickHeader(headers,["lat","latitude","szerokość","szerokosc"]),
+      lon:  pickHeader(headers,["lon","longitude","długość","dlugosc"]),
+      tel:  pickHeader(headers,["telefon","tel"]),
+      mail: pickHeader(headers,["email","e-mail","mail"]),
+      ph:   pickHeader(headers,["ph"]),
+      st:   pickHeader(headers,["status"]),
+      ulica:pickHeader(headers,["ulica","adres"]),
+      nr:   pickHeader(headers,["nr budynku","numer","nr","nr domu"]),
+      msc:  pickHeader(headers,["miejscowość","miejscowosc","miasto"]),
+      nazwa:pickHeader(headers,["zgłaszający","zglaszajacy","nazwa","imię","imie","nazwisko","klient","firma"]),
+      adresPelny: pickHeader(headers,["adres_pelny","adres pełny","adres pelny"]),
+      powod: pickHeader(headers,["powód","powod","reason","powód odmowy","powod odmowy"]),
+      notes: pickHeader(headers,["uwagi ph","uwagi","uwaga","notatki","note","notes"])
+    };
+    const get = (r, col) => { const idx=headers.indexOf(col); return idx>=0 ? r[idx] : ""; };
+
+    let out = body.map((r, idx) => {
+      let lat = toNum(get(r,H.lat));
+      let lon = toNum(get(r,H.lon));
+      let adr = get(r,H.adresPelny) || "";
+      if(!adr){
+        const u = String(get(r,H.ulica)||"").trim();
+        const n = String(get(r,H.nr)||"").trim();
+        const m = String(get(r,H.msc)||"").trim();
+        adr = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
+      }
+      return {
+        _row1: idx + 2,
+        createdAt: toDate(get(r,H.created)),
+        lat, lon, adres_pelny: adr||"",
+        PH: canonPH(get(r,H.ph)),
+        Status: canonStatus(String(get(r,H.st)||"")),
+        telefon: String(get(r,H.tel)||""),
+        email: String(get(r,H.mail)||""),
+        nazwa: String(get(r,H.nazwa)||""),
+        miejscowosc: String(get(r,H.msc)||""),
+        PowodOdmowy: String(get(r,H.powod)||""),
+        Uwagi: String(get(r,H.notes)||"")
+      };
+    });
+
+    const validLat=v=>isFinite(v)&&v>=-90&&v<=90;
+    const validLon=v=>isFinite(v)&&v>=-180&&v<=180;
+    const okNormal = out.filter(o=>validLat(o.lat)&&validLon(o.lon)).length;
+    const okSwapped= out.filter(o=>validLat(o.lon)&&validLon(o.lat)).length;
+    if(okSwapped>okNormal){ out = out.map(o=>({ ...o, lat:o.lon, lon:o.lat })); }
+    out = out.filter(o=>validLat(o.lat)&&validLon(o.lon));
+    return out;
+  }
+
+  async function loadDataFromExcel(){
+    setStatus("Ładowanie danych z Excela (Graph)…");
+    const used = await usedRange(CONFIG.dataSheet);
+    const values = used.values || [];
+    if(!values.length){ setStatus("Arkusz pusty."); rows=[]; frows=[]; return; }
+    rows = parseRows(values);
+
+    // UWAGA: nie rozszerzamy PH_LIST o wartości z Excela – tylko z lists.json
+    fillMiniFilters();
+    frows = rows.slice();
+    setStatus(`Załadowano ${rows.length} wierszy z arkusza „${CONFIG.dataSheet}”.`);
+  }
+
+  /* =========================== FILTRY / MASÓWKA =========================== */
+  function fillMiniFilters(){
+    const phSel=$("#mfPH"); const stSel=$("#mfStatus");
+    phSel.innerHTML = `<option value="">(wszyscy)</option>` + PH_LIST.map(ph=>`<option>${esc(ph)}</option>`).join("");
+    stSel.innerHTML = `<option value="">(wszystkie)</option>` + STATUS_LIST.map(st=>`<option>${esc(st)}</option>`).join("");
+  }
+  function applyMiniFilters(){
+    const wantPH = $("#mfPH").value.trim();
+    const wantST = $("#mfStatus").value.trim();
+    const query  = ($("#mfSearch").value || "").trim().toLowerCase();
+    const dFrom  = $("#mfFrom").value ? new Date($("#mfFrom").value+"T00:00:00") : null;
+    const dTo    = $("#mfTo").value   ? new Date($("#mfTo").value  +"T23:59:59") : null;
+
+    frows = rows.filter(r=>{
+      if(wantPH && (r.PH||"").trim() !== wantPH) return false;
+      if(wantST && (r.Status||"").trim() !== wantST) return false;
+      if(query){
+        const inCity = String(r.miejscowosc||"").toLowerCase().includes(query);
+        const inAddr = String(r.adres_pelny||"").toLowerCase().includes(query);
+        if(!inCity && !inAddr) return false;
+      }
+      if (dFrom || dTo){
+        if(!r.createdAt) return false;
+        const t = r.createdAt;
+        if(dFrom && t < dFrom) return false;
+        if(dTo   && t > dTo)   return false;
+      }
+      return true;
+    });
+  }
+
+  async function massAssignToMe(){
+    const me = (account && (account.name||"")) || "";
+    const targetPH = (me && PH_LIST.includes(me)) ? me : (PH_LIST[0]||"");
+    if(!targetPH){ alert("Brak listy PH do przypisania."); return; }
+    if(!frows.length){ alert("Brak pozycji w bieżącym filtrze."); return; }
+    if(!confirm(`Ustawić PH="${targetPH}" dla ${frows.length} widocznych pozycji?\nOperacja sekwencyjna zajmie chwilę.`)) return;
+    let ok=0, fail=0;
+    for(const rec of frows){
+      try{
+        await savePhStatus(rec, targetPH, rec.Status||"", rec.PowodOdmowy||"");
+        rec.PH = targetPH;
+        ok++;
+      }catch{ fail++; }
+    }
+    alert(`Zakończono: OK=${ok}, błędy=${fail}`);
+    rebuild();
+  }
+
+  /* =========================== ZAPISY ($batch) =========================== */
+  async function savePhStatus(rec, newPH, newStatus, newReason){
+    const used = await usedRange(CONFIG.dataSheet);
+    const vals = used.values || [];
+    if(!vals.length) throw new Error("Arkusz pusty.");
+    const headers = (vals[0]||[]).map(h=>String(h||"").trim());
+    const body = vals.slice(1);
+
+    const H = {
+      adresPelny: pickHeader(headers,["adres_pelny","adres pełny","adres pelny"]),
+      ulica:      pickHeader(headers,["ulica","adres"]),
+      nr:         pickHeader(headers,["nr budynku","numer","nr","nr domu"]),
+      msc:        pickHeader(headers,["miejscowość","miejscowosc","miasto"]),
+      lat:        pickHeader(headers,["lat","latitude","szerokość","szerokosc","punkt (y)","y"]),
+      lon:        pickHeader(headers,["lon","longitude","długość","dlugosc","punkt (x)","x"]),
+      ph:         pickHeader(headers,["ph"]),
+      st:         pickHeader(headers,["status"]),
+      reason:     pickHeader(headers,["powód","powod","reason","powód odmowy","powod odmowy"])
+    };
+
+    // zapewnij PH/Status, a dla odmowy – kolumnę powodu
+    let idxPH = headers.findIndex(h=>String(h).toLowerCase().trim()==="ph");
+    if(idxPH<0){ idxPH = headers.length; headers.push("PH"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+    let idxST = headers.findIndex(h=>String(h).toLowerCase().trim()==="status");
+    if(idxST<0){ idxST = headers.length; headers.push("Status"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+    let idxRS = -1;
+    if(newStatus==="Odmowa klienta"){
+      if(!H.reason){ H.reason="Powód odmowy"; headers.push(H.reason); idxRS = headers.length-1; await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+      else idxRS = headers.indexOf(H.reason);
+    }
+
+    // dopasowanie wiersza
+    let row1 = Number(rec._row1) || -1, oldPH="", oldST="";
+    if(row1>0){
+      const row = body[row1-2] || [];
+      oldPH = idxPH>=0 ? String(row[idxPH]||"") : "";
+      oldST = idxST>=0 ? String(row[idxST]||"") : "";
+    }else{
+      const wantAddr = normAddr(rec.adres_pelny||"");
+      for(let r=0; r<body.length; r++){
+        const row = body[r]||[]; let adrRow = "";
+        if(H.adresPelny){
+          const i = headers.indexOf(H.adresPelny);
+          adrRow = String(row[i]||"");
+        }else{
+          const u = H.ulica ? String(row[headers.indexOf(H.ulica)]||"").trim() : "";
+          const n = H.nr    ? String(row[headers.indexOf(H.nr)]||"").trim()    : "";
+          const m = H.msc   ? String(row[headers.indexOf(H.msc)]||"").trim()   : "";
+          adrRow = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
+        }
+        if(wantAddr && normAddr(adrRow) === wantAddr){ row1 = r+2; }
+        else if(H.lat && H.lon && isFinite(rec.lat) && isFinite(rec.lon)){
+          const iLat = headers.indexOf(H.lat); const iLon = headers.indexOf(H.lon);
+          const latR = toNum(row[iLat]); const lonR = toNum(row[iLon]);
+          if(near(latR, rec.lat) && near(lonR, rec.lon)){ row1 = r+2; }
+        }
+        if(row1>0){
+          oldPH = idxPH>=0 ? String(row[idxPH]||"") : "";
+          oldST = idxST>=0 ? String(row[idxST]||"") : "";
+          break;
+        }
+      }
+      if(row1<0) throw new Error("Nie znaleziono pozycji w Excelu (dopasowanie po adresie i/lub współrzędnych).");
+      rec._row1 = row1;
+    }
+
+    // --- [BATCH] PH, Status, (opcjonalnie) Powód + AuditLog ---
+    const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
+    const wsqData = CONFIG.dataSheet.replace(/'/g,"''");
+
+    const a1PH     = `${colLetter(idxPH+1)}${row1}`;
+    const a1ST     = `${colLetter(idxST+1)}${row1}`;
+    const a1REASON = (idxRS>=0) ? `${colLetter(idxRS+1)}${row1}` : null;
+
+    await ensureAuditHeaders();
+    const nextLog = await getNextLogRow();
+    const logA1   = `A${nextLog}:${colLetter(AUDIT_HEADERS.length)}${nextLog}`;
+    const now     = new Date().toISOString();
+    const upn     = (account && (account.username||account.homeAccountId)) || "";
+    const logRow  = [ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}|${newReason||""}`, "" ];
+
+    const requests = [
+      { id: "ph", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1PH}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ newPH || "" ]] } },
+      { id: "st", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1ST}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ newStatus || "" ]] } }
+    ];
+    if (a1REASON){
+      requests.push({ id: "reason", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1REASON}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ newReason || "" ]] } });
+    }
+    const wsqLog = CONFIG.logSheet.replace(/'/g,"''");
+    requests.push({ id: "log", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqLog}')/range(address='${logA1}')`, headers: { "Content-Type": "application/json" }, body: { values: [ logRow ] } });
+
+    await gBatch(requests);
+  }
+
+  async function saveUwagi(rec, newNotes){
+    const used = await usedRange(CONFIG.dataSheet);
+    const vals = used.values || [];
+    if(!vals.length) throw new Error("Arkusz pusty.");
+    const headers = (vals[0]||[]).map(h=>String(h||"").trim());
+    const body = vals.slice(1);
+
+    const H = {
+      adresPelny: pickHeader(headers,["adres_pelny","adres pełny","adres pelny"]),
+      ulica:      pickHeader(headers,["ulica","adres"]),
+      nr:         pickHeader(headers,["nr budynku","numer","nr","nr domu"]),
+      msc:        pickHeader(headers,["miejscowość","miejscowosc","miasto"]),
+      lat:        pickHeader(headers,["lat","latitude","szerokość","szerokosc","punkt (y)","y"]),
+      lon:        pickHeader(headers,["lon","longitude","długość","dlugosc","punkt (x)","x"]),
+      notes:      pickHeader(headers,["uwagi ph","uwagi","uwaga","notatki","note","notes"])
+    };
+
+    let idxNotes = (H.notes ? headers.indexOf(H.notes) : -1);
+    if(idxNotes < 0){
+      idxNotes = headers.length; headers.push("Uwagi");
+      await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]);
+    }
+
+    let row1 = Number(rec._row1) || -1, oldNotes = "";
+    if(row1 > 0){
+      const row = body[row1-2] || [];
+      oldNotes = String(row[idxNotes]||"");
+    }else{
+      const wantAddr = normAddr(rec.adres_pelny||"");
+      for(let r=0; r<body.length; r++){
+        const row = body[r]||[]; let adrRow = "";
+        if(H.adresPelny){ const i = headers.indexOf(H.adresPelny); adrRow = String(row[i]||""); }
+        else{
+          const u = H.ulica ? String(row[headers.indexOf(H.ulica)]||"").trim() : "";
+          const n = H.nr    ? String(row[headers.indexOf(H.nr)]||"").trim()    : "";
+          const m = H.msc   ? String(row[headers.indexOf(H.msc)]||"").trim()   : "";
+          adrRow = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
+        }
+        if(wantAddr && normAddr(adrRow) === wantAddr){ row1 = r+2; }
+        else if(H.lat && H.lon && isFinite(rec.lat) && isFinite(rec.lon)){
+          const iLat = headers.indexOf(H.lat); const iLon = headers.indexOf(H.lon);
+          const latR = toNum(row[iLat]); const lonR = toNum(row[iLon]);
+          if(near(latR, rec.lat) && near(lonR, rec.lon)){ row1 = r+2; }
+        }
+        if(row1 > 0){ oldNotes = String(row[idxNotes]||""); break; }
+      }
+      if(row1 < 0) throw new Error("Nie znaleziono pozycji w Excelu (dopasowanie po adresie i/lub współrzędnych).");
+      rec._row1 = row1;
+    }
+
+    const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
+    const wsqData = CONFIG.dataSheet.replace(/'/g,"''");
+    const a1NOTE  = `${colLetter(idxNotes+1)}${row1}`;
+
+    await ensureAuditHeaders();
+    const nextLog = await getNextLogRow();
+    const logA1   = `A${nextLog}:${colLetter(AUDIT_HEADERS.length)}${nextLog}`;
+    const now     = new Date().toISOString();
+    const upn     = (account && (account.username||account.homeAccountId)) || "";
+    const logRow  = [ now, upn, "UpdateUwagi", "", rec.adres_pelny||"", oldNotes, newNotes||"", "" ];
+
+    const requests = [
+      { id: "notes", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1NOTE}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ newNotes || "" ]] } },
+      { id: "log",   method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${CONFIG.logSheet.replace(/'/g,"''")}')/range(address='${logA1}')`, headers: { "Content-Type": "application/json" }, body: { values: [ logRow ] } }
+    ];
+    await gBatch(requests);
+  }
+
+  /* =========================== UI =========================== */
+  $("#btnLogin").addEventListener('click', async ()=>{ try{ await ensureLogin(); setStatus("Zalogowano."); }catch(err){ showError("Logowanie nieudane: " + (err.message||err)); } });
+  $("#btnLogout").addEventListener('click', async ()=>{
+    try{ const acc = msalApp.getAllAccounts()[0]; if(acc){ await msalApp.logoutPopup({ account: acc }); }
+      account=null; who.textContent=""; setStatus("Wylogowano."); }catch(err){ showError("Wylogowanie nieudane: " + (err.message||err)); }
+  });
+  $("#btnReload").addEventListener('click', async ()=>{
+    try{
+      await ensureLogin();
+      await loadLists();  renderLegend();
+      await getSiteId(); await getFileItemId();
+      await loadDataFromExcel(); applyMiniFilters(); rebuild();
+    } catch(err){ showError(err.message||err); }
+  });
+
+  $("#mfApply").addEventListener('click', ()=>{ applyMiniFilters(); rebuild(); });
+  $("#mfMassAssign").addEventListener('click', ()=>{ massAssignToMe(); });
+
+  /* =========================== START =========================== */
+  await loadLists();
+  initMap();
+  renderLegend();
+  attachToggle("toolbarBox","tgToolbar","toolbar");
+  attachToggle("filtersBox","tgFilters","filters");
+  attachToggle("legend","tgLegend","legend");
+  setStatus(DEFAULT_STATUS);
+  window.addEventListener('unhandledrejection', e=>showError(e.reason?.message||e.reason||"Błąd"));
+  msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e));
+})();
+</script>
+<div class="credit">Autor: Adrian Daniel</div>
+</body>
+</html>
