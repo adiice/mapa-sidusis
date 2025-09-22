@@ -720,7 +720,7 @@
         });
       }catch(e){ console.warn('MSAL init retry failed:', e); }
     }
-    if(!msalApp){ showError('MSAL niedostêpny. SprawdŸ po³¹czenie i spróbuj ponownie.'); return; }
+    if(!msalApp){ showError('MSAL niedostï¿½pny. Sprawdï¿½ poï¿½ï¿½czenie i sprï¿½buj ponownie.'); return; }
   }
   // jeÅ›li juÅ¼ mamy konto â€“ nic nie rÃ³b
   const accs = msalApp.getAllAccounts();
@@ -746,7 +746,7 @@
 
 async function getToken(){
   if(!msalApp){ await ensureLogin(); }
-  if(!msalApp){ throw new Error('MSAL niedostêpny'); }
+  if(!msalApp){ throw new Error('MSAL niedostï¿½pny'); }
   // sprÃ³buj cicho, jeÅ›li nie wyjdzie â€“ popup tylko, gdy faktycznie wymagany
   const acc = msalApp.getAllAccounts()[0] || account;
   if (acc) account = acc;
@@ -1188,7 +1188,7 @@ async function getToken(){
       await getSiteId(); await getFileItemId();
       await loadDataFromExcel(); applyMiniFilters(); rebuild();
     } catch(err){ showError(err.message||err); }
-  }); }
+  });
 
   $("#mfApply").addEventListener('click', ()=>{ applyMiniFilters(); rebuild(); });
 
