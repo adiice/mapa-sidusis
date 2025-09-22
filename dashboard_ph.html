@@ -801,9 +801,10 @@
             await saveFields(rec, { NextContactAt: d });
             rec.NextContactAt = d;
             const inp = tr.querySelector('.inpNext'); if(inp) inp.value = fmtDateLocal(d);
-            scoreKPIs((account && account.name)||"");
             btn.classList.add('done'); setTimeout(()=>btn.classList.remove('done'), 1000);
             setStatus('Zapisano NextContactAt.');
+            // natychmiast odśwież listę i KPI
+            scoreAndRender();
           }catch(e){ showError('Błąd zapisu: ' + (e.message||e)); }
         });
       });
@@ -956,7 +957,15 @@
   }
 
   // przyciski
-  document.getElementById("btnLogin").addEventListener("click", async ()=>{ try{ await ensureLogin(); setStatus("Zalogowano."); updateManagerOwnerSelect(); }catch(e){ showError("Logowanie nieudane: " + (e.message||e)); } });
+  document.getElementById("btnLogin").addEventListener("click", async ()=>{
+    try{
+      await ensureLogin();
+      setStatus("Zalogowano.");
+      updateManagerOwnerSelect();
+      // automatyczne odświeżenie danych po zalogowaniu
+      await loadData();
+    }catch(e){ showError("Logowanie nieudane: " + (e.message||e)); }
+  });
   document.getElementById("btnLogout").addEventListener("click", async ()=>{
     try{ const acc = msalApp.getAllAccounts()[0]; if(acc){ await msalApp.logoutPopup({ account: acc }); }
       account=null; who.textContent=""; setStatus("Wylogowano."); }catch(e){ showError("Wylogowanie nieudane: " + (e.message||e)); }
