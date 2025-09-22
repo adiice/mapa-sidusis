@@ -93,6 +93,11 @@
   .btn-danger{ background:#3b1a22; border-color:#6b2330; color:#ffe6e6 }
   .btn-ghost{ background:transparent; border-color:var(--btn-ghost-b) }
 
+  /* Quick set for Next contact */
+  .next-quick{ font-size:12px; padding:2px 6px; border-radius:999px; border:1px solid var(--line); background:var(--panel-2); color:var(--text); cursor:pointer }
+  .next-quick + .next-quick{ margin-left:4px }
+  .next-quick.done{ color:var(--muted); filter:brightness(.9) }
+
   /* Kafelki menedżera */
   .cards-manager{ display:grid; grid-template-columns:repeat(3,minmax(220px,1fr)); gap:12px; margin-top:12px }
   .badge{ position:absolute; top:10px; right:10px; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:600; border:1px solid var(--line) }
@@ -757,7 +762,14 @@
         </td>
         <td class="small">${esc(rec.email||"")}<br/>${esc(rec.telefon||"")}</td>
         <td><select class="selStatus" style="border-left:4px solid ${stColor}">${["",...STATUS_LIST].map(st=>`<option ${st===(rec.Status||"")?"selected":""}>${esc(st)}</option>`).join("")}</select></td>
-        <td><input type="date" class="inpNext" value="${rec.NextContactAt?fmtDateLocal(rec.NextContactAt):""}" /></td>
+        <td>
+          <input type="date" class="inpNext" value="${rec.NextContactAt?fmtDateLocal(rec.NextContactAt):""}" />
+          <div class="small" style="margin-top:4px">
+            <button type="button" class="next-quick" data-delta="0">Dziś</button>
+            <button type="button" class="next-quick" data-delta="2">+2d</button>
+            <button type="button" class="next-quick" data-delta="7">+7d</button>
+          </div>
+        </td>
         <td style="text-align:center"><input type="checkbox" class="chkOpt" ${(["1","true","TRUE","x","X"].includes(String(rec.OptOut||"")))?"checked":""} /></td>
         <td class="small">${esc(rec.PH||"")}</td>
         <td><textarea class="taUwagi" rows="2" style="width:220px">${esc(rec.Uwagi||"")}</textarea></td>
@@ -779,6 +791,22 @@
         b.addEventListener('click',()=>{ const t=mailTemplates(rec)[b.getAttribute('data-mail')]; composeAndSend(t.to,t.subject,t.body); });
       });
       tr.querySelector(".selStatus").addEventListener("change", e=> e.currentTarget.style.borderLeftColor = colorForStatus(e.currentTarget.value||""));
+
+      // quick next-contact buttons
+      tr.querySelectorAll('.next-quick').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const delta = Number(btn.dataset.delta||0);
+          const d = todayLocal(); d.setDate(d.getDate()+delta);
+          try{
+            await saveFields(rec, { NextContactAt: d });
+            rec.NextContactAt = d;
+            const inp = tr.querySelector('.inpNext'); if(inp) inp.value = fmtDateLocal(d);
+            scoreKPIs((account && account.name)||"");
+            btn.classList.add('done'); setTimeout(()=>btn.classList.remove('done'), 1000);
+            setStatus('Zapisano NextContactAt.');
+          }catch(e){ showError('Błąd zapisu: ' + (e.message||e)); }
+        });
+      });
 
       tr.querySelector(".btnSave").addEventListener("click", async ()=>{
         try{
