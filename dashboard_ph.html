@@ -330,6 +330,7 @@
   /* ========== STATE ========== */
   let account=null, siteId=null, fileId=null;
   let rows=[], frows=[];
+  let phDueOverride = null; // override: kliknięcie kafelka lub wymuszenie zakresu PH+≤dziś
   const $ = s=>document.querySelector(s);
   const dsSelect = $("#dsSelect");
   const who=$("#who"), statusbar=$("#statusbar"), errorBar=$("#errorBar");
@@ -832,7 +833,9 @@
       account=null; who.textContent=""; setStatus("Wylogowano."); }catch(e){ showError("Wylogowanie nieudane: " + (e.message||e)); }
   });
   document.getElementById("btnReload").addEventListener("click", async ()=>{ try{ await ensureLogin(); await loadData(); }catch(e){ showError(e.message||e); } });
-  document.getElementById("btnApply").addEventListener("click", ()=>{ scoreAndRender(); });
+  document.getElementById("btnApply").addEventListener("click", ()=>{ phDueOverride=null; scoreAndRender(); });
+  // zmiana unified scope usuwa ewentualny override
+  (function(){ const s=document.getElementById('fltScopeUnified'); if(s){ s.addEventListener('change', ()=>{ phDueOverride=null; }); }})();
 
   // dropdown statusów
   const dd = document.getElementById('ddStatus');
