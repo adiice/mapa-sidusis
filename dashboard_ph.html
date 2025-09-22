@@ -48,10 +48,18 @@
     background:linear-gradient(180deg,var(--card) 0%, var(--panel-2) 100%);
     border:1px solid var(--line); border-radius:var(--br);
     padding:14px; min-height:96px; box-shadow:0 10px 30px rgba(0,0,0,.12), inset 0 1px 0 color-mix(in oklab, var(--line) 40%, transparent);
+    position:relative; /* aby badge mogła być w rogu */
   }
   .card h3{ margin:0 0 6px; font-size:14px; color:color-mix(in oklab, var(--muted) 90%, var(--text)) }
   .kpi{ font-size:28px; font-weight:700; letter-spacing:.3px }
   .kpi.bad{ color:var(--amber) } .kpi.verybad{ color:var(--red) } .kpi.good{ color:var(--green) }
+
+  /* Kafelki dla menedżera */
+  .cards-manager{ display:grid; grid-template-columns:repeat(3,minmax(220px,1fr)); gap:12px; margin-top:12px }
+  .badge{ position:absolute; top:10px; right:10px; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:600; border:1px solid var(--line) }
+  .badge.red{ border-color:#6b2330; background:#2a0f16; color:#ffc9c9 }
+  .badge.amber{ border-color:#5a4930; background:#2a200f; color:#ffd89c }
+  .badge.green{ border-color:#285a3b; background:#0f2a1a; color:#a6f3c4 }
 
   .panel{ margin-top:16px; background:linear-gradient(180deg,var(--card) 0%, var(--panel-2) 100%); border:1px solid var(--line); border-radius:var(--br); }
   .panel .hd{ padding:12px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center }
@@ -148,6 +156,9 @@
     <div class="card"><h3>Moje pilne (przeterminowane / dziś)</h3><div class="kpi" id="kpiMyDue">—</div><div class="small muted" id="myNameLabel"></div></div>
   </div>
 
+  <!-- MANAGER CARDS (dynamicznie) -->
+  <div class="cards cards-manager" id="cardsManager"></div>
+
   <!-- MY QUEUE -->
   <div class="panel">
     <div class="hd">
@@ -155,14 +166,8 @@
       <div class="tools controls">
         <!-- ZAKRES -->
         <label class="small muted">Zakres:</label>
-        <select id="fltScope">
-          <option value="due">Do kontaktu (≤ dziś)</option>
-          <option value="all">Wszystkie przypisane do mnie</option>
-          <option value="none">Tylko nieprzydzielone</option>
-        </select>
-
-        <!-- WŁAŚCICIEL (dla przełożonego) -->
-        <select id="fltOwner" style="display:none" title="Filtruj po PH (dla przełożonego)"></select>
+        <!-- SCALONY ZAKRES: jedna kontrolka -->
+        <select id="fltScopeUnified" title="Zakres danych (scalony)"></select>
 
         <!-- STATUS: kompaktowy dropdown z checkboxami -->
         <div class="dropdown" id="ddStatus">
@@ -302,9 +307,24 @@
     return a;
   }
 
+  // sprawdza rolę: przełożony (UPN lub memberOf/roles/grops w tokenie)
+  function isManager(){
+    try{
+      const upn = String(account?.username||"").toLowerCase();
+      if(upn === "adaniel@internetunion.pl") return true;
+      const claims = account?.idTokenClaims || {};
+      const arr = []
+        .concat(Array.isArray(claims.memberOf)?claims.memberOf:(claims.memberOf?[claims.memberOf]:[]))
+        .concat(Array.isArray(claims.groups)?claims.groups:(claims.groups?[claims.groups]:[]))
+        .concat(Array.isArray(claims.roles)?claims.roles:(claims.roles?[claims.roles]:[]));
+      return arr.some(v=>String(v||"").toLowerCase().includes("salesmanagers"));
+    }catch{ return false; }
+  }
+
   /* ========== STATE ========== */
   let account=null, siteId=null, fileId=null;
   let rows=[], frows=[];
+  let phDueOverride=null; // kliknięcie kafelka: wymuszenie filtra PH + "Do kontaktu"
   const $ = s=>document.querySelector(s);
   const dsSelect = $("#dsSelect");
   const who=$("#who"), statusbar=$("#statusbar"), errorBar=$("#errorBar");
@@ -472,6 +492,12 @@
     const opt = String(rec.OptOut||"").toLowerCase(); if(opt==="1"||opt==="true"||opt==="x") return false;
     if(!rec.NextContactAt) return false; const d = todayLocal(); return rec.NextContactAt <= new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23,59,59,999);
   }
+  // pilne: NextContactAt ≤ dziś i brak OptOut (bez właściciela)
+  function isUrgentLead(rec){
+    const opt = String(rec.OptOut||"").toLowerCase(); if(opt==="1"||opt==="true"||opt==="x") return false;
+    if(!rec.NextContactAt) return false; const d = todayLocal();
+    return rec.NextContactAt <= new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23,59,59,999);
+  }
 
   function scoreKPIs(me){
     const unassigned = rows.filter(isUnassigned).length;
@@ -502,18 +528,24 @@
     return new Date() > dl;
   }
 
+  // wypełnia scalony select Zakres wg roli użytkownika
   function updateManagerOwnerSelect(){
-    const ownerSel = document.getElementById("fltOwner");
-    const isBoss = (account?.username||"").toLowerCase() === "adaniel@internetunion.pl";
-    ownerSel.style.display = isBoss ? "" : "none";
-    if(!isBoss) return;
-
-    const options = ['<option value="__my__">Tylko moje</option>',
-                     '<option value="__all__">Wszyscy PH</option>',
-                     '<option value="__none__">Tylko nieprzydzielone</option>']
-      .concat(PH_LIST.map(ph=>`<option value="${ph}">PH: ${ph}</option>`));
-    ownerSel.innerHTML = options.join('');
-    if(!ownerSel.value) ownerSel.value="__all__";
+    const sel = document.getElementById("fltScopeUnified");
+    if(!sel) return;
+    const prev = sel.value; // zachowaj poprzednią wartość
+    const boss = isManager();
+    sel.innerHTML = "";
+    const add = (label, value, disabled=false)=>{ const o=document.createElement('option'); o.value=value; o.textContent=label; if(disabled) o.disabled=true; sel.appendChild(o); };
+    add("Tylko moje","my");
+    add("Do kontaktu (≤ dziś)","due");
+    add("Tylko nieprzydzielone","unassigned");
+    if(boss){
+      add("────────","__sep__", true); // separator
+      (PH_LIST||[]).forEach(ph=> add("PH: "+ph, "ph:"+ph));
+      add("Wszyscy PH","all_ph");
+    }
+    const allowed = Array.from(sel.options).map(o=>o.value);
+    sel.value = allowed.includes(prev) ? prev : "my";
   }
 
   function parseDateInput(id, endOfDay=false){ const v=document.getElementById(id).value; return v ? new Date(v + (endOfDay? "T23:59:59" : "T00:00:00")) : null; }
@@ -522,8 +554,7 @@
   function setAllStatuses(checked){ document.querySelectorAll('#fltStatusGrid input[type="checkbox"]').forEach(ch=>ch.checked=checked); updateStatusBtnLabel(); }
 
   function applyFilters(){
-    const scope = document.getElementById("fltScope").value;
-    const ownerVal = document.getElementById("fltOwner").value || "__my__";
+    const scope = (document.getElementById("fltScopeUnified")?.value)||"my";
     const q = (document.getElementById("fltQuery").value||"").toLowerCase().trim();
     const me = (account && (account.name||"")) || "";
     const WANT_ST = getSelectedStatuses();
@@ -533,15 +564,13 @@
     frows = rows.filter(r=>{
       // podstawowy zakres
       let pass=true;
-      if(scope==="due") pass = isDueForMe(r, me);
-      else if(scope==="all") pass = (r.PH||"").trim() === (me||"").trim();
-      else if(scope==="none") pass = isUnassigned(r);
+      if(phDueOverride){ pass = (r.PH||"") === phDueOverride && isUrgentLead(r); }
+      else if(scope==="due") pass = isDueForMe(r, me);
+      else if(scope==="my") pass = (r.PH||"").trim() === (me||"").trim();
+      else if(scope==="unassigned") pass = isUnassigned(r);
+      else if(scope==="all_ph") pass = !isUnassigned(r);
+      else if(String(scope||"").startsWith("ph:")) { const trg = String(scope).slice(3); pass = (r.PH||"") === trg; }
       if(!pass) return false;
-
-      // dodatkowy zakres przełożonego
-      if(ownerVal==="__all__"){ /* przepuszczamy */ }
-      else if(ownerVal==="__none__"){ if(!isUnassigned(r)) return false; }
-      else if(ownerVal!=="__my__"){ if((r.PH||"") !== ownerVal) return false; }
 
       if(WANT_ST.length && !WANT_ST.includes(r.Status||"")) return false;
       if(cFrom && (!r.createdAt || r.createdAt < cFrom)) return false;
@@ -574,6 +603,45 @@
 
   function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function colorForStatus(st){ return STATUS_COLOR_MAP[st] || "#9E9E9E"; }
+
+  // render kafelków dla menedżera / PH
+  function renderManagerCards(){
+    const box = document.getElementById('cardsManager'); if(!box) return;
+    const me = (account && (account.name||"")) || "";
+    const boss = isManager();
+    const list = boss ? (PH_LIST||[]).slice() : (me? [me] : []);
+
+    const startDay = todayLocal(); startDay.setHours(0,0,0,0);
+    const endDay = new Date(startDay); endDay.setHours(23,59,59,999);
+    const isOO = (rec)=>{ const o=String(rec.OptOut||"").toLowerCase(); return (o==="1"||o==="true"||o==="x"); };
+
+    const html = list.map(ph=>{
+      const arr = rows.filter(r=> (r.PH||"")===ph && !isOO(r) && r.NextContactAt);
+      const urgent = arr.filter(r=> r.NextContactAt <= endDay).length;
+      const overdue = arr.filter(r=> r.NextContactAt < startDay).length;
+      const color = overdue>0 ? 'red' : (urgent>0 ? 'amber' : 'green');
+      return `<div class="card card-ph" data-ph="${esc(ph)}">
+        <span class="badge ${color}" title="Przeterminowane">${overdue}</span>
+        <h3>Pilne sprawy — ${esc(ph)}</h3>
+        <div class="kpi">${urgent}</div>
+        <div class="small muted">NextContactAt ≤ dziś (bez OptOut)</div>
+      </div>`;
+    }).join("");
+
+    box.innerHTML = html;
+    box.onclick = (ev)=>{
+      const card = ev.target.closest('.card[data-ph]');
+      if(!card) return;
+      const ph = card.getAttribute('data-ph')||"";
+      // kliknięcie: ustaw filtr na PH + Do kontaktu (≤ dziś)
+      const sel = document.getElementById('fltScopeUnified');
+      if(sel) sel.value = 'ph:'+ph;
+      phDueOverride = ph;
+      applyFilters();
+      renderTable();
+      document.getElementById('tbl')?.scrollIntoView({ behavior:'smooth', block:'start' });
+    };
+  }
 
   // szablony maili – jak wcześniej
   function mailTemplates(rec){
@@ -767,6 +835,7 @@
     myNameLabel.textContent = me ? ("Przypisane do: " + me) : "";
     updateManagerOwnerSelect();
     scoreKPIs(me);
+    renderManagerCards(); // kafelki PH / menedżera
     applyFilters();
     renderTable();
   }
@@ -795,7 +864,9 @@
       account=null; who.textContent=""; setStatus("Wylogowano."); }catch(e){ showError("Wylogowanie nieudane: " + (e.message||e)); }
   });
   document.getElementById("btnReload").addEventListener("click", async ()=>{ try{ await ensureLogin(); await loadData(); }catch(e){ showError(e.message||e); } });
-  document.getElementById("btnApply").addEventListener("click", ()=>{ scoreAndRender(); });
+  document.getElementById("btnApply").addEventListener("click", ()=>{ phDueOverride=null; scoreAndRender(); });
+  // zmiana scalonego selecta: wyczyść phDueOverride
+  (function(){ const s=document.getElementById('fltScopeUnified'); if(s){ s.addEventListener('change', ()=>{ phDueOverride=null; }); }})();
 
   // dropdown statusów
   const dd = document.getElementById('ddStatus');
