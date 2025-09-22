@@ -533,14 +533,10 @@ Długość geograficzna: ${isFinite(rec.lon)?rec.lon:""}
 `Dzień dobry ${nazwa},
 
 Serdecznie dziękujemy za przesłanie zgłoszenia za pośrednictwem platformy SIDUSIS.
-
-Informujemy, że zapytanie dotyczące możliwości podłączenia Internetu w lokalizacji ${adresBezMiasta}${miasto ? ', ' + miasto : ''} zostało przekazane do Działu Inwestycji celem przygotowania indywidualnej wyceny.
-
+Informujemy, że zapytanie dotyczące możliwości podłączenia Internetu w lokalizacji ${adresBezMiasta}${cityPartForSubject} zostało przekazane do Działu Inwestycji celem przygotowania indywidualnej wyceny.
 Odpowiedź prześlę nie później niż w ciągu 3 dni roboczych.
 
 W przypadku jakichkolwiek pytań – pozostaję do dyspozycji.
-
-Z wyrazami szacunku,
 `;
 
     const body_std =
@@ -548,9 +544,7 @@ Z wyrazami szacunku,
 
 W odpowiedzi na przesłane zapytanie poniżej przesyłam ofertę na podłączenie Prywatnego Światłowodu The Network:
 
-Jednorazowy koszt instalacji wynosi 2500 zł (możliwość rozłożenia na 10 równych płatności po 250 zł)
-- Płatność po uruchomieniu usługi - Brak zaliczki / przedpłaty.
-
+Jednorazowy koszt instalacji wynosi 2500 zł (możliwość rozłożenia na 10 równych płatności po 250 zł)- Płatność po uruchomieniu usługi - Brak zaliczki / przedpłaty.
 Abonament miesięczny zależny jest od prędkości łącza:
 300/300Mbs - 125 zł
 1000/1000Mbs - 150 zł
@@ -560,22 +554,61 @@ lista kanałów: https://thenetwork.pl/telewizja/
 
 - Światłowód wprowadzany jest do pierwszego możliwego punktu w domu,
 - W miejscu, do którego zostanie doprowadzony światłowód niezbędne jest zasilanie dla urządzenia optycznego ONU.
-- Infrastruktura wewnętrzna pozostaje w gestii właściciela posesji.
-Umowa: 24 miesiące.
+- Infrastruktura wewnętrzna pozostaje w gestii właściciela posesji (sieć LAN oraz wifi).
+Umowa zawierana jest na 24 miesiące.
 
-W przypadku akceptacji proszę o dane do umowy (Imię i nazwisko, adres, PESEL, e-mail, tel., pakiet TV, prędkość).
+Celem przygotowania umowy proszę o przesłanie poniższych danych:
+
+Nazwisko i Imie ..............................
+adres...........................
+PESEL: .................
+mail......................
+TEL................................
+Pakiet TV: ............................
+Prędkość: ................................
+ 
+Jakie są następne kroki?
+Po otrzymaniu danych przygotujemy umowę on-line, która zostanie wysłana w oddzielnej wiadomości.
+Następnie po zaakceptowaniu umowy Zostaną Państwo wpisani na listę do realizacji dla wykonawcy. Po wykonaniu przyłącza domowego oraz połączeniu go z główną magistralą Biuro Obsługi Klienta kontaktuje się z Państwem celem ustalenia dogodnego terminu uruchomienia usługi.
+Ostatni etap to wizyta technika, podczas której zostaje uruchomiona usługa. Po tej wizycie w Panelu Klienta pojawi się pierwsza faktura.
+ 
+W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
 `;
 
     const body_dev =
 `Dzień dobry,
 
-W odpowiedzi na zapytanie – oferta deweloperska:
-Jednorazowy koszt instalacji: 1 zł
-Abonament: 300/300Mbs – 89 zł, 1000/1000Mbs – 114 zł
-TV 82 – 10 zł, TV 177 – 69 zł
-lista kanałów: https://thenetwork.pl/telewizja/
+W odpowiedzi na przesłane zapytanie poniżej przesyłam ofertę na podłączenie Prywatnego Światłowodu The Network:
+Jednorazowy koszt instalacji wynosi 1 zł
+Abonament miesięczny zależny jest od prędkości łącza:
+300/300Mbs - 89 zł
+1000/1000Mbs - 114 zł
+TV 82 - 10 zł (Telewizja po łączu internetowym)
+TV 177 – 69 zł (Telewizja po łączu internetowym)
+lista kanałów: 
+https://thenetwork.pl/telewizja/
 
-Pozostałe informacje jak w ofercie standardowej.
+- Światłowód wprowadzany jest do pierwszego możliwego punktu w domu,
+- W miejscu, do którego zostanie doprowadzony światłowód niezbędne jest zasilanie dla urządzenia optycznego ONU.
+- Infrastruktura wewnętrzna pozostaje w gestii właściciela posesji (sieć LAN oraz wifi).
+Umowa zawierana jest na 24 miesiące.
+
+Celem przygotowania umowy proszę o przesłanie poniższych danych:
+
+Nazwisko i Imie ..............................
+adres...........................
+PESEL: .................
+mail......................
+TEL................................
+Pakiet TV: ............................
+Prędkość: ................................
+
+Jakie są następne kroki?
+Biuro Obsługi Klienta przygotowuje umowę on-line, która zostanie wysłana w oddzielnej wiadomości.
+Następnie po zaakceptowaniu umowy Biuro Obsługi Klienta kontaktuje się z Państwem celem ustalenia dogodnego terminu uruchomienia usługi.
+Ostatni etap to wizyta technika, podczas której zostaje uruchomiona usługa. Po tej wizycie w Panelu Klienta pojawi się pierwsza faktura.
+
+W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
 `;
 
     return {
