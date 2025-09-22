@@ -690,12 +690,13 @@
 
   /* =========================== ZAŁADUJ MSAL =========================== */
   try { await loadScriptSequential(MSAL_CDNS); }
-  catch(e){ alert('Nie udało się załadować msal-browser (alcdn/jsDelivr/unpkg).'); console.error(e); return; }
-  if (typeof msal === 'undefined' || !msal.PublicClientApplication){ alert('MSAL nie jest dostępny.'); return; }
+  catch(e){ console.warn('MSAL script load failed (alcdn/jsDelivr/unpkg).', e); }
+  if (typeof msal === 'undefined' || !msal.PublicClientApplication){ console.warn('MSAL not available at startup.'); }
 
   /* =========================== MSAL / GRAPH =========================== */
   let authInProgress = false;
-  const msalApp = new msal.PublicClientApplication({
+  let msalApp = null;
+  if (typeof msal !== 'undefined' && msal.PublicClientApplication){ msalApp = new msal.PublicClientApplication({
     auth: {
       clientId: CONFIG.clientId,
       authority: "https://login.microsoftonline.com/" + CONFIG.tenantId,
@@ -703,10 +704,24 @@
     },
     cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false },
     system: { loggerOptions: { loggerCallback: (l, m)=>console.log("[MSAL]", m) } }
-  });
+  }); }
   const graphScopes = ["openid","profile","offline_access","Files.ReadWrite.All","Sites.Read.All"];
 
   async function ensureLogin(){
+  // Lazy init MSAL if needed
+  if(!msalApp){
+    try { await loadScriptSequential(MSAL_CDNS); } catch(e){ console.warn('MSAL retry load failed:', e); }
+    if (typeof msal !== 'undefined' && msal.PublicClientApplication){
+      try{
+        msalApp = new msal.PublicClientApplication({
+          auth: { clientId: CONFIG.clientId, authority: "https://login.microsoftonline.com/" + CONFIG.tenantId, redirectUri: "https://adiice.github.io/mapa-sidusis/mapa.html" },
+          cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false },
+          system: { loggerOptions: { loggerCallback: (l, m)=>console.log("[MSAL]", m) } }
+        });
+      }catch(e){ console.warn('MSAL init retry failed:', e); }
+    }
+    if(!msalApp){ showError('MSAL niedost�pny. Sprawd� po��czenie i spr�buj ponownie.'); return; }
+  }
   // jeśli już mamy konto – nic nie rób
   const accs = msalApp.getAllAccounts();
   if (accs.length) {
@@ -730,6 +745,8 @@
 }
 
 async function getToken(){
+  if(!msalApp){ await ensureLogin(); }
+  if(!msalApp){ throw new Error('MSAL niedost�pny'); }
   // spróbuj cicho, jeśli nie wyjdzie – popup tylko, gdy faktycznie wymagany
   const acc = msalApp.getAllAccounts()[0] || account;
   if (acc) account = acc;
@@ -1161,7 +1178,7 @@ async function getToken(){
   /* =========================== UI =========================== */
   $("#btnLogin").addEventListener('click', async ()=>{ try{ await ensureLogin(); setStatus("Zalogowano."); updateMissingPanel(); }catch(err){ showError("Logowanie nieudane: " + (err.message||err)); } });
   $("#btnLogout").addEventListener('click', async ()=>{
-    try{ const acc = msalApp.getAllAccounts()[0]; if(acc){ await msalApp.logoutPopup({ account: acc }); }
+    try{ const acc = msalApp ? msalApp.getAllAccounts()[0] : null; if(acc){ await msalApp.logoutPopup({ account: acc }); }
       account=null; who.textContent=""; setStatus("Wylogowano."); updateMissingPanel(); }catch(err){ showError("Wylogowanie nieudane: " + (err.message||err)); }
   });
   $("#btnReload").addEventListener('click', async ()=>{
@@ -1171,7 +1188,7 @@ async function getToken(){
       await getSiteId(); await getFileItemId();
       await loadDataFromExcel(); applyMiniFilters(); rebuild();
     } catch(err){ showError(err.message||err); }
-  });
+  }); }
 
   $("#mfApply").addEventListener('click', ()=>{ applyMiniFilters(); rebuild(); });
 
@@ -1185,7 +1202,7 @@ async function getToken(){
   attachToggle("legend","tgLegend","legend");
   setStatus(DEFAULT_STATUS);
   window.addEventListener('unhandledrejection', e=>showError(e.reason?.message||e.reason||"Błąd"));
-  msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e));
+  (msalApp && msalApp.handleRedirectPromise ? msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e)) : void 0);
 })();
 </script>
 <div class="credit">Autor: Adrian Daniel</div>
