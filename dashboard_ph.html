@@ -313,6 +313,20 @@
     return a;
   }
 
+  // rola: menedżer = UPN lub członkostwo w grupie "SalesManagers" (jeśli claims dostępne)
+  function isManager(){
+    try{
+      const upn = String(account?.username||"").toLowerCase();
+      if(upn === "adaniel@internetunion.pl") return true;
+      const claims = account?.idTokenClaims || {};
+      const arr = []
+        .concat(Array.isArray(claims.memberOf)?claims.memberOf:(claims.memberOf?[claims.memberOf]:[]))
+        .concat(Array.isArray(claims.groups)?claims.groups:(claims.groups?[claims.groups]:[]))
+        .concat(Array.isArray(claims.roles)?claims.roles:(claims.roles?[claims.roles]:[]));
+      return arr.some(v=>String(v||"").toLowerCase().includes("salesmanagers"));
+    }catch{ return false; }
+  }
+
   /* ========== STATE ========== */
   let account=null, siteId=null, fileId=null;
   let rows=[], frows=[];
