@@ -303,6 +303,53 @@
     return null;
   }
 
+  // === Daty lokalne i formatowanie ===
+  function todayLocal(){ const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+  function addDays(d, days){ const base = new Date(d.getFullYear(), d.getMonth(), d.getDate()); base.setDate(base.getDate() + (Number(days)||0)); return base; }
+  function fmtYMD(d){ if(!d) return ""; const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; }
+
+  // === Reguły NextContactAt (w tle) ===
+  let STATUS_RULES = null; // { [status]: { nextDays:number, nextFrom:'createdAt'|'LastTouchAt'|'today' } }
+  async function loadStatusRules(){
+    try{
+      const resp = await fetch('assets/status_rules.json?v=' + Date.now(), { cache:'no-store' });
+      if(resp.ok){ STATUS_RULES = await resp.json(); }
+    }catch(e){ console.warn('status_rules.json – fallback na domyślne:', e); }
+  }
+  function computeNextContactAt(rec, newStatus){
+    const status = String(newStatus || rec?.Status || '').trim();
+    const NO_REM = new Set([ 'Odmowa klienta', 'Poza Zasięgiem', 'KPO', 'Akceptacja klienta' ]);
+    if(!status) return { nextAt: null, reasonText: 'brak statusu (bez terminu)' };
+    if(NO_REM.has(status)) return { nextAt: null, reasonText: `${status} (bez terminu)` };
+
+    const FALLBACK = {
+      'Wycena Inwestycji': { nextDays: 3, nextFrom: 'today' },
+      'Oferta wysłana':    { nextDays: 7, nextFrom: 'today' },
+      'Zapytanie o wycenę':{ nextDays: 2, nextFrom: 'today' }
+    };
+    // Kolumny Next/Last (nagłówki zgodne z dashboard_ph)
+    H.next = H.next || pickHeader(headers,["nextcontactat","następny kontakt","nastepny kontakt","nast. kontakt","nast kontakt"]);
+    H.last = H.last || pickHeader(headers,["lasttouchat","ostatni kontakt","last touch","ostatni kontakt at"]);
+    const rule = (STATUS_RULES && STATUS_RULES[status]) || FALLBACK[status];
+    if(!rule){ return { nextAt: null, reasonText: `${status} (bez terminu)` }; }
+
+    let base;
+    switch(String(rule.nextFrom||'today')){
+      case 'createdAt': base = rec?.createdAt || todayLocal(); break;
+      case 'LastTouchAt': base = rec?.LastTouchAt || todayLocal(); break;
+      default: base = todayLocal();
+    }
+
+    // Upewnij się, że kolumny NextContactAt i LastTouchAt istnieją
+    let idxNEXT = headers.findIndex(h=>String(h||"").toLowerCase().trim()==="nextcontactat");
+    if(idxNEXT<0){ idxNEXT = headers.length; headers.push("NextContactAt"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+    let idxLAST = headers.findIndex(h=>String(h||"").toLowerCase().trim()==="lasttouchat");
+    if(idxLAST<0){ idxLAST = headers.length; headers.push("LastTouchAt"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+    const nd = Number(rule.nextDays)||0;
+    const nextAt = addDays(base, nd);
+    return { nextAt, reasonText: `${status} (+${nd}d)` };
+  }
+
   /* === UI collapsibles === */
   const UI_STATE_KEY = "uiCollapsed_v1";
   const UI_STATE = (()=>{ try{ return JSON.parse(localStorage.getItem(UI_STATE_KEY)) || {toolbar:false, filters:false, legend:false}; } catch{ return {toolbar:false, filters:false, legend:false}; } })();
@@ -385,6 +432,7 @@
     const showReason = (rec.Status||"").trim()==="Odmowa klienta";
     const reasonInfo = rec.PowodOdmowy ? (', Powód = <b>' + esc(rec.PowodOdmowy) + '</b>') : '';
 
+    const nextInfo = rec.NextContactAt ? fmtYMD(rec.NextContactAt) : '—';
     return `<div class="popup">
   <h4>${esc(rec.nazwa||'')}</h4>
   ${esc(rec.adres_pelny||'')}<br/>
@@ -404,6 +452,7 @@
   </div>
 
   <div class="meta"><b>Aktualnie:</b> PH = <b>${esc(rec.PH||'-')}</b>, Status = <b>${esc(rec.Status||'-')}</b>${reasonInfo}</div>
+  <div class="meta"><b>Nast. kontakt:</b> ${nextInfo}</div>
   <div class="row" id="notesRow">
     <label style="align-self:flex-start;">Uwagi PH:</label>
     <textarea id="noteText" rows="3" style="flex:1;min-width:280px">${esc(rec.Uwagi||"")}</textarea>
@@ -437,12 +486,15 @@
         if(st === "Odmowa klienta" && !reason){ alert("Wybierz Powód odmowy."); return; }
         try{
           setStatus("Zapis do Excela…");
-          await savePhStatus(rec, ph, st, reason);
+          const res = await savePhStatus(rec, ph, st, reason);
           rec.PH = ph; rec.Status = st; rec.PowodOdmowy = reason;
+          rec.LastTouchAt = res?.lastTouchAt || todayLocal();
+          rec.NextContactAt = res?.nextContactAt || null;
           m.setIcon(makeIcon(rec));
           m.setPopupContent(buildPopup(rec));
           m.openPopup();
-          setStatus("Zapisano.", { autoClearMs: 2500 });
+          const hasNext = !!rec.NextContactAt;
+          setStatus("Zapisano." + (hasNext ? " (+ NextContactAt)" : ""), { autoClearMs: 2500 });
         }catch(err){ showError("Błąd zapisu: " + (err.message||err)); setStatus("Błąd zapisu."); }
       });
 
@@ -847,7 +899,9 @@ async function getToken(){
         nazwa: String(get(r,H.nazwa)||""),
         miejscowosc: String(get(r,H.msc)||""),
         PowodOdmowy: String(get(r,H.powod)||""),
-        Uwagi: String(get(r,H.notes)||"")
+        Uwagi: String(get(r,H.notes)||""),
+        NextContactAt: toDate(get(r,H.next)) || null,
+        LastTouchAt: toDate(get(r,H.last)) || null
       };
     });
 
@@ -980,13 +1034,20 @@ async function getToken(){
     const a1PH     = `${colLetter(idxPH+1)}${row1}`;
     const a1ST     = `${colLetter(idxST+1)}${row1}`;
     const a1REASON = (idxRS>=0) ? `${colLetter(idxRS+1)}${row1}` : null;
+    const a1NEXT   = `${colLetter(idxNEXT+1)}${row1}`;
+    const a1LAST   = `${colLetter(idxLAST+1)}${row1}`;
 
     await ensureAuditHeaders();
     const nextLog = await getNextLogRow();
     const logA1   = `A${nextLog}:${colLetter(AUDIT_HEADERS.length)}${nextLog}`;
     const now     = new Date().toISOString();
     const upn     = (account && (account.username||account.homeAccountId)) || "";
-    const logRow  = [ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}|${newReason||""}`, "" ];
+    const nowLocal = todayLocal();
+    const comp = computeNextContactAt(rec, newStatus);
+    const willWriteNext = (String(oldST||"").trim() !== String(newStatus||"").trim()) || !(rec.NextContactAt);
+    const nextCellValue = willWriteNext ? (comp.nextAt ? fmtYMD(comp.nextAt) : "") : null; // null => bez zmian
+    const noteNextText = willWriteNext ? (nextCellValue||'—') : (rec.NextContactAt ? fmtYMD(rec.NextContactAt) : '—');
+    const logRow  = [ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}|${newReason||""}`, `NextContactAt=${noteNextText}; LastTouchAt=${fmtYMD(nowLocal)}; rule: ${comp.reasonText}` ];
 
     const requests = [
       { id: "ph", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1PH}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ newPH || "" ]] } },
@@ -995,10 +1056,17 @@ async function getToken(){
     if (a1REASON){
       requests.push({ id: "reason", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1REASON}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ newReason || "" ]] } });
     }
+    // LastTouchAt zawsze dziś
+    requests.push({ id: "last", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1LAST}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ fmtYMD(nowLocal) ]] } });
+    // NextContactAt wg reguł (tylko gdy zmiana statusu lub było puste)
+    if(nextCellValue!==null){
+      requests.push({ id: "next", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1NEXT}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ nextCellValue ]] } });
+    }
     const wsqLog = CONFIG.logSheet.replace(/'/g,"''");
     requests.push({ id: "log", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqLog}')/range(address='${logA1}')`, headers: { "Content-Type": "application/json" }, body: { values: [ logRow ] } });
 
     await gBatch(requests);
+    return { lastTouchAt: nowLocal, nextContactAt: (nextCellValue!==null ? (comp.nextAt || null) : (rec.NextContactAt || null)), wroteNext: (nextCellValue!==null) };
   }
 
   async function saveUwagi(rec, newNotes){
@@ -1099,7 +1167,7 @@ async function getToken(){
   $("#btnReload").addEventListener('click', async ()=>{
     try{
       await ensureLogin();
-      await loadLists();  renderLegend();
+      await loadLists();  await loadStatusRules(); renderLegend();
       await getSiteId(); await getFileItemId();
       await loadDataFromExcel(); applyMiniFilters(); rebuild();
     } catch(err){ showError(err.message||err); }
@@ -1109,6 +1177,7 @@ async function getToken(){
 
   /* =========================== START =========================== */
   await loadLists();
+  await loadStatusRules();
   initMap();
   renderLegend();
   attachToggle("toolbarBox","tgToolbar","toolbar");
