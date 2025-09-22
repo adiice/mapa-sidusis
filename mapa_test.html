@@ -44,7 +44,6 @@
     font-size:13px; display:none;
   }
 
-  /* Mini-filtry */
   .mini-filter{
     position: fixed; left:12px; top:12px; z-index:10001;
     display:flex; gap:6px; align-items:flex-end; flex-wrap:wrap;
@@ -56,11 +55,7 @@
   .mini-filter button{ padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#eef2ff; cursor:pointer; }
   .mini-filter label{ font-size:12px; color:#64748b; margin-bottom:4px; }
 
-  /* Znacznik */
-  .dot{
-    width:18px; height:18px; border-radius:50%;
-    border:3px solid #999; box-sizing:border-box; background:#777;
-  }
+  .dot{ width:18px; height:18px; border-radius:50%; border:3px solid #999; box-sizing:border-box; background:#777; }
   .dot.badge::after{
     content:"!"; position:absolute; top:-6px; right:-6px;
     width:14px; height:14px; font-size:10px; color:#fff; background:#ef4444;
@@ -68,7 +63,6 @@
     border:1px solid rgba(0,0,0,.2);
   }
 
-  /* Collapsibles */
   .collapsible { display: inline-block; box-sizing: border-box; }
   .collapsible .toggle{
     position:absolute; top:6px; right:6px; width:24px; height:24px;
@@ -86,7 +80,6 @@
     padding:6px 10px; font-size:12px; color:#374151;
   }
 
-  /* Panel braków geolokalizacji (tylko dla adaniel@...) */
   .missingBox{
     position: fixed; left: 12px; bottom: 12px; z-index: 10002;
     background:#fff; border:1px solid #ddd; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,.08);
@@ -94,10 +87,7 @@
   }
   .missingBox .hd{ padding:10px 12px; font-weight:600; border-bottom:1px solid #eee; }
   .missingBox .bd{ padding:8px 12px; max-height:220px; overflow:auto; font-size:12px; }
-  .missingBox .toggle{
-    position:absolute; top:6px; right:6px; width:24px; height:24px;
-    border:1px solid #cbd5e1; border-radius:999px; background:#f8fafc; cursor:pointer;
-  }
+  .missingBox .toggle{ position:absolute; top:6px; right:6px; width:24px; height:24px; border:1px solid #cbd5e1; border-radius:999px; background:#f8fafc; cursor:pointer; }
   .missingBox.collapsed .bd{ display:none; }
 </style>
 
@@ -260,7 +250,7 @@
     REJECTION_REASONS = Array.isArray(LISTS.rejectionReasons) ? LISTS.rejectionReasons.slice() : DEFAULT_LISTS.rejectionReasons.slice();
     EXCLUDED_STATUSES = new Set(Array.isArray(LISTS.excluded) ? LISTS.excluded : DEFAULT_LISTS.excluded);
     const phColors = LISTS.phColors || {};
-	PH_COLOR_MAP = { ...buildPhColorMap(PH_LIST), ...phColors };
+    PH_COLOR_MAP = { ...buildPhColorMap(PH_LIST), ...phColors };
   }
 
   function canonStatus(s){
@@ -316,6 +306,7 @@
       if(resp.ok){ STATUS_RULES = await resp.json(); }
     }catch(e){ console.warn('status_rules.json – fallback na domyślne:', e); }
   }
+
   function computeNextContactAt(rec, newStatus){
     const status = String(newStatus || rec?.Status || '').trim();
     const NO_REM = new Set([ 'Odmowa klienta', 'Poza Zasięgiem', 'KPO', 'Akceptacja klienta' ]);
@@ -327,24 +318,15 @@
       'Oferta wysłana':    { nextDays: 7, nextFrom: 'today' },
       'Zapytanie o wycenę':{ nextDays: 2, nextFrom: 'today' }
     };
-    // Kolumny Next/Last (nagłówki zgodne z dashboard_ph)
-    H.next = H.next || pickHeader(headers,["nextcontactat","następny kontakt","nastepny kontakt","nast. kontakt","nast kontakt"]);
-    H.last = H.last || pickHeader(headers,["lasttouchat","ostatni kontakt","last touch","ostatni kontakt at"]);
     const rule = (STATUS_RULES && STATUS_RULES[status]) || FALLBACK[status];
     if(!rule){ return { nextAt: null, reasonText: `${status} (bez terminu)` }; }
 
     let base;
     switch(String(rule.nextFrom||'today')){
-      case 'createdAt': base = rec?.createdAt || todayLocal(); break;
+      case 'createdAt':   base = rec?.createdAt || todayLocal(); break;
       case 'LastTouchAt': base = rec?.LastTouchAt || todayLocal(); break;
-      default: base = todayLocal();
+      default:            base = todayLocal();
     }
-
-    // Upewnij się, że kolumny NextContactAt i LastTouchAt istnieją
-    let idxNEXT = headers.findIndex(h=>String(h||"").toLowerCase().trim()==="nextcontactat");
-    if(idxNEXT<0){ idxNEXT = headers.length; headers.push("NextContactAt"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
-    let idxLAST = headers.findIndex(h=>String(h||"").toLowerCase().trim()==="lasttouchat");
-    if(idxLAST<0){ idxLAST = headers.length; headers.push("LastTouchAt"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
     const nd = Number(rule.nextDays)||0;
     const nextAt = addDays(base, nd);
     return { nextAt, reasonText: `${status} (+${nd}d)` };
@@ -529,10 +511,10 @@
         a.addEventListener('click', ev=>{
           ev.preventDefault();
           const key = a.getAttribute('data-mail');
-		  const t = mailTemplates(rec)[key];
-			if (!t) { alert("Nie mogę przygotować tego maila."); return; }
-			if (!t.to) { alert("Brak adresu e-mail odbiorcy."); return; }
-			composeAndSend(t.to, t.subject, t.body);
+          const t = mailTemplates(rec)[key];
+          if (!t) { alert("Nie mogę przygotować tego maila."); return; }
+          if (!t.to) { alert("Brak adresu e-mail odbiorcy."); return; }
+          composeAndSend(t.to, t.subject, t.body);
         });
       });
     });
@@ -568,7 +550,7 @@
 
     const adresBezMiasta = hasCityAtEnd ? adres.replace(reCityAtEnd,"").replace(/,\s*$/,"").trim() : adres;
     const adresZMiastem  = hasCityAtEnd ? adres : (miasto ? `${adres}, ${miasto}` : adres);
-	const cityPartForSubject = miasto ? `, ${miasto}` : "";
+    const cityPartForSubject = miasto ? `, ${miasto}` : "";
 
     const subj_inv = `Zapytanie o wycenę - ${adresZMiastem} - SIDUSIS`;
     const subj_cli = `Internet światłowodowy - The Network - ${adresZMiastem}`;
@@ -576,97 +558,97 @@
     const subj_dev = subj_cli;
 
     const body_inv =
-	`Proszę o wycenę podłączenia klienta:
-	Nazwa: ${nazwa}
-	Miasto: ${miasto}
-	Adres: ${adresBezMiasta}
-	Telefon: ${tel}
-	E-mail: ${email}
-	Szerokość geograficzna: ${isFinite(rec.lat)?rec.lat:""}
-	Długość geograficzna: ${isFinite(rec.lon)?rec.lon:""}
-	`;
+`Proszę o wycenę podłączenia klienta:
+Nazwa: ${nazwa}
+Miasto: ${miasto}
+Adres: ${adresBezMiasta}
+Telefon: ${tel}
+E-mail: ${email}
+Szerokość geograficzna: ${isFinite(rec.lat)?rec.lat:""}
+Długość geograficzna: ${isFinite(rec.lon)?rec.lon:""}
+`;
 
     const body_cli =
-	`Dzień dobry ${nazwa},
+`Dzień dobry ${nazwa},
 
-	Serdecznie dziękujemy za przesłanie zgłoszenia za pośrednictwem platformy SIDUSIS.
-	Informujemy, że zapytanie dotyczące możliwości podłączenia Internetu w lokalizacji ${adresBezMiasta}${cityPartForSubject} zostało przekazane do Działu Inwestycji celem przygotowania indywidualnej wyceny.
-	Odpowiedź prześlę nie później niż w ciągu 3 dni roboczych.
+Serdecznie dziękujemy za przesłanie zgłoszenia za pośrednictwem platformy SIDUSIS.
+Informujemy, że zapytanie dotyczące możliwości podłączenia Internetu w lokalizacji ${adresBezMiasta}${cityPartForSubject} zostało przekazane do Działu Inwestycji celem przygotowania indywidualnej wyceny.
+Odpowiedź prześlę nie później niż w ciągu 3 dni roboczych.
 
-	W przypadku jakichkolwiek pytań – pozostaję do dyspozycji.
-	`;
+W przypadku jakichkolwiek pytań – pozostaję do dyspozycji.
+`;
 
     const body_std =
-	`Dzień dobry,
+`Dzień dobry,
 
-	W odpowiedzi na przesłane zapytanie poniżej przesyłam ofertę na podłączenie Prywatnego Światłowodu The Network:
+W odpowiedzi na przesłane zapytanie poniżej przesyłam ofertę na podłączenie Prywatnego Światłowodu The Network:
 
-	Jednorazowy koszt instalacji wynosi 2500 zł (możliwość rozłożenia na 10 równych płatności po 250 zł)- Płatność po uruchomieniu usługi - Brak zaliczki / przedpłaty.
-	Abonament miesięczny zależny jest od prędkości łącza:
-	300/300Mbs - 125 zł
-	1000/1000Mbs - 150 zł
-	TV 82 - 10 zł
-	TV 177 – 69 zł
-	lista kanałów: https://thenetwork.pl/telewizja/
+Jednorazowy koszt instalacji wynosi 2500 zł (możliwość rozłożenia na 10 równych płatności po 250 zł)- Płatność po uruchomieniu usługi - Brak zaliczki / przedpłaty.
+Abonament miesięczny zależny jest od prędkości łącza:
+300/300Mbs - 125 zł
+1000/1000Mbs - 150 zł
+TV 82 - 10 zł
+TV 177 – 69 zł
+lista kanałów: https://thenetwork.pl/telewizja/
 
-	- Światłowód wprowadzany jest do pierwszego możliwego punktu w domu,
-	- W miejscu, do którego zostanie doprowadzony światłowód niezbędne jest zasilanie dla urządzenia optycznego ONU.
-	- Infrastruktura wewnętrzna pozostaje w gestii właściciela posesji (sieć LAN oraz wifi).
-	Umowa zawierana jest na 24 miesiące.
+- Światłowód wprowadzany jest do pierwszego możliwego punktu w domu,
+- W miejscu, do którego zostanie doprowadzony światłowód niezbędne jest zasilanie dla urządzenia optycznego ONU.
+- Infrastruktura wewnętrzna pozostaje w gestii właściciela posesji (sieć LAN oraz wifi).
+Umowa zawierana jest na 24 miesiące.
 
-	Celem przygotowania umowy proszę o przesłanie poniższych danych:
+Celem przygotowania umowy proszę o przesłanie poniższych danych:
 
-	Nazwisko i Imie ..............................
-	adres...........................
-	PESEL: .................
-	mail......................
-	TEL................................
-	Pakiet TV: ............................
-	Prędkość: ................................
+Nazwisko i Imie ..............................
+adres...........................
+PESEL: .................
+mail......................
+TEL................................
+Pakiet TV: ............................
+Prędkość: ................................
 
-	Jakie są następne kroki?
-	Po otrzymaniu danych przygotujemy umowę on-line, która zostanie wysłana w oddzielnej wiadomości.
-	Następnie po zaakceptowaniu umowy Zostaną Państwo wpisani na listę do realizacji dla wykonawcy. Po wykonaniu przyłącza domowego oraz połączeniu go z główną magistralą Biuro Obsługi Klienta kontaktuje się z Państwem celem ustalenia dogodnego terminu uruchomienia usługi.
-	Ostatni etap to wizyta technika, podczas której zostaje uruchomiona usługa. Po tej wizycie w Panelu Klienta pojawi się pierwsza faktura.
+Jakie są następne kroki?
+Po otrzymaniu danych przygotujemy umowę on-line, która zostanie wysłana w oddzielnej wiadomości.
+Następnie po zaakceptowaniu umowy Zostaną Państwo wpisani na listę do realizacji dla wykonawcy. Po wykonaniu przyłącza domowego oraz połączeniu go z główną magistralą Biuro Obsługi Klienta kontaktuje się z Państwem celem ustalenia dogodnego terminu uruchomienia usługi.
+Ostatni etap to wizyta technika, podczas której zostaje uruchomiona usługa. Po tej wizycie w Panelu Klienta pojawi się pierwsza faktura.
 
-	W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
-	`;
+W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
+`;
 
     const body_dev =
-	`Dzień dobry,
+`Dzień dobry,
 
-	W odpowiedzi na przesłane zapytanie poniżej przesyłam ofertę na podłączenie Prywatnego Światłowodu The Network:
-	Jednorazowy koszt instalacji wynosi 1 zł
-	Abonament miesięczny zależny jest od prędkości łącza:
-	300/300Mbs - 89 zł
-	1000/1000Mbs - 114 zł
-	TV 82 - 10 zł (Telewizja po łączu internetowym)
-	TV 177 – 69 zł (Telewizja po łączu internetowym)
-	lista kanałów: 
-	https://thenetwork.pl/telewizja/
+W odpowiedzi na przesłane zapytanie poniżej przesyłam ofertę na podłączenie Prywatnego Światłowodu The Network:
+Jednorazowy koszt instalacji wynosi 1 zł
+Abonament miesięczny zależny jest od prędkości łącza:
+300/300Mbs - 89 zł
+1000/1000Mbs - 114 zł
+TV 82 - 10 zł (Telewizja po łączu internetowym)
+TV 177 – 69 zł (Telewizja po łączu internetowym)
+lista kanałów: 
+https://thenetwork.pl/telewizja/
 
-	- Światłowód wprowadzany jest do pierwszego możliwego punktu w domu,
-	- W miejscu, do którego zostanie doprowadzony światłowód niezbędne jest zasilanie dla urządzenia optycznego ONU.
-	- Infrastruktura wewnętrzna pozostaje w gestii właściciela posesji (sieć LAN oraz wifi).
-	Umowa zawierana jest na 24 miesiące.
+- Światłowód wprowadzany jest do pierwszego możliwego punktu w domu,
+- W miejscu, do którego zostanie doprowadzony światłowód niezbędne jest zasilanie dla urządzenia optycznego ONU.
+- Infrastruktura wewnętrzna pozostaje w gestii właściciela posesji (sieć LAN oraz wifi).
+Umowa zawierana jest na 24 miesiące.
 
-	Celem przygotowania umowy proszę o przesłanie poniższych danych:
+Celem przygotowania umowy proszę o przesłanie poniższych danych:
 
-	Nazwisko i Imie ..............................
-	adres...........................
-	PESEL: .................
-	mail......................
-	TEL................................
-	Pakiet TV: ............................
-	Prędkość: ................................
+Nazwisko i Imie ..............................
+adres...........................
+PESEL: .................
+mail......................
+TEL................................
+Pakiet TV: ............................
+Prędkość: ................................
 
-	Jakie są następne kroki?
-	Biuro Obsługi Klienta przygotowuje umowę on-line, która zostanie wysłana w oddzielnej wiadomości.
-	Następnie po zaakceptowaniu umowy Biuro Obsługi Klienta kontaktuje się z Państwem celem ustalenia dogodnego terminu uruchomienia usługi.
-	Ostatni etap to wizyta technika, podczas której zostaje uruchomiona usługa. Po tej wizycie w Panelu Klienta pojawi się pierwsza faktura.
+Jakie są następne kroki?
+Biuro Obsługi Klienta przygotowuje umowę on-line, która zostanie wysłana w oddzielnej wiadomości.
+Następnie po zaakceptowaniu umowy Biuro Obsługi Klienta kontaktuje się z Państwem celem ustalenia dogodnego terminu uruchomienia usługi.
+Ostatni etap to wizyta technika, podczas której zostaje uruchomiona usługa. Po tej wizycie w Panelu Klienta pojawi się pierwsza faktura.
 
-	W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
-	`;
+W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
+`;
 
     return {
       INV: { to: "inwestycje@internetunion.pl", subject: subj_inv, body: body_inv },
@@ -708,73 +690,74 @@
   const graphScopes = ["openid","profile","offline_access","Files.ReadWrite.All","Sites.Read.All"];
 
   async function ensureLogin(){
-  // Lazy init MSAL if needed
-  if(!msalApp){
-    try { await loadScriptSequential(MSAL_CDNS); } catch(e){ console.warn('MSAL retry load failed:', e); }
-    if (typeof msal !== 'undefined' && msal.PublicClientApplication){
-      try{
-        msalApp = new msal.PublicClientApplication({
-          auth: { clientId: CONFIG.clientId, authority: "https://login.microsoftonline.com/" + CONFIG.tenantId, redirectUri: "https://adiice.github.io/mapa-sidusis/mapa.html" },
-          cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false },
-          system: { loggerOptions: { loggerCallback: (l, m)=>console.log("[MSAL]", m) } }
-        });
-      }catch(e){ console.warn('MSAL init retry failed:', e); }
+    // Lazy init MSAL if needed
+    if(!msalApp){
+      try { await loadScriptSequential(MSAL_CDNS); } catch(e){ console.warn('MSAL retry load failed:', e); }
+      if (typeof msal !== 'undefined' && msal.PublicClientApplication){
+        try{
+          msalApp = new msal.PublicClientApplication({
+            auth: { clientId: CONFIG.clientId, authority: "https://login.microsoftonline.com/" + CONFIG.tenantId, redirectUri: "https://adiice.github.io/mapa-sidusis/mapa.html" },
+            cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false },
+            system: { loggerOptions: { loggerCallback: (l, m)=>console.log("[MSAL]", m) } }
+          });
+        }catch(e){ console.warn('MSAL init retry failed:', e); }
+      }
+      if(!msalApp){ showError('MSAL niedostępny. Sprawdź połączenie i spróbuj ponownie.'); return; }
     }
-    if(!msalApp){ showError('MSAL niedost�pny. Sprawd� po��czenie i spr�buj ponownie.'); return; }
-  }
-  // jeśli już mamy konto – nic nie rób
-  const accs = msalApp.getAllAccounts();
-  if (accs.length) {
-    account = accs[0];
-    who.textContent = "Zalogowano: " + (account.username || account.homeAccountId);
-    updateMissingPanel();
-    return;
-  }
+    // jeśli już mamy konto – nic nie rób
+    const accs = msalApp.getAllAccounts();
+    if (accs.length) {
+      account = accs[0];
+      who.textContent = "Zalogowano: " + (account.username || account.homeAccountId);
+      updateMissingPanel();
+      return;
+    }
 
-  // nie otwieraj 2-giego popupu naraz
-  if (authInProgress) return;
-  authInProgress = true;
-  try {
-    const r = await msalApp.loginPopup({ scopes: graphScopes, prompt: "select_account" });
-    account = r.account;
-    who.textContent = "Zalogowano: " + (account.username || account.homeAccountId);
-    updateMissingPanel();
-  } finally {
-    authInProgress = false;
-  }
-}
-
-async function getToken(){
-  if(!msalApp){ await ensureLogin(); }
-  if(!msalApp){ throw new Error('MSAL niedost�pny'); }
-  // spróbuj cicho, jeśli nie wyjdzie – popup tylko, gdy faktycznie wymagany
-  const acc = msalApp.getAllAccounts()[0] || account;
-  if (acc) account = acc;
-
-  try {
-    const r = await msalApp.acquireTokenSilent({ scopes: graphScopes, account });
-    return r.accessToken;
-  } catch (e) {
-    // tylko wtedy próbuj popup
-    const needPopup =
-      (e && (e.errorCode === "no_account_error" ||
-             e.errorCode === "no_tokens_found" ||
-             (e.errorCode && String(e.errorCode).includes("interaction_required"))));
-
-    if (!needPopup) throw e;
-
-    if (authInProgress) throw e; // poczekaj na trwającą interakcję
-
+    // nie otwieraj 2-giego popupu naraz
+    if (authInProgress) return;
     authInProgress = true;
     try {
-      const r = await msalApp.acquireTokenPopup({ scopes: graphScopes });
-      account = r.account || account;
-      return r.accessToken;
+      const r = await msalApp.loginPopup({ scopes: graphScopes, prompt: "select_account" });
+      account = r.account;
+      who.textContent = "Zalogowano: " + (account.username || account.homeAccountId);
+      updateMissingPanel();
     } finally {
       authInProgress = false;
     }
   }
-}
+
+  async function getToken(){
+    if(!msalApp){ await ensureLogin(); }
+    if(!msalApp){ throw new Error('MSAL niedostępny'); }
+    // spróbuj cicho, jeśli nie wyjdzie – popup tylko, gdy faktycznie wymagany
+    const acc = msalApp.getAllAccounts()[0] || account;
+    if (acc) account = acc;
+
+    try {
+      const r = await msalApp.acquireTokenSilent({ scopes: graphScopes, account });
+      return r.accessToken;
+    } catch (e) {
+      // tylko wtedy próbuj popup
+      const needPopup =
+        (e && (e.errorCode === "no_account_error" ||
+               e.errorCode === "no_tokens_found" ||
+               (e.errorCode && String(e.errorCode).includes("interaction_required"))));
+
+      if (!needPopup) throw e;
+
+      if (authInProgress) throw e; // poczekaj na trwającą interakcję
+
+      authInProgress = true;
+      try {
+        const r = await msalApp.acquireTokenPopup({ scopes: graphScopes });
+        account = r.account || account;
+        return r.accessToken;
+      } finally {
+        authInProgress = false;
+      }
+    }
+  }
+
   async function gfetch(method, url, body){
     const token = await getToken();
     const resp = await fetch(url, {
@@ -800,7 +783,7 @@ async function getToken(){
       const msg = (js && js.error && js.error.message) ? js.error.message : JSON.stringify(js);
       throw new Error("Batch error: " + msg);
     }
-    const bad = (js.responses || []).find(r => r.status < 200 || r.status >= 300);  /* <-- FIX */
+    const bad = (js.responses || []).find(r => r.status < 200 || r.status >= 300);
     if (bad) throw new Error("Batch subrequest failed: " + bad.status + " " + JSON.stringify(bad.body||{}));
     return js;
   }
@@ -891,7 +874,9 @@ async function getToken(){
       nazwa:pickHeader(headers,["zgłaszający","zglaszajacy","nazwa","imię","imie","nazwisko","klient","firma"]),
       adresPelny: pickHeader(headers,["adres_pelny","adres pełny","adres pelny"]),
       powod: pickHeader(headers,["powód","powod","reason","powód odmowy","powod odmowy"]),
-      notes: pickHeader(headers,["uwagi ph","uwagi","uwaga","notatki","note","notes"])
+      notes: pickHeader(headers,["uwagi ph","uwagi","uwaga","notatki","note","notes"]),
+      next:  pickHeader(headers,["nextcontactat","następny kontakt","nastepny kontakt","nast. kontakt","nast kontakt"]),
+      last:  pickHeader(headers,["lasttouchat","ostatni kontakt","last touch","ostatni kontakt at"])
     };
     const get = (r, col) => { const idx=headers.indexOf(col); return idx>=0 ? r[idx] : ""; };
 
@@ -997,13 +982,17 @@ async function getToken(){
       lon:        pickHeader(headers,["lon","longitude","długość","dlugosc","punkt (x)","x"]),
       ph:         pickHeader(headers,["ph"]),
       st:         pickHeader(headers,["status"]),
-      reason:     pickHeader(headers,["powód","powod","reason","powód odmowy","powod odmowy"])
+      reason:     pickHeader(headers,["powód","powod","reason","powód odmowy","powod odmowy"]),
+      next:       pickHeader(headers,["nextcontactat","następny kontakt","nastepny kontakt","nast. kontakt","nast kontakt"]),
+      last:       pickHeader(headers,["lasttouchat","ostatni kontakt","last touch","ostatni kontakt at"])
     };
 
-    let idxPH = headers.findIndex(h=>String(h).toLowerCase().trim()==="ph");
+    // Zapewnij kolumny wymagane do zapisu
+    let idxPH  = headers.findIndex(h=>String(h).toLowerCase().trim()==="ph");
     if(idxPH<0){ idxPH = headers.length; headers.push("PH"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
-    let idxST = headers.findIndex(h=>String(h).toLowerCase().trim()==="status");
+    let idxST  = headers.findIndex(h=>String(h).toLowerCase().trim()==="status");
     if(idxST<0){ idxST = headers.length; headers.push("Status"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+
     let idxRS = -1;
     if(newStatus==="Odmowa klienta"){
       const reasonCol = H.reason || "Powód odmowy";
@@ -1011,11 +1000,19 @@ async function getToken(){
       else idxRS = headers.indexOf(reasonCol);
     }
 
-    let row1 = Number(rec._row1) || -1, oldPH="", oldST="";
+    // NOWE: zapewnij kolumny NextContactAt i LastTouchAt
+    let idxNEXT = headers.findIndex(h=>String(h).toLowerCase().trim()==="nextcontactat");
+    if(idxNEXT<0){ idxNEXT = headers.length; headers.push("NextContactAt"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+    let idxLAST = headers.findIndex(h=>String(h).toLowerCase().trim()==="lasttouchat");
+    if(idxLAST<0){ idxLAST = headers.length; headers.push("LastTouchAt"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+
+    // Znajdź wiersz rekordu i odczytaj dotychczasowe wartości
+    let row1 = Number(rec._row1) || -1, oldPH="", oldST="", oldNext="";
     if(row1>0){
       const row = body[row1-2] || [];
       oldPH = idxPH>=0 ? String(row[idxPH]||"") : "";
       oldST = idxST>=0 ? String(row[idxST]||"") : "";
+      oldNext = idxNEXT>=0 ? String(row[idxNEXT]||"") : "";
     }else{
       const wantAddr = normAddr(rec.adres_pelny||"");
       for(let r=0; r<body.length; r++){
@@ -1038,6 +1035,7 @@ async function getToken(){
         if(row1>0){
           oldPH = idxPH>=0 ? String(row[idxPH]||"") : "";
           oldST = idxST>=0 ? String(row[idxST]||"") : "";
+          oldNext = idxNEXT>=0 ? String(row[idxNEXT]||"") : "";
           break;
         }
       }
@@ -1045,6 +1043,7 @@ async function getToken(){
       rec._row1 = row1;
     }
 
+    // Przygotuj adresy A1 do zapisu
     const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
     const wsqData = CONFIG.dataSheet.replace(/'/g,"''");
 
@@ -1054,18 +1053,25 @@ async function getToken(){
     const a1NEXT   = `${colLetter(idxNEXT+1)}${row1}`;
     const a1LAST   = `${colLetter(idxLAST+1)}${row1}`;
 
+    // Audit row
     await ensureAuditHeaders();
     const nextLog = await getNextLogRow();
     const logA1   = `A${nextLog}:${colLetter(AUDIT_HEADERS.length)}${nextLog}`;
     const now     = new Date().toISOString();
     const upn     = (account && (account.username||account.homeAccountId)) || "";
     const nowLocal = todayLocal();
+
+    // Wylicz NextContactAt wg reguł
     const comp = computeNextContactAt(rec, newStatus);
-    const willWriteNext = (String(oldST||"").trim() !== String(newStatus||"").trim()) || !(rec.NextContactAt);
+    const statusChanged = String(oldST||"").trim() !== String(newStatus||"").trim();
+    const hadNextBefore = !!String(oldNext||"").trim();
+    const willWriteNext = statusChanged || !hadNextBefore;
     const nextCellValue = willWriteNext ? (comp.nextAt ? fmtYMD(comp.nextAt) : "") : null; // null => bez zmian
-    const noteNextText = willWriteNext ? (nextCellValue||'—') : (rec.NextContactAt ? fmtYMD(rec.NextContactAt) : '—');
+    const noteNextText  = willWriteNext ? (nextCellValue||'—') : (hadNextBefore ? oldNext : '—');
+
     const logRow  = [ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}|${newReason||""}`, `NextContactAt=${noteNextText}; LastTouchAt=${fmtYMD(nowLocal)}; rule: ${comp.reasonText}` ];
 
+    // Batch PATCH
     const requests = [
       { id: "ph", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1PH}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ newPH || "" ]] } },
       { id: "st", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1ST}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ newStatus || "" ]] } }
