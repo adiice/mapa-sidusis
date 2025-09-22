@@ -86,7 +86,7 @@
     padding:6px 10px; font-size:12px; color:#374151;
   }
 
-  /* [NEW] Panel braków geolokalizacji (tylko dla adaniel@...) */
+  /* Panel braków geolokalizacji (tylko dla adaniel@...) */
   .missingBox{
     position: fixed; left: 12px; bottom: 12px; z-index: 10002;
     background:#fff; border:1px solid #ddd; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,.08);
@@ -181,7 +181,7 @@
   <div class="legend-body"></div>
 </div>
 
-<!-- [NEW] Panel braków geolokalizacji (tylko dla adaniel@...) -->
+<!-- Panel braków geolokalizacji (tylko dla adaniel@...) -->
 <div class="missingBox collapsed" id="missingBox" style="display:none">
   <button class="toggle" id="tgMissing" title="Zwiń/rozwiń">⯈</button>
   <div class="hd">Brak geolokalizacji <span id="missingCount">(0)</span></div>
@@ -268,8 +268,8 @@
   }
   function canonPH(s){
     const raw = String(s||"").trim();
-    const a = PH_ALIASES[normStr(raw)] || raw;    // skrót -> pełne
-    return PH_LIST.includes(a) ? a : "";          // spoza listy = „brak”
+    const a = PH_ALIASES[normStr(raw)] || raw;
+    return PH_LIST.includes(a) ? a : "";
   }
 
   /* =========================== STAN/UTIL =========================== */
@@ -277,7 +277,7 @@
   let rows=[]; let frows=[];
   let map, cluster;
 
-  // [NEW] brak geolokalizacji (lista) + strażnik użytkownika
+  // brak geolokalizacji (lista) + strażnik użytkownika
   let missingRows = [];
   const isPrivileged = () => (account?.username || "").toLowerCase() === "adaniel@internetunion.pl";
 
@@ -415,13 +415,10 @@
 
   function addOneMarker(rec){
     const m = L.marker([rec.lat, rec.lon], { icon: makeIcon(rec) });
-
-    // pusty popup – uzupełniamy przy otwarciu
     m.bindPopup("", { maxWidth: 420 });
 
     m.on('popupopen', e=>{
       e.popup.setContent(buildPopup(rec));
-
       const el = e.popup.getElement()?.querySelector('.leaflet-popup-content');
       if(!el) return;
 
@@ -515,7 +512,6 @@
 
     const adresBezMiasta = hasCityAtEnd ? adres.replace(reCityAtEnd,"").replace(/,\s*$/,"").trim() : adres;
     const adresZMiastem  = hasCityAtEnd ? adres : (miasto ? `${adres}, ${miasto}` : adres);
-    const cityPartForSubject = miasto ? `, ${miasto}` : "";
 
     const subj_inv = `Zapytanie o wycenę - ${adresZMiastem} - SIDUSIS`;
     const subj_cli = `Internet światłowodowy - The Network - ${adresZMiastem}`;
@@ -531,14 +527,14 @@ Telefon: ${tel}
 E-mail: ${email}
 Szerokość geograficzna: ${isFinite(rec.lat)?rec.lat:""}
 Długość geograficzna: ${isFinite(rec.lon)?rec.lon:""}
-`; // [NEW] dodane lat/lon
+`;
 
     const body_cli =
 `Dzień dobry ${nazwa},
 
 Serdecznie dziękujemy za przesłanie zgłoszenia za pośrednictwem platformy SIDUSIS.
 
-Informujemy, że zapytanie dotyczące możliwości podłączenia Internetu w lokalizacji ${adresBezMiasta}${cityPartForSubject} zostało przekazane do Działu Inwestycji celem przygotowania indywidualnej wyceny.
+Informujemy, że zapytanie dotyczące możliwości podłączenia Internetu w lokalizacji ${adresBezMiasta}${miasto ? ', ' + miasto : ''} zostało przekazane do Działu Inwestycji celem przygotowania indywidualnej wyceny.
 
 Odpowiedź prześlę nie później niż w ciągu 3 dni roboczych.
 
@@ -621,10 +617,10 @@ Pozostałe informacje jak w ofercie standardowej.
 
   async function ensureLogin(){
     const accs = msalApp.getAllAccounts();
-    if(accs.length){ account=accs[0]; who.textContent = "Zalogowano: " + (account.username||account.homeAccountId); updateMissingPanel(); return; } // [NEW] update panel
+    if(accs.length){ account=accs[0]; who.textContent = "Zalogowano: " + (account.username||account.homeAccountId); updateMissingPanel(); return; }
     const r = await msalApp.loginPopup({ scopes: graphScopes });
     account = r.account; who.textContent = "Zalogowano: " + (account.username||account.homeAccountId);
-    updateMissingPanel(); // [NEW]
+    updateMissingPanel();
   }
   async function getToken(){
     await ensureLogin();
@@ -656,7 +652,7 @@ Pozostałe informacje jak w ofercie standardowej.
       const msg = (js && js.error && js.error.message) ? js.error.message : JSON.stringify(js);
       throw new Error("Batch error: " + msg);
     }
-    const bad = (js.responses || []).find r => r.status < 200 || r.status >= 300;
+    const bad = (js.responses || []).find(r => r.status < 200 || r.status >= 300);  /* <-- FIX */
     if (bad) throw new Error("Batch subrequest failed: " + bad.status + " " + JSON.stringify(bad.body||{}));
     return js;
   }
@@ -728,7 +724,7 @@ Pozostałe informacje jak w ofercie standardowej.
     return null;
   }
 
-  // [NEW] parse zwraca zarówno prawidłowe jak i brakujące
+  // parse zwraca zarówno prawidłowe jak i brakujące
   function parseRows(values){
     if(!values || !values.length) return { valid:[], missing:[] };
     const headers = (values[0]||[]).map(h=>String(h||"").trim());
@@ -793,14 +789,14 @@ Pozostałe informacje jak w ofercie standardowej.
     const values = used.values || [];
     if(!values.length){ setStatus("Arkusz pusty."); rows=[]; frows=[]; missingRows=[]; updateMissingPanel(); return; }
 
-    const parsed = parseRows(values); // [NEW]
+    const parsed = parseRows(values);
     rows = parsed.valid;
     missingRows = parsed.missing;
 
     fillMiniFilters();
     frows = rows.slice();
     setStatus(`Załadowano ${rows.length} wierszy z arkusza „${CONFIG.dataSheet}”.`);
-    updateMissingPanel(); // [NEW]
+    updateMissingPanel();
   }
 
   /* =========================== FILTRY =========================== */
@@ -834,24 +830,6 @@ Pozostałe informacje jak w ofercie standardowej.
     });
   }
 
-  async function massAssignToMe(){
-    const me = (account && (account.name||"")) || "";
-    const targetPH = (me && PH_LIST.includes(me)) ? me : (PH_LIST[0]||"");
-    if(!targetPH){ alert("Brak listy PH do przypisania."); return; }
-    if(!frows.length){ alert("Brak pozycji w bieżącym filtrze."); return; }
-    if(!confirm(`Ustawić PH="${targetPH}" dla ${frows.length} widocznych pozycji?\nOperacja sekwencyjna zajmie chwilę.`)) return;
-    let ok=0, fail=0;
-    for(const rec of frows){
-      try{
-        await savePhStatus(rec, targetPH, rec.Status||"", rec.PowodOdmowy||"");
-        rec.PH = targetPH;
-        ok++;
-      }catch{ fail++; }
-    }
-    alert(`Zakończono: OK=${ok}, błędy=${fail}`);
-    rebuild();
-  }
-
   /* =========================== ZAPISY ($batch) =========================== */
   async function savePhStatus(rec, newPH, newStatus, newReason){
     const used = await usedRange(CONFIG.dataSheet);
@@ -878,8 +856,9 @@ Pozostałe informacje jak w ofercie standardowej.
     if(idxST<0){ idxST = headers.length; headers.push("Status"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
     let idxRS = -1;
     if(newStatus==="Odmowa klienta"){
-      if(!H.reason){ H.reason="Powód odmowy"; headers.push(H.reason); idxRS = headers.length-1; await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
-      else idxRS = headers.indexOf(H.reason);
+      const reasonCol = H.reason || "Powód odmowy";
+      if(!H.reason){ headers.push(reasonCol); idxRS = headers.length-1; await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+      else idxRS = headers.indexOf(reasonCol);
     }
 
     let row1 = Number(rec._row1) || -1, oldPH="", oldST="";
@@ -1011,7 +990,7 @@ Pozostałe informacje jak w ofercie standardowej.
     await gBatch(requests);
   }
 
-  /* [NEW] Panel braków – odświeżanie i zwijanie */
+  /* Panel braków – odświeżanie i zwijanie */
   function updateMissingPanel(){
     const box = document.getElementById("missingBox");
     if(!box) return;
