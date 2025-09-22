@@ -1,0 +1,10 @@
+{
+  "mode": "outlook",  // outlook | planner | teams
+  "planner": {
+    "planId": "",     // ID Planu (Planner)
+    "bucketId": ""    // ID Bucketa
+  },
+  "teams": {
+    "userId": ""      // ID użytkownika do DM (opcjonalnie)
+  }
+}

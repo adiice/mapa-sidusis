@@ -38,6 +38,19 @@
     "seev":               "SEEV"
   },
 
+	"phColors": {
+	  "Adrian Daniel": "#1abc9c",
+	  "Robert Kaźmierczak": "#3498db",
+	  "Mariusz Kielczyk": "#9b59b6",
+	  "Inga Kaźmierczak": "#e67e22",
+	  "Jacek Trybuchowski": "#e74c3c",
+	  "Tomasz Józefowicz": "#2ecc71",
+	  "MOICO": "#8e44ad",
+	  "SEEV": "#00bcd4",
+	  "Duplikat": "#9e9e9e"
+	}
+
+
   "statusColors": {
     "Wycena Inwestycji":"#607D8B",
     "Oferta wysłana":"#2196F3",
