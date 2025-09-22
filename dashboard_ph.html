@@ -358,14 +358,14 @@
     cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false }
   });
   // DODANE zakresy do powiadomień
-  const graphScopes = [
-    "openid","profile","offline_access",
-    "Files.ReadWrite.All","Sites.Read.All",
-    "Calendars.ReadWrite",             // Outlook eventy
-    "Tasks.ReadWrite",                 // To Do (opcjonalnie)
-    "Group.ReadWrite.All", "Planner.ReadWrite.All", // Planner (opcjonalnie)
-    "Chat.ReadWrite","ChannelMessage.Send"          // Teams DM / kanał (opcjonalnie)
-  ];
+	const graphScopes = [
+	  "openid","profile","offline_access",
+	  "Files.ReadWrite.All","Sites.Read.All",
+	  "Calendars.ReadWrite",              // jeżeli chcesz też wpisy w kalendarzu
+	  "Tasks.ReadWrite",                  // <-- Planner/To Do (delegated)
+	  "Group.ReadWrite.All"               // <-- dostęp do planów/bucketów
+	];
+
 
   async function ensureLogin(){
     const accs = msalApp.getAllAccounts();
