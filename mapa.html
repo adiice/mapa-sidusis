@@ -670,20 +670,27 @@ Pozostałe informacje jak w ofercie standardowej.
     return resp.status===204 ? null : resp.json();
   }
   async function gBatch(requests){
-    const token = await getToken();
-    const resp = await fetch("https://graph.microsoft.com/v1.0/$batch", {
-      method: "POST",
-      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
-      body: JSON.stringify({ requests })
-    });
-    const js = await resp.json();
-    if (!resp.ok) {
-      const msg = (js && js.error && js.error.message) ? js.error.message : JSON.stringify(js);
-      throw new Error("Batch error: " + msg);
-    }
-    const bad = (js.responses || []).find r => r.status < 200 || r.status >= 300;
-    return js;
+  const token = await getToken();
+  const resp = await fetch("https://graph.microsoft.com/v1.0/$batch", {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({ requests })
+  });
+
+  const js = await resp.json();
+  if (!resp.ok) {
+    const msg = (js && js.error && js.error.message) ? js.error.message : JSON.stringify(js);
+    throw new Error("Batch error: " + msg);
   }
+
+  // ✅ poprawna składnia:
+  const bad = (js.responses || []).find(r => r.status < 200 || r.status >= 300);
+  if (bad) {
+    const details = typeof bad.body === "string" ? bad.body : JSON.stringify(bad.body || {});
+    throw new Error("Batch subrequest failed: " + bad.status + " " + details);
+  }
+  return js;
+}
   async function getSiteId(){
     if(siteId) return siteId;
     const url = `https://graph.microsoft.com/v1.0/sites/${CONFIG.spHost}:/sites/${CONFIG.spSitePath}`;
