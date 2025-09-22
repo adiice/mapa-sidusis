@@ -14,21 +14,26 @@
     --btn:#15224a; --btn-b:#2a3a73; --btn2:#21316a; --btn2-b:#3951a6; --btn-ghost-b:#29406f;
   }
   /* LIGHT */
-  body[data-theme="light"]{
+  [data-theme="light"]{
     --bg:#f6f8ff; --panel:#ffffff; --panel-2:#f3f5fb; --muted:#5d6b88; --text:#0d1321;
     --green:#1e8e5a; --red:#c0392b; --amber:#b5740c; --blue:#2563eb; --card:#ffffff;
-    --line:#d7deef; --gradFrom:#ffffff; --gradTo:#eef3ff; --br:14px;
+    --line:#d7deef; --gradFrom:#ffffff; --gradTo:#eef3ff;
     --btn:#e8ecfb; --btn-b:#c8d2f2; --btn2:#dfe6ff; --btn2-b:#b8c6fb; --btn-ghost-b:#c8d2f2;
   }
 
   *{ box-sizing:border-box }
-  html,body{ height:100%; margin:0; font-family:system-ui, Segoe UI, Roboto, Arial; color:var(--text); background:linear-gradient(180deg,var(--gradFrom) 0%,var(--gradTo) 100%); }
-  a{ color:#9cc4ff; text-decoration:none } body[data-theme="light"] a{ color:#1d4ed8; }
+  html,body{
+    height:100%; margin:0; color:var(--text);
+    background:linear-gradient(180deg,var(--gradFrom) 0%,var(--gradTo) 100%);
+    background-attachment: fixed; /* FIX: bez „odcinania” przy scrollu */
+  }
+  a{ color:#9cc4ff; text-decoration:none } [data-theme="light"] a{ color:#1d4ed8; }
   a:hover{ text-decoration:underline }
 
   .toolbar{
     position:sticky; top:0; z-index:50; backdrop-filter:saturate(140%) blur(6px);
-    background:color-mix(in oklab, var(--panel) 80%, transparent); border-bottom:1px solid var(--line);
+    background:color-mix(in oklab, var(--panel) 88%, transparent);
+    border-bottom:1px solid var(--line);
   }
   .toolbar .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:10px 14px; }
   .toolbar select,.toolbar input,.toolbar button{
@@ -40,17 +45,15 @@
   .wrap{ max-width:1200px; margin:16px auto; padding:0 14px }
   .cards{ display:grid; grid-template-columns:repeat(3,minmax(220px,1fr)); gap:12px; }
   .card{
-    background:linear-gradient(180deg,var(--card) 0%, var(--panel-2) 100%); border:1px solid var(--line); border-radius:var(--br);
+    background:linear-gradient(180deg,var(--card) 0%, var(--panel-2) 100%);
+    border:1px solid var(--line); border-radius:var(--br);
     padding:14px; min-height:96px; box-shadow:0 10px 30px rgba(0,0,0,.12), inset 0 1px 0 color-mix(in oklab, var(--line) 40%, transparent);
   }
-  .card h3{ margin:0 0 6px; font-size:14px; color:color-mix(in oklab, var(--muted) 85%, var(--text)) }
+  .card h3{ margin:0 0 6px; font-size:14px; color:color-mix(in oklab, var(--muted) 90%, var(--text)) }
   .kpi{ font-size:28px; font-weight:700; letter-spacing:.3px }
   .kpi.bad{ color:var(--amber) } .kpi.verybad{ color:var(--red) } .kpi.good{ color:var(--green) }
 
-  .panel{
-    margin-top:16px; background:linear-gradient(180deg,var(--card) 0%, var(--panel-2) 100%);
-    border:1px solid var(--line); border-radius:var(--br);
-  }
+  .panel{ margin-top:16px; background:linear-gradient(180deg,var(--card) 0%, var(--panel-2) 100%); border:1px solid var(--line); border-radius:var(--br); }
   .panel .hd{ padding:12px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center }
   .panel .hd h2{ margin:0; font-size:16px; color:color-mix(in oklab, var(--text) 86%, white) }
   .panel .hd .tools{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -61,7 +64,8 @@
   .table td{ background:var(--card); border:1px solid var(--line); padding:8px; vertical-align:top; }
   .table tr td:first-child{ border-top-left-radius:10px; border-bottom-left-radius:10px }
   .table tr td:last-child{ border-top-right-radius:10px; border-bottom-right-radius:10px }
-  .pill{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid color-mix(in oklab, var(--line) 90%, black); background:var(--panel-2); color:color-mix(in oklab, var(--text) 86%, white) }
+  .pill{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px;
+         border:1px solid color-mix(in oklab, var(--line) 90%, black); background:var(--panel-2); color:color-mix(in oklab, var(--text) 86%, white) }
   .pill.red{ border-color:#5a2630; background:#2a0f16; color:#ffb3b3 }
   .pill.amber{ border-color:#5a4930; background:#2a200f; color:#ffd89c }
   .pill.green{ border-color:#285a3b; background:#0f2a1a; color:#a6f3c4 }
@@ -70,7 +74,6 @@
   .statusbar{ margin:10px 14px 0; font-size:12px; color:var(--muted) }
   .error{ display:none; margin:10px 14px 0; padding:10px 12px; border:1px solid #6b2330; background:#2a0f16; color:#ffc9c9; border-radius:10px }
 
-  .grid-2{ display:grid; grid-template-columns:2fr 1fr; gap:12px }
   .controls input,.controls select, .controls button{ background:var(--panel-2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:6px 8px; font:inherit; }
   .controls{ display:flex; gap:8px; flex-wrap:wrap }
   .btn{ background:var(--btn); border-color:var(--btn-b) } .btn:hover{ filter:brightness(1.08) }
@@ -92,26 +95,19 @@
   .dd-actions{ display:flex; justify-content:space-between; gap:8px; margin-top:8px }
   .dd-actions button{ padding:6px 8px }
 
-  @media (max-width:980px){
-    .cards{ grid-template-columns:repeat(2,minmax(220px,1fr)) }
-  }
-  @media (max-width:640px){
-    .cards{ grid-template-columns:1fr }
-    .dd-grid{ grid-template-columns:1fr }
-  }
+  @media (max-width:980px){ .cards{ grid-template-columns:repeat(2,minmax(220px,1fr)) } }
+  @media (max-width:640px){ .cards{ grid-template-columns:1fr } .dd-grid{ grid-template-columns:1fr } }
 </style>
 
-<!-- MSAL dynamic loader with fallbacks -->
+<!-- MSAL dynamic loader -->
 <script>
   function loadScriptSequential(urls) {
     return new Promise((resolve, reject) => {
       let i = 0;
       const tryNext = () => {
-        if (i >= urls.length) return reject(new Error('Nie udało się załadować msal-browser z żadnego CDN.'));
+        if (i >= urls.length) return reject(new Error('Nie udało się załadować msal-browser.'));
         const s = document.createElement('script');
-        s.src = urls[i++]; s.async = true;
-        s.onload = () => resolve();
-        s.onerror = () => tryNext();
+        s.src = urls[i++]; s.async = true; s.onload = resolve; s.onerror = tryNext;
         document.head.appendChild(s);
       };
       tryNext();
@@ -147,21 +143,9 @@
 <div class="wrap">
   <!-- KPI CARDS -->
   <div class="cards">
-    <div class="card">
-      <h3>Nieprzydzielone leady (wykl. KPO/MOICO/itd.)</h3>
-      <div class="kpi" id="kpiUnassigned">—</div>
-      <div class="small muted">Kliknij „Odśwież”, aby przeliczyć.</div>
-    </div>
-    <div class="card">
-      <h3>Nowe nieprzydzielone – poprzedni dzień roboczy</h3>
-      <div class="kpi" id="kpiNewPrev">—</div>
-      <div class="small muted" id="prevRangeLabel"></div>
-    </div>
-    <div class="card">
-      <h3>Moje pilne (przeterminowane / dziś)</h3>
-      <div class="kpi" id="kpiMyDue" title="Liczba moich wpisów, gdzie NextContactAt ≤ dziś i nie OptOut">—</div>
-      <div class="small muted" id="myNameLabel"></div>
-    </div>
+    <div class="card"><h3>Nieprzydzielone leady (wykl. KPO/MOICO/itd.)</h3><div class="kpi" id="kpiUnassigned">—</div><div class="small muted">Kliknij „Odśwież”, aby przeliczyć.</div></div>
+    <div class="card"><h3>Nowe nieprzydzielone – poprzedni dzień roboczy</h3><div class="kpi" id="kpiNewPrev">—</div><div class="small muted" id="prevRangeLabel"></div></div>
+    <div class="card"><h3>Moje pilne (przeterminowane / dziś)</h3><div class="kpi" id="kpiMyDue">—</div><div class="small muted" id="myNameLabel"></div></div>
   </div>
 
   <!-- MY QUEUE -->
@@ -169,6 +153,7 @@
     <div class="hd">
       <h2>Moje leady</h2>
       <div class="tools controls">
+        <!-- ZAKRES -->
         <label class="small muted">Zakres:</label>
         <select id="fltScope">
           <option value="due">Do kontaktu (≤ dziś)</option>
@@ -176,11 +161,14 @@
           <option value="none">Tylko nieprzydzielone</option>
         </select>
 
+        <!-- WŁAŚCICIEL (dla przełożonego) -->
+        <select id="fltOwner" style="display:none" title="Filtruj po PH (dla przełożonego)"></select>
+
         <!-- STATUS: kompaktowy dropdown z checkboxami -->
         <div class="dropdown" id="ddStatus">
           <button class="dropdown-toggle" id="fltStatusBtn" type="button">Statusy: (wszystkie) ▼</button>
           <div class="dropdown-menu" id="fltStatusMenu">
-            <div class="dd-grid" id="fltStatusGrid"><!-- wypełniane skryptem --></div>
+            <div class="dd-grid" id="fltStatusGrid"></div>
             <div class="dd-actions">
               <button class="btn btn-ghost" id="stClear">Wyczyść</button>
               <button class="btn btn-primary" id="stAll">Zaznacz wszystkie</button>
@@ -191,12 +179,12 @@
         <!-- WYSZUKIWANIE -->
         <input type="text" id="fltQuery" placeholder="szukaj: miasto / ulica / nazwa" />
 
-        <!-- NOWE FILTRY DATA ZGŁOSZENIA -->
+        <!-- DATA ZGŁOSZENIA -->
         <label class="small muted">Data zgłoszenia:</label>
         <input type="date" id="fltCreatedFrom" title="od">
         <input type="date" id="fltCreatedTo" title="do">
 
-        <!-- NOWE FILTRY NASTĘPNY KONTAKT -->
+        <!-- NAST. KONTAKT -->
         <label class="small muted">Nast. kontakt:</label>
         <input type="date" id="fltNextFrom" title="od">
         <input type="date" id="fltNextTo" title="do">
@@ -209,14 +197,8 @@
       <table class="table" id="tbl">
         <thead>
           <tr>
-            <th>Data zgł.</th>
-            <th>Klient / adres</th>
-            <th class="small">Kontakt</th>
-            <th>Status</th>
-            <th>Next contact</th>
-            <th>OptOut</th>
-            <th>Uwagi</th>
-            <th>Akcje</th>
+            <th>Data zgł.</th><th>Klient / adres</th><th class="small">Kontakt</th>
+            <th>Status</th><th>Next contact</th><th>OptOut</th><th>Uwagi</th><th>Akcje</th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -231,30 +213,27 @@
 
 <script>
 (async function main(){
-  /* ==================== THEME ==================== */
+  /* ========== THEME ========== */
   const THEME_KEY='phdash_theme';
   const bodyEl=document.body;
   function applyTheme(theme){
     bodyEl.setAttribute('data-theme', theme);
-    const btn=document.getElementById('btnTheme');
-    btn.textContent = (theme==='light') ? '☀️ Tryb jasny' : '🌙 Tryb ciemny';
+    document.getElementById('btnTheme').textContent = (theme==='light') ? '☀️ Tryb jasny' : '🌙 Tryb ciemny';
     localStorage.setItem(THEME_KEY, theme);
   }
-  // start z pamięci lub prefers-color-scheme
   (function initTheme(){
     const saved=localStorage.getItem(THEME_KEY);
     if(saved){ applyTheme(saved); }
     else{
-      const prefers = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-      applyTheme(prefers==='light' ? 'light' : 'dark');
+      const prefersLight = window.matchMedia?.('(prefers-color-scheme: light)').matches;
+      applyTheme(prefersLight ? 'light' : 'dark');
     }
     document.getElementById('btnTheme').addEventListener('click', ()=>{
-      const next = (bodyEl.getAttribute('data-theme')==='light') ? 'dark' : 'light';
-      applyTheme(next);
+      applyTheme(bodyEl.getAttribute('data-theme')==='light' ? 'dark' : 'light');
     });
   })();
 
-  /* ==================== KONFIG DOMYŚLNY (nadpisywalny datasources.json) ==================== */
+  /* ========== CONFIG ========== */
   const CONFIG = {
     clientId: "2c5a0274-30c0-4efa-b13c-7ce1e0768cf9",
     tenantId: "e44d0310-65ed-4096-a024-dac77110765a",
@@ -264,15 +243,11 @@
     dataSheet: "Dane",
     logSheet: "AuditLog"
   };
-
   const LS_KEY_DS = "sidusis_ds_key";
 
-  /* ==================== LISTY / SŁOWNIKI ==================== */
+  /* ========== LISTS / STATUS RULES (SLA) ========== */
   const DEFAULT_LISTS = {
-    ph: [],
-    phAliases: {},
-    phUsers: {},
-
+    ph: [], phAliases: {}, phUsers: {},
     status: ["Wycena Inwestycji","Oferta wysłana","Odmowa klienta","Akceptacja klienta","Poza Zasięgiem","KPO","MOICO","Duplikat","SEEV"],
     statusAliases: {
       "zapytanie o wycenę":"Wycena Inwestycji","zapytanie o wycene":"Wycena Inwestycji","wycena inwestycji":"Wycena Inwestycji",
@@ -285,53 +260,37 @@
       "MOICO":"#8E24AA","Duplikat":"#9E9E9E","SEEV":"#00BCD4"
     },
     excluded: ["KPO","Poza Zasięgiem","MOICO","Duplikat","SEEV"],
-    rejectionReasons: [
-      "Zbyt droga instalacja","Drogi abonament","Lepsza oferta konkurencji",
-      "Brak możliwości technicznych","Nieaktualny kontakt","Inne"
-    ]
+    rejectionReasons: ["Zbyt droga instalacja","Drogi abonament","Lepsza oferta konkurencji","Brak możliwości technicznych","Nieaktualny kontakt","Inne"]
   };
 
   let LISTS = DEFAULT_LISTS;
-  let PH_LIST = [], PH_ALIASES = {}, PH_USERS = {};
-  let STATUS_LIST = [], STATUS_COLOR_MAP = {}, EXCLUDED_STATUSES = new Set();
+  let PH_LIST = [], PH_ALIASES = {}, STATUS_LIST = [], STATUS_COLOR_MAP = {}, EXCLUDED_STATUSES = new Set();
+  let STATUS_RULES = {}; // { Status: { slaDays: n, startField: "createdAt"|"LastTouchAt"|"NextContactAt" } }
 
   function normLower(s){ return String(s||"").toLowerCase().trim(); }
 
   async function loadLists(){
     try{
       const r = await fetch("assets/lists.json?v="+Date.now(), {cache:"no-store"});
-      if(r.ok){
-        const js = await r.json();
-        LISTS = { ...DEFAULT_LISTS, ...js };
-      }
+      if(r.ok){ LISTS = { ...DEFAULT_LISTS, ...(await r.json()) }; }
     }catch(e){ console.warn("lists.json fallback", e); LISTS = DEFAULT_LISTS; }
 
     PH_LIST = Array.isArray(LISTS.ph) ? LISTS.ph.slice() : [];
     PH_ALIASES = Object.fromEntries(Object.entries(LISTS.phAliases||{}).map(([k,v])=>[normLower(k), v]));
-    PH_USERS = LISTS.phUsers || {};
     STATUS_LIST = Array.isArray(LISTS.status) ? LISTS.status.slice() : DEFAULT_LISTS.status;
     STATUS_COLOR_MAP = { ...DEFAULT_LISTS.statusColors, ...(LISTS.statusColors||{}) };
     EXCLUDED_STATUSES = new Set(Array.isArray(LISTS.excluded)? LISTS.excluded : DEFAULT_LISTS.excluded);
 
-    // Zasyp dropdown statusów (checkboxy)
+    // dropdown statusów
     const grid = document.getElementById("fltStatusGrid");
-    grid.innerHTML = STATUS_LIST.map(s=>`
-      <label><input type="checkbox" value="${s}"> ${s}</label>
-    `).join("");
+    grid.innerHTML = STATUS_LIST.map(s=>`<label><input type="checkbox" value="${s}"> ${s}</label>`).join("");
     updateStatusBtnLabel();
   }
-  function updateStatusBtnLabel(){
-    const sel = getSelectedStatuses();
-    const btn = document.getElementById("fltStatusBtn");
-    btn.textContent = sel.length ? `Statusy: ${sel.length} wybrane ▼` : 'Statusy: (wszystkie) ▼';
-  }
-  function getSelectedStatuses(){
-    return [...document.querySelectorAll('#fltStatusGrid input[type="checkbox"]')]
-      .filter(ch=>ch.checked).map(ch=>ch.value);
-  }
-  function setAllStatuses(checked){
-    document.querySelectorAll('#fltStatusGrid input[type="checkbox"]').forEach(ch=>{ ch.checked = checked; });
-    updateStatusBtnLabel();
+  async function loadStatusRules(){
+    try{
+      const r = await fetch("assets/status_rules.json?v="+Date.now(), {cache:"no-store"});
+      if(r.ok){ STATUS_RULES = await r.json(); }
+    }catch(e){ console.warn("status_rules.json not found – using defaults"); }
   }
   function canonStatus(s){
     const k = normLower(s);
@@ -340,13 +299,12 @@
   function canonPH(s){
     const raw = String(s||"").trim();
     const a = PH_ALIASES[normLower(raw)] || raw;
-    return PH_LIST.includes(a) ? a : raw; // nie wycinaj – pokaż jak w źródle
+    return a;
   }
 
-  /* ==================== STAN/UTIL ==================== */
+  /* ========== STATE ========== */
   let account=null, siteId=null, fileId=null;
   let rows=[], frows=[];
-
   const $ = s=>document.querySelector(s);
   const dsSelect = $("#dsSelect");
   const who=$("#who"), statusbar=$("#statusbar"), errorBar=$("#errorBar");
@@ -365,79 +323,49 @@
     if(m){ const [_,dd,mm,yy]=m; return new Date(Number(yy.length===2?("20"+yy):yy), Number(mm)-1, Number(dd)); }
     return null;
   }
-  function fmtDateLocal(d){
-    if(!d) return "";
-    const y=d.getFullYear(), m=("0"+(d.getMonth()+1)).slice(-2), dd=("0"+d.getDate()).slice(-2);
-    return `${y}-${m}-${dd}`;
-  }
-  function todayLocal(){
-    const now = new Date(); return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  }
+  function fmtDateLocal(d){ if(!d) return ""; const y=d.getFullYear(), m=("0"+(d.getMonth()+1)).slice(-2), dd=("0"+d.getDate()).slice(-2); return `${y}-${m}-${dd}`; }
+  function todayLocal(){ const now = new Date(); return new Date(now.getFullYear(), now.getMonth(), now.getDate()); }
   function prevBusinessRange(){
-    const d = todayLocal(); const dow = d.getDay(); // 0=nd,1=pn,...6=sb
+    const d = todayLocal(); const dow = d.getDay();
     let start, end;
-    if(dow===1){ // pn -> (pt..nd)
-      const fri = new Date(d); fri.setDate(d.getDate()-3);
-      start = new Date(fri); end = new Date(d); end.setDate(d.getDate()-1);
-    }else{
-      start = new Date(d); start.setDate(d.getDate()-1);
-      end = new Date(start);
-    }
-    start.setHours(0,0,0,0); end.setHours(23,59,59,999);
-    return {start,end};
+    if(dow===1){ const fri = new Date(d); fri.setDate(d.getDate()-3); start = new Date(fri); end = new Date(d); end.setDate(d.getDate()-1); }
+    else{ start = new Date(d); start.setDate(d.getDate()-1); end = new Date(start); }
+    start.setHours(0,0,0,0); end.setHours(23,59,59,999); return {start,end};
   }
 
-  /* ============== Wybór źródła (assets/datasources.json – opcjonalnie) ============== */
-  let DS = {}; // key -> { spHost, spSitePath, filePath, title }
-  let CURRENT_DS_KEY = "default";
-
+  /* ========== DATASOURCES ========== */
+  let DS = {}; let CURRENT_DS_KEY = "default";
   async function loadDatasources(){
     DS = { default: { title:"Domyślne (CONFIG)", spHost:CONFIG.spHost, spSitePath:CONFIG.spSitePath, filePath:CONFIG.filePath } };
     try{
       const r = await fetch("assets/datasources.json?v="+Date.now(), {cache:"no-store"});
-      if(r.ok){
-        const js = await r.json();
-        for(const it of (js||[])){
-          if(it && it.key && it.spHost && it.spSitePath && it.filePath){
-            DS[it.key] = { title: it.title || it.key, spHost: it.spHost, spSitePath: it.spSitePath, filePath: it.filePath };
-          }
-        }
-      }
-    }catch(e){ console.warn("datasources.json missing or invalid", e); }
+      if(r.ok){ for(const it of (await r.json()||[])){ if(it?.key && it?.spHost && it?.spSitePath && it?.filePath){ DS[it.key] = { title: it.title || it.key, spHost: it.spHost, spSitePath: it.spSitePath, filePath: it.filePath }; } } }
+    }catch(e){ console.warn("datasources.json missing/invalid", e); }
     dsSelect.innerHTML = "";
-    for(const [k,v] of Object.entries(DS)){
-      const opt = document.createElement("option");
-      opt.value = k; opt.textContent = v.title + " — " + v.filePath.split("/").pop();
-      dsSelect.appendChild(opt);
-    }
-    const saved = localStorage.getItem(LS_KEY_DS);
-    if(saved && DS[saved]) CURRENT_DS_KEY = saved;
-    dsSelect.value = CURRENT_DS_KEY;
-    applyDatasource(CURRENT_DS_KEY);
-    dsSelect.addEventListener("change", ()=>{
-      CURRENT_DS_KEY = dsSelect.value;
-      localStorage.setItem(LS_KEY_DS, CURRENT_DS_KEY);
-      applyDatasource(CURRENT_DS_KEY);
-      siteId=null; fileId=null; // wymuś ponowne pobranie ID
-      setStatus("Zmieniono źródło. Kliknij „Odśwież”.");
-    });
+    for(const [k,v] of Object.entries(DS)){ const opt = document.createElement("option"); opt.value = k; opt.textContent = v.title + " — " + v.filePath.split("/").pop(); dsSelect.appendChild(opt); }
+    const saved = localStorage.getItem(LS_KEY_DS); if(saved && DS[saved]) CURRENT_DS_KEY = saved; dsSelect.value = CURRENT_DS_KEY; applyDatasource(CURRENT_DS_KEY);
+    dsSelect.addEventListener("change", ()=>{ CURRENT_DS_KEY = dsSelect.value; localStorage.setItem(LS_KEY_DS, CURRENT_DS_KEY); applyDatasource(CURRENT_DS_KEY); siteId=null; fileId=null; setStatus("Zmieniono źródło. Kliknij „Odśwież”."); });
   }
-  function applyDatasource(key){
-    const d = DS[key] || DS.default;
-    CONFIG.spHost = d.spHost; CONFIG.spSitePath = d.spSitePath; CONFIG.filePath = d.filePath;
-  }
+  function applyDatasource(key){ const d = DS[key] || DS.default; CONFIG.spHost = d.spHost; CONFIG.spSitePath = d.spSitePath; CONFIG.filePath = d.filePath; }
 
-  /* ==================== MSAL / GRAPH ==================== */
-  try { await loadScriptSequential(MSAL_CDNS); }
-  catch(e){ alert('Nie udało się załadować msal-browser (alcdn/jsDelivr/unpkg).'); console.error(e); return; }
-  if (typeof msal === 'undefined' || !msal.PublicClientApplication){ alert('MSAL nie jest dostępny.'); return; }
+  /* ========== MSAL / GRAPH ========== */
+  try { await loadScriptSequential(MSAL_CDNS); } catch(e){ alert('MSAL nie załadował się.'); console.error(e); return; }
+  if (typeof msal === 'undefined' || !msal.PublicClientApplication){ alert('MSAL niedostępny.'); return; }
 
   const msalApp = new msal.PublicClientApplication({
     auth: { clientId: CONFIG.clientId, authority: "https://login.microsoftonline.com/" + CONFIG.tenantId,
             redirectUri: window.location.origin + window.location.pathname },
     cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false }
   });
-  const graphScopes = ["openid","profile","offline_access","Files.ReadWrite.All","Sites.Read.All"];
+  // DODANE zakresy do powiadomień
+  const graphScopes = [
+    "openid","profile","offline_access",
+    "Files.ReadWrite.All","Sites.Read.All",
+    "Calendars.ReadWrite",             // Outlook eventy
+    "Tasks.ReadWrite",                 // To Do (opcjonalnie)
+    "Group.ReadWrite.All", "Planner.ReadWrite.All", // Planner (opcjonalnie)
+    "Chat.ReadWrite","ChannelMessage.Send"          // Teams DM / kanał (opcjonalnie)
+  ];
 
   async function ensureLogin(){
     const accs = msalApp.getAllAccounts();
@@ -453,74 +381,46 @@
   async function gfetch(method, url, body){
     const token = await getToken();
     const resp = await fetch(url, {
-      method,
-      headers: { "Authorization":"Bearer " + token, "Accept":"application/json", "Content-Type":"application/json" },
+      method, headers: { "Authorization":"Bearer " + token, "Accept":"application/json", "Content-Type":"application/json" },
       body: body ? JSON.stringify(body) : undefined
     });
-    if(!resp.ok){
-      const txt=await resp.text().catch(()=>String(resp.status));
-      throw new Error(`${method} ${url} -> ${resp.status} ${txt}`);
-    }
+    if(!resp.ok){ const txt=await resp.text().catch(()=>String(resp.status)); throw new Error(`${method} ${url} -> ${resp.status} ${txt}`); }
     return resp.status===204 ? null : resp.json();
   }
-  async function getSiteId(){
-    if(siteId) return siteId;
-    const url = `https://graph.microsoft.com/v1.0/sites/${CONFIG.spHost}:/sites/${CONFIG.spSitePath}`;
-    const js = await gfetch("GET", url); siteId = js.id; return siteId;
-  }
-  async function getFileItemId(){
-    if(fileId) return fileId;
-    const sid = await getSiteId();
-    const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/root:${encodeURI(CONFIG.filePath)}`;
-    const js = await gfetch("GET", url); fileId = js.id; return fileId;
-  }
-  async function usedRange(wsName){
-    const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
-    const wsq = wsName.replace(/'/g,"''");
-    const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/usedRange(valuesOnly=true)`;
-    return gfetch("GET", url);
-  }
-  async function patchRange(wsName, a1, values2d){
-    const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
-    const wsq = wsName.replace(/'/g,"''");
-    const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='${a1}')`;
-    return gfetch("PATCH", url, { values: values2d });
-  }
+  async function getSiteId(){ if(siteId) return siteId; const url = `https://graph.microsoft.com/v1.0/sites/${CONFIG.spHost}:/sites/${CONFIG.spSitePath}`; const js = await gfetch("GET", url); siteId = js.id; return siteId; }
+  async function getFileItemId(){ if(fileId) return fileId; const sid = await getSiteId(); const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/root:${encodeURI(CONFIG.filePath)}`; const js = await gfetch("GET", url); fileId = js.id; return fileId; }
+  async function usedRange(wsName){ const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]); const wsq = wsName.replace(/'/g,"''"); const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/usedRange(valuesOnly=true)`; return gfetch("GET", url); }
+  async function patchRange(wsName, a1, values2d){ const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]); const wsq = wsName.replace(/'/g,"''"); const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='${a1}')`; return gfetch("PATCH", url, { values: values2d }); }
   function colLetter(n){ let s="",x=n; while(x>0){x--; s=String.fromCharCode(65+(x%26))+s; x=Math.floor(x/26);} return s; }
 
-  /* ==================== PARSE DANYCH ==================== */
-  function pickHeader(headers, tokens){
-    const lc = headers.map(h => String(h||"").toLowerCase());
-    for(const t of tokens){ const i = lc.findIndex(n => n.includes(t)); if(i>=0) return headers[i]; }
-    return null;
-  }
+  /* ========== PARSE ========== */
+  function pickHeader(headers, tokens){ const lc = headers.map(h => String(h||"").toLowerCase()); for(const t of tokens){ const i = lc.findIndex(n => n.includes(t)); if(i>=0) return headers[i]; } return null; }
 
   function parseRows(values){
     if(!values || !values.length) return [];
     const headers = (values[0]||[]).map(h=>String(h||"").trim());
     const body = values.slice(1);
-
     const H = {
       created: headers[0],
-      lat:  pickHeader(headers,["szerokość","szerokosc","lat","latitude"]),
-      lon:  pickHeader(headers,["długość","dlugosc","lon","longitude"]),
-      tel:  pickHeader(headers,["telefon","tel"]),
+      lat: pickHeader(headers,["szerokosc","szerokość","lat","latitude"]),
+      lon: pickHeader(headers,["dlugosc","długość","lon","longitude"]),
+      tel: pickHeader(headers,["telefon","tel"]),
       mail: pickHeader(headers,["email","e-mail","mail"]),
-      ph:   pickHeader(headers,["ph"]),
-      st:   pickHeader(headers,["status"]),
-      ulica:pickHeader(headers,["ulica","adres"]),
-      nr:   pickHeader(headers,["nr budynku","numer","nr","nr domu"]),
-      msc:  pickHeader(headers,["miejscowość","miejscowosc","miasto"]),
-      nazwa:pickHeader(headers,["zgłaszający","zglaszajacy","nazwa","imię","imie","nazwisko","klient","firma"]),
-      adresPelny: pickHeader(headers,["adres_pelny","adres pełny","adres pelny"]),
-      powod: pickHeader(headers,["powód","powod","reason","powód odmowy","powod odmowy"]),
+      ph: pickHeader(headers,["ph"]),
+      st: pickHeader(headers,["status"]),
+      ulica: pickHeader(headers,["ulica","adres"]),
+      nr: pickHeader(headers,["nr budynku","numer","nr","nr domu"]),
+      msc: pickHeader(headers,["miejscowosc","miejscowość","miasto"]),
+      nazwa: pickHeader(headers,["zglaszajacy","zgłaszający","nazwa","imię","imie","nazwisko","klient","firma"]),
+      adresPelny: pickHeader(headers,["adres_pelny","adres pelny","adres pełny"]),
+      powod: pickHeader(headers,["powod","powód","powód odmowy","reason"]),
       notes: pickHeader(headers,["uwagi ph","uwagi","uwaga","notatki","note","notes"]),
-      next:  pickHeader(headers,["nextcontactat","następny kontakt","nastepny kontakt"]),
-      last:  pickHeader(headers,["lasttouchat","lasttoucha","ostatni kontakt"]),
+      next: pickHeader(headers,["nextcontactat","następny kontakt","nastepny kontakt"]),
+      last: pickHeader(headers,["lasttouchat","ostatni kontakt"]),
       rSent: pickHeader(headers,["remindersentat"]),
-      rId:   pickHeader(headers,["remindertaskid"]),
-      opt:   pickHeader(headers,["optout"]),
-      src:   pickHeader(headers,["source"]),
+      rId: pickHeader(headers,["remindertaskid"]),
+      opt: pickHeader(headers,["optout"]),
+      src: pickHeader(headers,["source"]),
       srcId: pickHeader(headers,["sourcerowid"]),
     };
     const get = (r, col) => { const idx=headers.indexOf(col); return idx>=0 ? r[idx] : ""; };
@@ -529,9 +429,7 @@
       let lat = toNum(get(r,H.lat)), lon = toNum(get(r,H.lon));
       let adr = get(r,H.adresPelny) || "";
       if(!adr){
-        const u = String(get(r,H.ulica)||"").trim();
-        const n = String(get(r,H.nr)||"").trim();
-        const m = String(get(r,H.msc)||"").trim();
+        const u=String(get(r,H.ulica)||"").trim(), n=String(get(r,H.nr)||"").trim(), m=String(get(r,H.msc)||"").trim();
         adr = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
       }
       return {
@@ -556,40 +454,29 @@
       };
     });
 
-    // sanity dla współrzędnych
-    const validLat=v=>isFinite(v)&&v>=-90&&v<=90;
-    const validLon=v=>isFinite(v)&&v>=-180&&v<=180;
-    const okNormal = out.filter(o=>validLat(o.lat)&&validLon(o.lon)).length;
-    const okSwapped= out.filter(o=>validLat(o.lon)&&validLon(o.lat)).length;
+    // sanity współrzędnych
+    const validLat=v=>isFinite(v)&&v>=-90&&v<=90, validLon=v=>isFinite(v)&&v>=-180&&v<=180;
+    const okNormal=out.filter(o=>validLat(o.lat)&&validLon(o.lon)).length, okSwapped=out.filter(o=>validLat(o.lon)&&validLon(o.lat)).length;
     if(okSwapped>okNormal){ out = out.map(o=>({ ...o, lat:o.lon, lon:o.lat })); }
     return out;
   }
 
-  /* ==================== KPI / FILTRY / RENDER ==================== */
+  /* ========== KPI / SLA / FILTRY / RENDER ========== */
   function isUnassigned(rec){
-    const ph = (rec.PH||"").trim();
-    const st = (rec.Status||"").trim();
+    const ph = (rec.PH||"").trim(), st = (rec.Status||"").trim();
     return (!ph || !PH_LIST.includes(ph)) && !EXCLUDED_STATUSES.has(st);
   }
-  function inPrevBusiness(rec){
-    if(!rec.createdAt) return false;
-    const {start,end} = prevBusinessRange();
-    return rec.createdAt >= start && rec.createdAt <= end;
-  }
+  function inPrevBusiness(rec){ if(!rec.createdAt) return false; const {start,end} = prevBusinessRange(); return rec.createdAt >= start && rec.createdAt <= end; }
   function isDueForMe(rec, me){
     if((rec.PH||"").trim() !== (me||"").trim()) return false;
-    const opt = String(rec.OptOut||"").toLowerCase();
-    if(opt==="1" || opt==="true" || opt==="x") return false;
-    if(!rec.NextContactAt) return false;
-    const d = todayLocal();
-    return rec.NextContactAt <= new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23,59,59,999);
+    const opt = String(rec.OptOut||"").toLowerCase(); if(opt==="1"||opt==="true"||opt==="x") return false;
+    if(!rec.NextContactAt) return false; const d = todayLocal(); return rec.NextContactAt <= new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23,59,59,999);
   }
 
   function scoreKPIs(me){
     const unassigned = rows.filter(isUnassigned).length;
     const newPrev = rows.filter(r=>isUnassigned(r)&&inPrevBusiness(r)).length;
     const myDue = rows.filter(r=>isDueForMe(r, me)).length;
-
     kpiUnassigned.textContent = unassigned;
     kpiUnassigned.className = "kpi " + (unassigned>50?"verybad":unassigned>10?"bad":"");
     kpiNewPrev.textContent = newPrev;
@@ -599,58 +486,83 @@
     kpiMyDue.className = "kpi " + (myDue===0?"good":myDue>10?"verybad":"bad");
   }
 
-  function parseDateInput(id, endOfDay=false){
-    const v = document.getElementById(id).value;
-    return v ? new Date(v + (endOfDay? "T23:59:59" : "T00:00:00")) : null;
+  // --------- rozpoznanie SLA
+  function slaDeadline(rec){
+    const rule = STATUS_RULES[rec.Status]; if(!rule || !rule.slaDays) return null;
+    const start = rule.startField==="LastTouchAt" ? rec.LastTouchAt
+                : rule.startField==="NextContactAt" ? rec.NextContactAt
+                : rec.createdAt;
+    if(!start) return null;
+    const d = new Date(start); d.setDate(d.getDate()+Number(rule.slaDays||0)); d.setHours(23,59,59,999);
+    return d;
   }
+  function isSLAOverdue(rec){
+    const dl = slaDeadline(rec); if(!dl) return false;
+    const opt = String(rec.OptOut||"").toLowerCase(); if(opt==="1"||opt==="true"||opt==="x") return false;
+    return new Date() > dl;
+  }
+
+  function updateManagerOwnerSelect(){
+    const ownerSel = document.getElementById("fltOwner");
+    const isBoss = (account?.username||"").toLowerCase() === "adaniel@internetunion.pl";
+    ownerSel.style.display = isBoss ? "" : "none";
+    if(!isBoss) return;
+
+    const options = ['<option value="__my__">Tylko moje</option>',
+                     '<option value="__all__">Wszyscy PH</option>',
+                     '<option value="__none__">Tylko nieprzydzielone</option>']
+      .concat(PH_LIST.map(ph=>`<option value="${ph}">PH: ${ph}</option>`));
+    ownerSel.innerHTML = options.join('');
+    if(!ownerSel.value) ownerSel.value="__all__";
+  }
+
+  function parseDateInput(id, endOfDay=false){ const v=document.getElementById(id).value; return v ? new Date(v + (endOfDay? "T23:59:59" : "T00:00:00")) : null; }
+  function getSelectedStatuses(){ return [...document.querySelectorAll('#fltStatusGrid input[type="checkbox"]')].filter(ch=>ch.checked).map(ch=>ch.value); }
+  function updateStatusBtnLabel(){ const sel=getSelectedStatuses(); document.getElementById("fltStatusBtn").textContent = sel.length ? `Statusy: ${sel.length} wybrane ▼` : 'Statusy: (wszystkie) ▼'; }
+  function setAllStatuses(checked){ document.querySelectorAll('#fltStatusGrid input[type="checkbox"]').forEach(ch=>ch.checked=checked); updateStatusBtnLabel(); }
 
   function applyFilters(){
     const scope = document.getElementById("fltScope").value;
+    const ownerVal = document.getElementById("fltOwner").value || "__my__";
     const q = (document.getElementById("fltQuery").value||"").toLowerCase().trim();
     const me = (account && (account.name||"")) || "";
-
-    // statusy z dropdownu
     const WANT_ST = getSelectedStatuses();
-
-    // daty
-    const cFrom = parseDateInput("fltCreatedFrom", false);
-    const cTo   = parseDateInput("fltCreatedTo",   true);
-    const nFrom = parseDateInput("fltNextFrom",    false);
-    const nTo   = parseDateInput("fltNextTo",      true);
+    const cFrom=parseDateInput("fltCreatedFrom"), cTo=parseDateInput("fltCreatedTo",true);
+    const nFrom=parseDateInput("fltNextFrom"),   nTo=parseDateInput("fltNextTo",true);
 
     frows = rows.filter(r=>{
+      // podstawowy zakres
       let pass=true;
       if(scope==="due") pass = isDueForMe(r, me);
       else if(scope==="all") pass = (r.PH||"").trim() === (me||"").trim();
       else if(scope==="none") pass = isUnassigned(r);
       if(!pass) return false;
 
-      // filtr po statusach
-      if(WANT_ST.length && !WANT_ST.includes(r.Status||"")) return false;
+      // dodatkowy zakres przełożonego
+      if(ownerVal==="__all__"){ /* przepuszczamy */ }
+      else if(ownerVal==="__none__"){ if(!isUnassigned(r)) return false; }
+      else if(ownerVal!=="__my__"){ if((r.PH||"") !== ownerVal) return false; }
 
-      // data zgłoszenia
+      if(WANT_ST.length && !WANT_ST.includes(r.Status||"")) return false;
       if(cFrom && (!r.createdAt || r.createdAt < cFrom)) return false;
       if(cTo   && (!r.createdAt || r.createdAt > cTo))   return false;
-
-      // następny kontakt
       if(nFrom || nTo){
         const nc = r.NextContactAt;
         if(nFrom && (!nc || nc < nFrom)) return false;
         if(nTo   && (!nc || nc > nTo))   return false;
       }
-
       if(q){
-        const hay = [
-          r.miejscowosc||"", r.adres_pelny||"", r.nazwa||"", r.telefon||"", r.email||""
-        ].join(" ").toLowerCase();
+        const hay=[r.miejscowosc||"",r.adres_pelny||"",r.nazwa||"",r.telefon||"",r.email||""].join(" ").toLowerCase();
         if(!hay.includes(q)) return false;
       }
       return true;
     });
 
-    // sort: due first (overdue -> today -> future), then createdAt asc
+    // sort: 1) SLA overdue 2) due date 3) createdAt
     const today = todayLocal();
     frows.sort((a,b)=>{
+      const oa = isSLAOverdue(a)?0:1, ob = isSLAOverdue(b)?0:1;
+      if(oa!==ob) return oa-ob;
       const da = a.NextContactAt ? (a.NextContactAt - today) : 9e15;
       const db = b.NextContactAt ? (b.NextContactAt - today) : 9e15;
       if(da!==db) return da - db;
@@ -663,7 +575,7 @@
   function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function colorForStatus(st){ return STATUS_COLOR_MAP[st] || "#9E9E9E"; }
 
-  // DODANO – szablony maili jak w mapie
+  // szablony maili – jak wcześniej
   function mailTemplates(rec){
     const nazwa=rec.nazwa||""; let adres=(rec.adres_pelny||"").trim(); const tel=rec.telefon||""; const email=rec.email||"";
     const subj_inv=`Zapytanie o wycenę - ${adres} - SIDUSIS`;
@@ -672,77 +584,63 @@
     const body_cli=`Dzień dobry ${nazwa},\n\nSerdecznie dziękujemy za przesłane zgłoszenie. Wrócę z informacją.\n`;
     const body_std=`Dzień dobry,\n\nW odpowiedzi na zgłoszenie – oferta standardowa…\n`;
     const body_dev=`Dzień dobry,\n\nW odpowiedzi na zgłoszenie – oferta deweloperska…\n`;
-    return {
-      INV:{to:"inwestycje@internetunion.pl",subject:subj_inv,body:body_inv},
-      CLI:{to:email,subject:subj_cli,body:body_cli},
-      STD:{to:email,subject:subj_cli,body:body_std},
-      DEV:{to:email,subject:subj_cli,body:body_dev}
-    };
+    return { INV:{to:"inwestycje@internetunion.pl",subject:subj_inv,body:body_inv}, CLI:{to:email,subject:subj_cli,body:body_cli}, STD:{to:email,subject:subj_cli,body:body_std}, DEV:{to:email,subject:subj_cli,body:body_dev} };
   }
   function composeAndSend(to,subject,body){
     const base="mailto:"+encodeURIComponent(to||"")+"?subject="+encodeURIComponent(subject||"");
     const full=base+"&body="+encodeURIComponent(body||"");
     if(full.length<=1500){ location.href=full; }
-    else if(navigator.clipboard?.writeText){
-      navigator.clipboard.writeText(body||"").then(()=>{ location.href=base; alert("Treść zbyt długa – skopiowano do schowka. Wklej w oknie poczty (Ctrl+V)."); });
-    }else{ location.href=base; }
+    else if(navigator.clipboard?.writeText){ navigator.clipboard.writeText(body||"").then(()=>{ location.href=base; alert("Treść zbyt długa – skopiowano do schowka. Wklej w oknie poczty (Ctrl+V)."); }); }
+    else{ location.href=base; }
   }
 
   function renderTable(){
     tbody.innerHTML = "";
-    for(const rec of frows.slice(0,800)){ // prosty limit bezpieczeństwa
+    for(const rec of frows.slice(0,800)){
       const tr = document.createElement("tr");
 
+      const overdue = isSLAOverdue(rec);
       const over = rec.NextContactAt && rec.NextContactAt < todayLocal();
       const dueToday = rec.NextContactAt && fmtDateLocal(rec.NextContactAt)===fmtDateLocal(todayLocal());
-      const badgeClass = over ? "pill red" : dueToday ? "pill amber" : "pill";
-
+      const badgeClass = overdue ? "pill red" : (over ? "pill amber" : (dueToday ? "pill amber" : "pill"));
       const stColor = colorForStatus(rec.Status);
+      const dl = slaDeadline(rec);
 
       tr.innerHTML = `
         <td class="small muted">${rec.createdAt?fmtDateLocal(rec.createdAt):""}</td>
         <td>
           <div><strong>${esc(rec.nazwa||"")}</strong> <span class="pill" style="border-color:#2a355f;background:var(--panel-2)">${esc(rec.PH||"-")}</span></div>
           <div class="muted small">${esc(rec.adres_pelny||"")}</div>
-          <div class="small"><span class="${badgeClass}">${rec.NextContactAt?("Kontakt: "+fmtDateLocal(rec.NextContactAt)):"brak terminu"}</span></div>
+          <div class="small">
+            <span class="${badgeClass}">
+              ${rec.NextContactAt?("Kontakt: "+fmtDateLocal(rec.NextContactAt)):"brak terminu"}
+              ${dl?` • SLA: ${fmtDateLocal(dl)}`:""}
+            </span>
+          </div>
         </td>
-        <td class="small">
-          ${esc(rec.email||"")}<br/>
-          ${esc(rec.telefon||"")}
-        </td>
-        <td>
-          <select class="selStatus" style="border-left:4px solid ${stColor}">
-            ${["", ...STATUS_LIST].map(st=>`<option ${st===(rec.Status||"")?"selected":""}>${esc(st)}</option>`).join("")}
-          </select>
-        </td>
+        <td class="small">${esc(rec.email||"")}<br/>${esc(rec.telefon||"")}</td>
+        <td><select class="selStatus" style="border-left:4px solid ${stColor}">${["",...STATUS_LIST].map(st=>`<option ${st===(rec.Status||"")?"selected":""}>${esc(st)}</option>`).join("")}</select></td>
         <td><input type="date" class="inpNext" value="${rec.NextContactAt?fmtDateLocal(rec.NextContactAt):""}" /></td>
         <td style="text-align:center"><input type="checkbox" class="chkOpt" ${(["1","true","TRUE","x","X"].includes(String(rec.OptOut||"")))?"checked":""} /></td>
         <td><textarea class="taUwagi" rows="2" style="width:220px">${esc(rec.Uwagi||"")}</textarea></td>
         <td class="small">
-          <div class="row-actions" style="margin-bottom:6px">
-            <button class="btn btn-compact" data-mail="INV" title="Prośba o wycenę">INV</button>
-            <button class="btn btn-compact" data-mail="CLI" title="Mail do klienta">CLI</button>
-            <button class="btn btn-compact" data-mail="STD" title="Oferta standardowa">STD</button>
-            <button class="btn btn-compact" data-mail="DEV" title="Oferta deweloperska">DEV</button>
+          <div class="row-actions" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+            <button class="btn btn-compact" data-mail="INV">INV</button>
+            <button class="btn btn-compact" data-mail="CLI">CLI</button>
+            <button class="btn btn-compact" data-mail="STD">STD</button>
+            <button class="btn btn-compact" data-mail="DEV">DEV</button>
           </div>
-          <div class="row-actions">
+          <div class="row-actions" style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-primary btnSave">Zapisz</button>
             <button class="btn btn-ghost btnTouch">Dotknij</button>
           </div>
         </td>
       `;
 
-      // podpięcia – maile
       tr.querySelectorAll('button[data-mail]').forEach(b=>{
-        b.addEventListener('click',()=>{
-          const t=mailTemplates(rec)[b.getAttribute('data-mail')];
-          composeAndSend(t.to,t.subject,t.body);
-        });
+        b.addEventListener('click',()=>{ const t=mailTemplates(rec)[b.getAttribute('data-mail')]; composeAndSend(t.to,t.subject,t.body); });
       });
-
-      // podpięcia – kolor statusu przy zmianie
-      const selStatus = tr.querySelector(".selStatus");
-      selStatus.addEventListener("change", ()=> selStatus.style.borderLeftColor = colorForStatus(selStatus.value||""));
+      tr.querySelector(".selStatus").addEventListener("change", e=> e.currentTarget.style.borderLeftColor = colorForStatus(e.currentTarget.value||""));
 
       tr.querySelector(".btnSave").addEventListener("click", async ()=>{
         try{
@@ -750,26 +648,15 @@
           const newNext = tr.querySelector(".inpNext").value ? new Date(tr.querySelector(".inpNext").value+"T00:00:00") : null;
           const newOpt = tr.querySelector(".chkOpt").checked ? "1" : "";
           const newUw = tr.querySelector(".taUwagi").value || "";
-
-          await saveFields(rec, {
-            Status: newSt,
-            NextContactAt: newNext,
-            OptOut: newOpt,
-            Uwagi: newUw
-          });
-          rec.Status = newSt; rec.NextContactAt = newNext; rec.OptOut = newOpt; rec.Uwagi = newUw;
-          setStatus("Zapisano zmiany.");
-          scoreKPIs((account && account.name)||"");
+          await saveFields(rec, { Status:newSt, NextContactAt:newNext, OptOut:newOpt, Uwagi:newUw });
+          rec.Status=newSt; rec.NextContactAt=newNext; rec.OptOut=newOpt; rec.Uwagi=newUw;
+          setStatus("Zapisano zmiany."); scoreKPIs((account && account.name)||"");
         }catch(e){ showError("Błąd zapisu: " + (e.message||e)); }
       });
 
       tr.querySelector(".btnTouch").addEventListener("click", async ()=>{
-        try{
-          const now = new Date();
-          await saveFields(rec, { LastTouchAt: now });
-          rec.LastTouchAt = now;
-          setStatus("Zapisano LastTouchAt = teraz.");
-        }catch(e){ showError("Błąd zapisu: " + (e.message||e)); }
+        try{ const now = new Date(); await saveFields(rec, { LastTouchAt: now }); rec.LastTouchAt = now; setStatus("Zapisano LastTouchAt = teraz."); }
+        catch(e){ showError("Błąd zapisu: " + (e.message||e)); }
       });
 
       tbody.appendChild(tr);
@@ -777,61 +664,28 @@
     countInfo.textContent = `Widoczne: ${frows.length} / Wszystkich: ${rows.length}`;
   }
 
-  /* ==================== ZAPIS DO EXCELA + AUDITLOG ==================== */
+  /* ========== ZAPIS + AUDITLOG ========== */
   const AUDIT_HEADERS = ["ts","user","action","itemId","adres_pelny","old","new","note"];
+  async function ensureAuditHeaders(){ const used = await usedRange(CONFIG.logSheet); const have = (used.values && used.values[0]) ? used.values[0].map(v=>String(v||"").trim()) : []; const need = AUDIT_HEADERS.some((h,i)=> (have[i]||"") !== h); if (need){ const a1 = `A1:${colLetter(AUDIT_HEADERS.length)}1`; await patchRange(CONFIG.logSheet, a1, [AUDIT_HEADERS]); } }
+  async function getNextLogRow(){ const used = await usedRange(CONFIG.logSheet); const values = used.values || []; return Math.max(2, values.length + 1); }
+  async function appendLog(row){ await ensureAuditHeaders(); const next = await getNextLogRow(); const a1 = `A${next}:${colLetter(AUDIT_HEADERS.length)}${next}`; await patchRange(CONFIG.logSheet, a1, [row]); }
 
-  async function ensureAuditHeaders(){
-    const used = await usedRange(CONFIG.logSheet);
-    const have = (used.values && used.values[0]) ? used.values[0].map(v=>String(v||"").trim()) : [];
-    const need = AUDIT_HEADERS.some((h,i)=> (have[i]||"") !== h);
-    if (need){
-      const a1 = `A1:${colLetter(AUDIT_HEADERS.length)}1`;
-      await patchRange(CONFIG.logSheet, a1, [AUDIT_HEADERS]);
-    }
-  }
-  async function getNextLogRow(){
-    const used = await usedRange(CONFIG.logSheet);
-    const values = used.values || [];
-    return Math.max(2, values.length + 1);
-  }
-  async function appendLog(row){
-    await ensureAuditHeaders();
-    const next = await getNextLogRow();
-    const a1 = `A${next}:${colLetter(AUDIT_HEADERS.length)}${next}`;
-    await patchRange(CONFIG.logSheet, a1, [row]);
-  }
-
-  // zapis pól (Status, NextContactAt, LastTouchAt, OptOut, Uwagi) + opcjonalnie Reminder* (pod PA)
   async function saveFields(rec, patchObj){
     const used = await usedRange(CONFIG.dataSheet);
-    const vals = used.values || [];
-    if(!vals.length) throw new Error("Arkusz pusty.");
+    const vals = used.values || []; if(!vals.length) throw new Error("Arkusz pusty.");
     const headers = (vals[0]||[]).map(h=>String(h||"").trim());
+    function needCol(title){ let idx = headers.findIndex(h=>String(h).toLowerCase().trim()===title.toLowerCase()); if(idx<0){ idx = headers.length; headers.push(title); } return idx; }
+    const idxStatus = needCol("Status"), idxNext=needCol("NextContactAt"), idxLast=needCol("LastTouchAt"), idxOpt=needCol("OptOut");
+    const idxUwagi = (()=>{ let i = headers.findIndex(h=>normLower(h).includes("uwagi")); if(i<0){ i = headers.length; headers.push("Uwagi"); } return i; })();
+    const idxRSent=needCol("ReminderSentAt"), idxRTask=needCol("ReminderTaskId");
 
-    function needCol(title){
-      let idx = headers.findIndex(h=>String(h).toLowerCase().trim()===title.toLowerCase());
-      if(idx<0){ idx = headers.length; headers.push(title); }
-      return idx;
-    }
-    const idxStatus = needCol("Status");
-    const idxNext   = needCol("NextContactAt");
-    const idxLast   = needCol("LastTouchAt");
-    const idxOpt    = needCol("OptOut");
-    const idxUwagi  = (()=>{ let i = headers.findIndex(h=>normLower(h).includes("uwagi")); if(i<0){ i = headers.length; headers.push("Uwagi"); } return i; })();
-    const idxRSent  = needCol("ReminderSentAt");
-    const idxRTask  = needCol("ReminderTaskId");
-
-    let row1 = Number(rec._row1)||-1;
-    if(row1<0){ throw new Error("Brak wskaźnika wiersza. Odśwież dane."); }
-
+    let row1 = Number(rec._row1)||-1; if(row1<0) throw new Error("Brak wskaźnika wiersza.");
     const toA1 = (idx)=> `${colLetter(idx+1)}${row1}`;
 
     const old = { Status: rec.Status, NextContactAt: rec.NextContactAt, LastTouchAt: rec.LastTouchAt, OptOut: rec.OptOut, Uwagi: rec.Uwagi, ReminderSentAt: rec.ReminderSentAt, ReminderTaskId: rec.ReminderTaskId };
     const neu = { ...old, ...patchObj };
 
-    if(headers.length !== (vals[0]||[]).length){
-      await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]);
-    }
+    if(headers.length !== (vals[0]||[]).length){ await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
 
     const writes = [];
     if("Status" in patchObj)       writes.push({ a1: toA1(idxStatus), val: [[ String(neu.Status||"") ]] });
@@ -841,7 +695,6 @@
     if("Uwagi" in patchObj)        writes.push({ a1: toA1(idxUwagi),  val: [[ String(neu.Uwagi||"") ]] });
     if("ReminderSentAt" in patchObj) writes.push({ a1: toA1(idxRSent), val: [[ neu.ReminderSentAt? fmtDateLocal(neu.ReminderSentAt): "" ]] });
     if("ReminderTaskId" in patchObj) writes.push({ a1: toA1(idxRTask), val: [[ String(neu.ReminderTaskId||"") ]] });
-
     for(const w of writes){ await patchRange(CONFIG.dataSheet, w.a1, w.val); }
 
     const now = new Date().toISOString();
@@ -851,19 +704,76 @@
     await appendLog([ now, upn, "UpdatePHDashboard", "", rec.adres_pelny||"", logOld, logNew, "" ]);
   }
 
-  /* ==================== ŁADOWANIE / UI ==================== */
+  /* ========== POWIADOMIENIA (Planner / Outlook / Teams) ========== */
+  let NOTIFY_CFG = null;
+  async function loadNotifyCfg(){
+    try{
+      const r = await fetch("assets/notify.json?v="+Date.now(), {cache:"no-store"});
+      if(r.ok){ NOTIFY_CFG = await r.json(); }
+    }catch(e){ console.warn("notify.json not found – notifications disabled"); }
+  }
+
+  async function createCalendarEvent(rec, deadline){
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Warsaw";
+    const body = {
+      subject: `SLA PRZEKROCZONE • ${rec.Status} • ${rec.miejscowosc||""} • ${rec.nazwa||""}`,
+      body: { contentType:"Text", content: `Adres: ${rec.adres_pelny||""}\nPH: ${rec.PH||""}\nStatus: ${rec.Status}\nSLA: ${fmtDateLocal(deadline)}\n` },
+      start: { dateTime: fmtDateLocal(deadline)+"T09:00:00", timeZone: tz },
+      end:   { dateTime: fmtDateLocal(deadline)+"T09:30:00", timeZone: tz }
+    };
+    const ev = await gfetch("POST","https://graph.microsoft.com/v1.0/me/events", body);
+    return ev?.id || "";
+  }
+
+  async function createPlannerTask(rec, deadline){
+    if(!NOTIFY_CFG?.planner?.planId || !NOTIFY_CFG?.planner?.bucketId) return "";
+    const body = {
+      planId: NOTIFY_CFG.planner.planId,
+      bucketId: NOTIFY_CFG.planner.bucketId,
+      title: `SLA • ${rec.Status} • ${rec.miejscowosc||""} • ${rec.nazwa||""}`,
+      assignments: {},  // przypisanie opcjonalnie po UPN
+      dueDateTime: deadline.toISOString()
+    };
+    const t = await gfetch("POST","https://graph.microsoft.com/v1.0/planner/tasks", body).catch(()=>null);
+    return t?.id || "";
+  }
+
+  async function sendTeamsDM(rec, deadline){
+    if(!NOTIFY_CFG?.teams?.userId) return "";
+    const body = { body: { content: `SLA **${rec.Status}** przekroczone dla **${rec.nazwa||""}** (${rec.adres_pelny||""}). Termin: ${fmtDateLocal(deadline)}` } };
+    const chat = await gfetch("POST",`https://graph.microsoft.com/v1.0/users/${NOTIFY_CFG.teams.userId}/chats`, { chatType:"oneOnOne", members:[] }).catch(()=>null);
+    if(!chat?.id) return "";
+    await gfetch("POST",`https://graph.microsoft.com/v1.0/chats/${chat.id}/messages`, body).catch(()=>null);
+    return chat.id;
+  }
+
+  async function notifyIfNeeded(rec){
+    if(!isSLAOverdue(rec)) return;
+    if(rec.ReminderSentAt) return; // już powiadomiony
+    const deadline = slaDeadline(rec); if(!deadline) return;
+
+    let taskId = "";
+    try{
+      if(NOTIFY_CFG?.mode==="planner") taskId = await createPlannerTask(rec, deadline);
+      else if(NOTIFY_CFG?.mode==="teams") taskId = await sendTeamsDM(rec, deadline);
+      else taskId = await createCalendarEvent(rec, deadline); // domyślnie Outlook
+      await saveFields(rec, { ReminderSentAt: new Date(), ReminderTaskId: taskId });
+    }catch(e){ console.warn("notify failed", e); }
+  }
+
+  /* ========== ŁADOWANIE / START ========== */
   function scoreAndRender(){
     const me = (account && (account.name||"")) || "";
     myNameLabel.textContent = me ? ("Przypisane do: " + me) : "";
+    updateManagerOwnerSelect();
     scoreKPIs(me);
     applyFilters();
     renderTable();
   }
 
   async function loadData(){
-    setStatus("Ładowanie list i źródeł…");
-    await loadLists();
-    await loadDatasources();
+    setStatus("Ładowanie list / reguł / źródeł…");
+    await Promise.all([loadLists(), loadStatusRules(), loadNotifyCfg(), loadDatasources()]);
 
     setStatus("Ładowanie danych z Excela…");
     const used = await usedRange(CONFIG.dataSheet);
@@ -872,26 +782,24 @@
 
     rows = parseRows(values);
     scoreAndRender();
+
+    // uruchom powiadomienia SLA dla widocznych rekordów
+    for(const r of rows){ notifyIfNeeded(r); }
     setStatus("Gotowe.");
   }
 
-  // --- przyciski / dropdown Status
-  document.getElementById("btnLogin").addEventListener("click", async ()=>{ try{ await ensureLogin(); setStatus("Zalogowano."); }catch(e){ showError("Logowanie nieudane: " + (e.message||e)); } });
+  // przyciski
+  document.getElementById("btnLogin").addEventListener("click", async ()=>{ try{ await ensureLogin(); setStatus("Zalogowano."); updateManagerOwnerSelect(); }catch(e){ showError("Logowanie nieudane: " + (e.message||e)); } });
   document.getElementById("btnLogout").addEventListener("click", async ()=>{
     try{ const acc = msalApp.getAllAccounts()[0]; if(acc){ await msalApp.logoutPopup({ account: acc }); }
       account=null; who.textContent=""; setStatus("Wylogowano."); }catch(e){ showError("Wylogowanie nieudane: " + (e.message||e)); }
   });
-  document.getElementById("btnReload").addEventListener("click", async ()=>{
-    try{ await ensureLogin(); await loadData(); }catch(e){ showError(e.message||e); }
-  });
+  document.getElementById("btnReload").addEventListener("click", async ()=>{ try{ await ensureLogin(); await loadData(); }catch(e){ showError(e.message||e); } });
   document.getElementById("btnApply").addEventListener("click", ()=>{ scoreAndRender(); });
 
-  // obsługa dropdownu statusów
+  // dropdown statusów
   const dd = document.getElementById('ddStatus');
-  document.getElementById('fltStatusBtn').addEventListener('click', (e)=>{
-    e.stopPropagation();
-    dd.classList.toggle('open');
-  });
+  document.getElementById('fltStatusBtn').addEventListener('click', (e)=>{ e.stopPropagation(); dd.classList.toggle('open'); });
   document.getElementById('stAll').addEventListener('click', ()=> setAllStatuses(true));
   document.getElementById('stClear').addEventListener('click', ()=> setAllStatuses(false));
   document.getElementById('fltStatusMenu').addEventListener('change', updateStatusBtnLabel);
@@ -899,6 +807,8 @@
 
   // start
   await loadLists();
+  await loadStatusRules();
+  await loadNotifyCfg();
   await loadDatasources();
   msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e));
   setStatus("Kliknij „Zaloguj”, a potem „Odśwież”.");
