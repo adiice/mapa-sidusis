@@ -604,11 +604,12 @@ Pozostałe informacje jak w ofercie standardowej.
   if (typeof msal === 'undefined' || !msal.PublicClientApplication){ alert('MSAL nie jest dostępny.'); return; }
 
   /* =========================== MSAL / GRAPH =========================== */
+  let authInProgress = false;
   const msalApp = new msal.PublicClientApplication({
     auth: {
       clientId: CONFIG.clientId,
       authority: "https://login.microsoftonline.com/" + CONFIG.tenantId,
-      redirectUri: window.location.origin + window.location.pathname
+      redirectUri: "https://adiice.github.io/mapa-sidusis/mapa.html"
     },
     cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false },
     system: { loggerOptions: { loggerCallback: (l, m)=>console.log("[MSAL]", m) } }
@@ -616,17 +617,57 @@ Pozostałe informacje jak w ofercie standardowej.
   const graphScopes = ["openid","profile","offline_access","Files.ReadWrite.All","Sites.Read.All"];
 
   async function ensureLogin(){
-    const accs = msalApp.getAllAccounts();
-    if(accs.length){ account=accs[0]; who.textContent = "Zalogowano: " + (account.username||account.homeAccountId); updateMissingPanel(); return; }
-    const r = await msalApp.loginPopup({ scopes: graphScopes });
-    account = r.account; who.textContent = "Zalogowano: " + (account.username||account.homeAccountId);
+  // jeśli już mamy konto – nic nie rób
+  const accs = msalApp.getAllAccounts();
+  if (accs.length) {
+    account = accs[0];
+    who.textContent = "Zalogowano: " + (account.username || account.homeAccountId);
     updateMissingPanel();
+    return;
   }
-  async function getToken(){
-    await ensureLogin();
-    try{ const r=await msalApp.acquireTokenSilent({ scopes: graphScopes, account }); return r.accessToken; }
-    catch{ const r=await msalApp.acquireTokenPopup({ scopes: graphScopes }); return r.accessToken; }
+
+  // nie otwieraj 2-giego popupu naraz
+  if (authInProgress) return;
+  authInProgress = true;
+  try {
+    const r = await msalApp.loginPopup({ scopes: graphScopes, prompt: "select_account" });
+    account = r.account;
+    who.textContent = "Zalogowano: " + (account.username || account.homeAccountId);
+    updateMissingPanel();
+  } finally {
+    authInProgress = false;
   }
+}
+
+async function getToken(){
+  // spróbuj cicho, jeśli nie wyjdzie – popup tylko, gdy faktycznie wymagany
+  const acc = msalApp.getAllAccounts()[0] || account;
+  if (acc) account = acc;
+
+  try {
+    const r = await msalApp.acquireTokenSilent({ scopes: graphScopes, account });
+    return r.accessToken;
+  } catch (e) {
+    // tylko wtedy próbuj popup
+    const needPopup =
+      (e && (e.errorCode === "no_account_error" ||
+             e.errorCode === "no_tokens_found" ||
+             (e.errorCode && String(e.errorCode).includes("interaction_required"))));
+
+    if (!needPopup) throw e;
+
+    if (authInProgress) throw e; // poczekaj na trwającą interakcję
+
+    authInProgress = true;
+    try {
+      const r = await msalApp.acquireTokenPopup({ scopes: graphScopes });
+      account = r.account || account;
+      return r.accessToken;
+    } finally {
+      authInProgress = false;
+    }
+  }
+}
   async function gfetch(method, url, body){
     const token = await getToken();
     const resp = await fetch(url, {
