@@ -1,11 +1,11 @@
 {
-  "Wycena Inwestycji": { "slaDays": 2, "startField": "createdAt" },
-  "Oferta wysłana":    { "slaDays": 3, "startField": "LastTouchAt" },
+  "Wycena Inwestycji": { "slaDays": 3, "startField": "LastTouchAt" },
+  "Oferta wysłana":    { "slaDays": 7, "startField": "LastTouchAt" },
   "Odmowa klienta":    { "slaDays": 0, "startField": "createdAt" },
-  "Akceptacja klienta":{ "slaDays": 1, "startField": "LastTouchAt" },
+  "Akceptacja klienta":{ "slaDays": 0, "startField": "createdAt" },
   "Poza Zasięgiem":    { "slaDays": 0, "startField": "createdAt" },
   "KPO":               { "slaDays": 0, "startField": "createdAt" },
   "MOICO":             { "slaDays": 0, "startField": "createdAt" },
   "Duplikat":          { "slaDays": 0, "startField": "createdAt" },
-  "SEEV":              { "slaDays": 2, "startField": "createdAt" }
+  "SEEV":              { "slaDays": 0, "startField": "createdAt" }
 }
