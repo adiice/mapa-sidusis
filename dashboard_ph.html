@@ -521,17 +521,24 @@
 
   // wypełnia scalony select Zakres wg roli użytkownika
   function updateManagerOwnerSelect(){
-    const ownerSel = document.getElementById("fltOwner");
-    const isBoss = (account?.username||"").toLowerCase() === "adaniel@internetunion.pl";
-    ownerSel.style.display = isBoss ? "" : "none";
-    if(!isBoss) return;
-
-    const options = ['<option value="__my__">Tylko moje</option>',
-                     '<option value="__all__">Wszyscy PH</option>',
-                     '<option value="__none__">Tylko nieprzydzielone</option>']
-      .concat(PH_LIST.map(ph=>`<option value="${ph}">PH: ${ph}</option>`));
-    ownerSel.innerHTML = options.join('');
-    if(!ownerSel.value) ownerSel.value="__all__";
+    const sel = document.getElementById("fltScopeUnified");
+    if(!sel) return;
+    const prev = sel.value; // zachowaj poprzednią wartość
+    const boss = isManager();
+    sel.innerHTML = "";
+    const add = (label, value, disabled=false)=>{ const o=document.createElement('option'); o.value=value; o.textContent=label; if(disabled) o.disabled=true; sel.appendChild(o); };
+    add("Tylko moje","my");
+    add("Do kontaktu (≤ dziś)","due");
+    add("Tylko nieprzydzielone","unassigned");
+    if(boss){
+      add("────────","__sep__", true); // separator
+      const rowPH = Array.from(new Set(rows.map(r=>String(r.PH||'').trim()).filter(Boolean)));
+      const list = Array.from(new Set([...(PH_LIST||[]), ...rowPH]));
+      list.forEach(ph=> add("PH: "+ph, "ph:"+ph));
+      add("Wszyscy PH","all_ph");
+    }
+    const allowed = Array.from(sel.options).map(o=>o.value);
+    sel.value = allowed.includes(prev) ? prev : "my";
   }
 
   function parseDateInput(id, endOfDay=false){ const v=document.getElementById(id).value; return v ? new Date(v + (endOfDay? "T23:59:59" : "T00:00:00")) : null; }
