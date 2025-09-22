@@ -163,7 +163,7 @@
   <!-- KPI CARDS -->
   <div class="cards">
     <div class="card"><h3>Nieprzydzielone leady (wykl. KPO/MOICO/itd.)</h3><div class="kpi" id="kpiUnassigned">—</div><div class="small muted">Kliknij „Odśwież”, aby przeliczyć.</div></div>
-    <div class="card"><h3>Nowe nieprzydzielone – poprzedni dzień roboczy</h3><div class="kpi" id="kpiNewPrev">—</div><div class="small muted" id="prevRangeLabel"></div></div>
+    <div class="card"><h3>Nowe nieprzydzielone – poprzedni tydzień</h3><div class="kpi" id="kpiNewPrev">—</div><div class="small muted" id="prevRangeLabel"></div></div>
     <div class="card"><h3>Moje pilne (przeterminowane / dziś)</h3><div class="kpi" id="kpiMyDue">—</div><div class="small muted" id="myNameLabel"></div></div>
   </div>
 
@@ -359,12 +359,11 @@
   }
   function fmtDateLocal(d){ if(!d) return ""; const y=d.getFullYear(), m=("0"+(d.getMonth()+1)).slice(-2), dd=("0"+d.getDate()).slice(-2); return `${y}-${m}-${dd}`; }
   function todayLocal(){ const now = new Date(); return new Date(now.getFullYear(), now.getMonth(), now.getDate()); }
-  function prevBusinessRange(){
-    const d = todayLocal(); const dow = d.getDay();
-    let start, end;
-    if(dow===1){ const fri = new Date(d); fri.setDate(d.getDate()-3); start = new Date(fri); end = new Date(d); end.setDate(d.getDate()-1); }
-    else{ start = new Date(d); start.setDate(d.getDate()-1); end = new Date(start); }
-    start.setHours(0,0,0,0); end.setHours(23,59,59,999); return {start,end};
+  function prevWeekRange(){
+    const d = todayLocal();
+    const end = new Date(d); end.setDate(d.getDate()-1); end.setHours(23,59,59,999);
+    const start = new Date(d); start.setDate(d.getDate()-7); start.setHours(0,0,0,0);
+    return {start,end};
   }
 
   /* ========== DATASOURCES ========== */
@@ -504,7 +503,7 @@
     const empty = !ph || phNorm==="brak" || phNorm==="none" || phNorm==="unassigned" || phNorm==="nieprzydzielone" || ph==="-";
     return empty && !EXCLUDED_STATUSES.has(st);
   }
-  function inPrevBusiness(rec){ if(!rec.createdAt) return false; const {start,end} = prevBusinessRange(); return rec.createdAt >= start && rec.createdAt <= end; }
+  function inPrevWeek(rec){ if(!rec.createdAt) return false; const {start,end} = prevWeekRange(); return rec.createdAt >= start && rec.createdAt <= end; }
   function isDueForMe(rec, me){
     if((rec.PH||"").trim() !== (me||"").trim()) return false;
     const opt = String(rec.OptOut||"").toLowerCase(); if(opt==="1"||opt==="true"||opt==="x") return false;
@@ -519,12 +518,12 @@
 
   function scoreKPIs(me){
     const unassigned = rows.filter(isUnassigned).length;
-    const newPrev = rows.filter(r=>isUnassigned(r)&&inPrevBusiness(r)).length;
+    const newPrev = rows.filter(r=>isUnassigned(r)&&inPrevWeek(r)).length;
     const myDue = rows.filter(r=>isDueForMe(r, me)).length;
     kpiUnassigned.textContent = unassigned;
     kpiUnassigned.className = "kpi " + (unassigned>50?"verybad":unassigned>10?"bad":"");
     kpiNewPrev.textContent = newPrev;
-    const {start,end} = prevBusinessRange();
+    const {start,end} = prevWeekRange();
     prevRangeLabel.textContent = "Zakres: " + fmtDateLocal(start) + (fmtDateLocal(start)!==fmtDateLocal(end) ? " – " + fmtDateLocal(end) : "");
     kpiMyDue.textContent = myDue;
     kpiMyDue.className = "kpi " + (myDue===0?"good":myDue>10?"verybad":"bad");
@@ -592,8 +591,8 @@
 
   function applyChip(id, save=true){
     const sel = document.getElementById('fltScopeUnified');
-    // reset statusów i wyszukiwarki
-    setAllStatuses(true);
+    // reset statusów (pusty = brak filtra) i wyszukiwarki
+    setAllStatuses(false);
     const q = document.getElementById('fltQuery'); if(q) q.value='';
     // wyczyść daty domyślnie
     ['fltCreatedFrom','fltCreatedTo','fltNextFrom','fltNextTo'].forEach(k=> setDateInput(k, null));
@@ -602,9 +601,10 @@
       phDueOverride=null; if(sel) sel.value='due';
     }else if(id==='my_all'){
       phDueOverride=null; if(sel) sel.value='my';
-    }else if(id==='unassigned_recent'){
+    }else if(id==='unassigned_recent' || id==='unassigned' || id==='unassigned_all'){
       phDueOverride=null; if(sel) sel.value='unassigned';
-      const from=new Date(today); from.setDate(today.getDate()-14); setDateInput('fltCreatedFrom', from); setDateInput('fltCreatedTo', null);
+      // brak daty: wszystkie nieprzydzielone
+      ['fltCreatedFrom','fltCreatedTo','fltNextFrom','fltNextTo'].forEach(k=> setDateInput(k, null));
     }else if(id==='allph_due'){
       phDueOverride=null; if(sel) sel.value='all_ph'; setDateInput('fltNextTo', today);
     }else if(id==='ph_due'){
@@ -694,21 +694,22 @@
   let SORT = { key: null, dir: 1 }; // key: 'createdAt' | 'NextContactAt' | 'Status'
   function setSort(key){
     if(SORT.key===key){ SORT.dir = -SORT.dir; } else { SORT.key = key; SORT.dir = 1; }
-    // strzałki w nagłówkach (bez zmiany HTML) – użyjemy dataset
+    // ikony sortowania w nagłówkach
     document.querySelectorAll('#tbl thead th').forEach(th=>{
       const k = th.dataset.sortKey; if(!k){ return; }
       const label = th.dataset.label || th.textContent.trim();
-      const suffix = (SORT.key===k) ? (SORT.dir>0? ' ▲':' ▼') : '';
-      th.textContent = label + suffix;
       th.dataset.label = label; th.dataset.sortKey = k; th.style.cursor='pointer';
+      if(!th.querySelector('.thicon')){ th.innerHTML = `<span class="thlbl">${label}</span> <span class="thicon">⇅</span>`; }
+      const icon = th.querySelector('.thicon');
+      icon.textContent = (SORT.key===k) ? (SORT.dir>0? '▲':'▼') : '⇅';
     });
     applyFilters();
     renderTable();
   }
   function initSortHeaders(){
     const ths = document.querySelectorAll('#tbl thead th');
-    const map = [ {idx:0,key:'createdAt'}, {idx:3,key:'Status'}, {idx:4,key:'NextContactAt'} ];
-    map.forEach(({idx,key})=>{ const th=ths[idx]; if(!th) return; th.dataset.sortKey=key; th.dataset.label=th.textContent.trim(); th.style.cursor='pointer'; th.addEventListener('click', ()=>setSort(key)); });
+    const map = [ {idx:0,key:'createdAt'}, {idx:3,key:'Status'}, {idx:4,key:'NextContactAt'}, {idx:6,key:'PH'} ];
+    map.forEach(({idx,key})=>{ const th=ths[idx]; if(!th) return; th.dataset.sortKey=key; th.dataset.label=th.textContent.trim(); th.style.cursor='pointer'; th.innerHTML = `<span class="thlbl">${th.dataset.label}</span> <span class="thicon">⇅</span>`; th.addEventListener('click', ()=>setSort(key)); });
   }
 
   // szablony maili – jak wcześniej
