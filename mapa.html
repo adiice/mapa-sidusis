@@ -211,7 +211,6 @@
     ]
   };
 
-  // >>> Uwaga: jedna, wspólna funkcja normStr (żeby nie było konfliktów nazw!)
   const normStr = s => String(s||"").toLowerCase().replace(/\s+/g," ").trim();
 
   let LISTS = DEFAULT_LISTS;
@@ -315,7 +314,7 @@
   function fitToData(arr){
     let minLat=90, maxLat=-90, minLon=180, maxLon=-180, has=false;
     for(const r of arr){
-      if(!isFinite(r.lat)||!isFinite(r.lon)) continue;
+      if(!r._hasGeo) continue;
       has=true;
       if(r.lat<minLat) minLat=r.lat; if(r.lat>maxLat) maxLat=r.lat;
       if(r.lon<minLon) minLon=r.lon; if(r.lon>maxLon) maxLon=r.lon;
@@ -464,15 +463,29 @@
   }
 
   function rebuild(){
+    // Guard + lazy init na wypadek wywołania przed initMap
+    if (!cluster) {
+      console.warn("Cluster not ready; initializing map…");
+      initMap();
+    }
+    if (!cluster) { 
+      showError("Mapa nie została zainicjalizowana."); 
+      return; 
+    }
+
     cluster.clearLayers();
     let placed=0;
     frows.forEach(rec=>{
-      if(!isFinite(rec.lat)||!isFinite(rec.lon)) return;
+      if(!rec._hasGeo) return; // renderuj tylko z geolokacją
       try{ addOneMarker(rec); placed++; }catch(err){ console.error("Render error for",rec,err); }
     });
     fitToData(frows);
-    const sample = frows.slice(0,2).map(r=>`(${r.lat.toFixed(5)}, ${r.lon.toFixed(5)})`).join(" ; ");
-    setStatus([`Widocznych na mapie: ${placed}`, `Przykładowe współrzędne: ${sample||"—"}`]);
+    const withGeoTotal = frows.filter(r=>r._hasGeo).length;
+    const sample = frows.filter(r=>r._hasGeo).slice(0,2).map(r=>`(${r.lat.toFixed(5)}, ${r.lon.toFixed(5)})`).join(" ; ");
+    setStatus([
+      `Wszystkich w filtrze: ${frows.length} | z geolokacją: ${withGeoTotal} | na mapie: ${placed}`,
+      withGeoTotal ? `Przykładowe współrzędne: ${sample}` : "Brak punktów do pokazania"
+    ]);
   }
 
   /* ==================== MAIL – szablony ==================== */
@@ -695,6 +708,37 @@ Pozostałe informacje jak w ofercie standardowej.
   }
 
   /* =========================== DANE z Excela =========================== */
+
+  // Heurystyki naprawy współrzędnych
+  function repairGeo(o){
+    const validLat=v=>isFinite(v)&&v>=-90&&v<=90;
+    const validLon=v=>isFinite(v)&&v>=-180&&v<=180;
+
+    // 1) Jeśli lon wygląda jak szerokość, a lat jak długość -> zamień
+    if(validLat(o.lon) && validLon(o.lat) && !validLat(o.lat)){
+      const tmp=o.lat; o.lat=o.lon; o.lon=tmp;
+    }
+    // 2) Jeśli lat nie w [-90,90], ale lon w [-90,90] -> zamień
+    if(!validLat(o.lat) && validLat(o.lon)){
+      const tmp=o.lat; o.lat=o.lon; o.lon=tmp;
+    }
+    // 3) Próba wydobycia z adresu: "...(lat, lon)" lub "lat;lon"
+    if(!validLat(o.lat) || !validLon(o.lon)){
+      const txt = String(o.adres_pelny||"");
+      const m = txt.match(/(-?\d{1,3}[.,]\d+)[^\d-]+(-?\d{1,3}[.,]\d+)/);
+      if(m){
+        let a = parseFloat(m[1].replace(",", "."));
+        let b = parseFloat(m[2].replace(",", "."));
+        // wybierz sensowną kombinację
+        if(validLat(a) && validLon(b)){ o.lat=a; o.lon=b; }
+        else if(validLat(b) && validLon(a)){ o.lat=b; o.lon=a; }
+      }
+    }
+
+    o._hasGeo = validLat(o.lat) && validLon(o.lon);
+    return o;
+  }
+
   function pickHeader(headers, tokens){
     const lc = headers.map(h => String(h||"").toLowerCase());
     for(const t of tokens){ const i = lc.findIndex(n => n.includes(t)); if(i>=0) return headers[i]; }
@@ -707,8 +751,9 @@ Pozostałe informacje jak w ofercie standardowej.
     const body = values.slice(1);
     const H = {
       created: headers[0],
-      lat:  pickHeader(headers,["lat","latitude","szerokość","szerokosc"]),
-      lon:  pickHeader(headers,["lon","longitude","długość","dlugosc"]),
+      // ⬇️ rozszerzone dopasowanie kolumn współrzędnych (także "PUNKT (X)/(Y)")
+      lat:  pickHeader(headers,["lat","latitude","szerokość","szerokosc","punkt (y)","y"]),
+      lon:  pickHeader(headers,["lon","longitude","długość","dlugosc","punkt (x)","x"]),
       tel:  pickHeader(headers,["telefon","tel"]),
       mail: pickHeader(headers,["email","e-mail","mail"]),
       ph:   pickHeader(headers,["ph"]),
@@ -733,7 +778,7 @@ Pozostałe informacje jak w ofercie standardowej.
         const m = String(get(r,H.msc)||"").trim();
         adr = (u && n && m) ? `ul. ${u} ${n}, ${m}` : (u+" "+n).trim() || m;
       }
-      return {
+      const obj = {
         _row1: idx + 2,
         createdAt: toDate(get(r,H.created)),
         lat, lon, adres_pelny: adr||"",
@@ -746,14 +791,10 @@ Pozostałe informacje jak w ofercie standardowej.
         PowodOdmowy: String(get(r,H.powod)||""),
         Uwagi: String(get(r,H.notes)||"")
       };
+      return repairGeo(obj);
     });
 
-    const validLat=v=>isFinite(v)&&v>=-90&&v<=90;
-    const validLon=v=>isFinite(v)&&v>=-180&&v<=180;
-    const okNormal = out.filter(o=>validLat(o.lat)&&validLon(o.lon)).length;
-    const okSwapped= out.filter(o=>validLat(o.lon)&&validLon(o.lat)).length;
-    if(okSwapped>okNormal){ out = out.map(o=>({ ...o, lat:o.lon, lon:o.lat })); }
-    out = out.filter(o=>validLat(o.lat)&&validLon(o.lon));
+    // Nie filtrujemy out – zwracamy pełną listę (z flagą _hasGeo)
     return out;
   }
 
@@ -764,10 +805,11 @@ Pozostałe informacje jak w ofercie standardowej.
     if(!values.length){ setStatus("Arkusz pusty."); rows=[]; frows=[]; return; }
     rows = parseRows(values);
 
-    // UWAGA: nie rozszerzamy PH_LIST o wartości z Excela – tylko z lists.json
     fillMiniFilters();
     frows = rows.slice();
-    setStatus(`Załadowano ${rows.length} wierszy z arkusza „${CONFIG.dataSheet}”.`);
+    const total = rows.length;
+    const withGeo = rows.filter(r => r._hasGeo).length;
+    setStatus(`Załadowano ${total} wierszy (z geolokacją: ${withGeo}) z arkusza „${CONFIG.dataSheet}”.`);
   }
 
   /* =========================== FILTRY / MASÓWKA =========================== */
@@ -1014,5 +1056,3 @@ Pozostałe informacje jak w ofercie standardowej.
 <div class="credit">Autor: Adrian Daniel</div>
 </body>
 </html>
-
-
