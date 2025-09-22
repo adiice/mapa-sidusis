@@ -63,6 +63,11 @@
   .panel{ margin-top:16px; background:linear-gradient(180deg,var(--card) 0%, var(--panel-2) 100%); border:1px solid var(--line); border-radius:var(--br); }
   .panel .hd{ padding:12px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center }
   .panel .hd h2{ margin:0; font-size:16px; color:color-mix(in oklab, var(--text) 86%, white) }
+  /* quick chips */
+  .chips{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-left:12px; opacity:.95 }
+  .quick-chip{ padding:4px 10px; border-radius:999px; background:var(--panel-2); color:var(--text); border:1px solid var(--line); cursor:pointer }
+  .quick-chip:hover{ filter:brightness(1.08) }
+  .quick-chip.active{ outline:2px solid var(--btn2-b) }
   .panel .hd .tools{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .panel .bd{ padding:12px 14px }
 
@@ -169,6 +174,7 @@
   <div class="panel">
     <div class="hd">
       <h2>Moje leady</h2>
+      <div class="chips" id="quickChips"></div>
       <div class="tools controls">
         <!-- ZAKRES -->
         <label class="small muted">Zakres:</label>
@@ -255,6 +261,8 @@
     logSheet: "AuditLog"
   };
   const LS_KEY_DS = "sidusis_ds_key";
+  const QUICK_CHIP_KEY = 'phdash_last_chip';
+  let INITIAL_CHIP_APPLIED = false;
 
   /* ========== LISTS / STATUS RULES (SLA) ========== */
   const DEFAULT_LISTS = {
@@ -565,6 +573,57 @@
   function updateStatusBtnLabel(){ const sel=getSelectedStatuses(); document.getElementById("fltStatusBtn").textContent = sel.length ? `Statusy: ${sel.length} wybrane ▼` : 'Statusy: (wszystkie) ▼'; }
   function setAllStatuses(checked){ document.querySelectorAll('#fltStatusGrid input[type="checkbox"]').forEach(ch=>ch.checked=checked); updateStatusBtnLabel(); }
 
+  // ---------- QUICK CHIPS ----------
+  function buildQuickChips(){
+    const box = document.getElementById('quickChips'); if(!box) return;
+    const boss = isManager();
+    const chips = [
+      { id:'my_due', label:'Moje zaległe' },
+      { id:'my_all', label:'Moje wszystkie' },
+      { id:'unassigned_recent', label:'Nieprzydzielone' },
+    ];
+    if(boss) chips.push({ id:'allph_due', label:'Wszyscy PH — zaległe' });
+    box.innerHTML = chips.map(c=>`<button class="quick-chip" data-id="${c.id}">${c.label}</button>`).join('');
+    // dynamiczny chip dla override PH
+    if(phDueOverride){ const b=document.createElement('button'); b.className='quick-chip'; b.dataset.id='ph_due'; b.textContent='PH zaległe'; box.appendChild(b); }
+  }
+
+  function setDateInput(id, d){ const el=document.getElementById(id); if(!el) return; el.value = d? fmtDateLocal(d): ''; }
+
+  function applyChip(id, save=true){
+    const sel = document.getElementById('fltScopeUnified');
+    // reset statusów i wyszukiwarki
+    setAllStatuses(true);
+    const q = document.getElementById('fltQuery'); if(q) q.value='';
+    // wyczyść daty domyślnie
+    ['fltCreatedFrom','fltCreatedTo','fltNextFrom','fltNextTo'].forEach(k=> setDateInput(k, null));
+    const today = todayLocal();
+    if(id==='my_due'){
+      phDueOverride=null; if(sel) sel.value='due';
+    }else if(id==='my_all'){
+      phDueOverride=null; if(sel) sel.value='my';
+    }else if(id==='unassigned_recent'){
+      phDueOverride=null; if(sel) sel.value='unassigned';
+      const from=new Date(today); from.setDate(today.getDate()-14); setDateInput('fltCreatedFrom', from); setDateInput('fltCreatedTo', null);
+    }else if(id==='allph_due'){
+      phDueOverride=null; if(sel) sel.value='all_ph'; setDateInput('fltNextTo', today);
+    }else if(id==='ph_due'){
+      // tylko podświetlenie – zakres utrzymuje phDueOverride
+    }
+    if(save) localStorage.setItem(QUICK_CHIP_KEY, id);
+    updateQuickChipsActive(id);
+    applyFilters(); renderTable();
+  }
+
+  function updateQuickChipsActive(currentId){
+    const box=document.getElementById('quickChips'); if(!box) return;
+    // zarządzaj chipem ph_due
+    let phChip = box.querySelector('.quick-chip[data-id="ph_due"]');
+    if(phDueOverride){ if(!phChip){ phChip=document.createElement('button'); phChip.className='quick-chip'; phChip.dataset.id='ph_due'; phChip.textContent='PH zaległe'; box.appendChild(phChip); } }
+    else{ if(phChip) phChip.remove(); }
+    [...box.querySelectorAll('.quick-chip')].forEach(b=> b.classList.toggle('active', b.dataset.id===currentId));
+  }
+
   function applyFilters(){
     const scope = (document.getElementById("fltScopeUnified")?.value)||"my";
     const q = (document.getElementById("fltQuery").value||"").toLowerCase().trim();
@@ -844,6 +903,7 @@
     const me = (account && (account.name||"")) || "";
     myNameLabel.textContent = me ? ("Przypisane do: " + me) : "";
     updateManagerOwnerSelect();
+    buildQuickChips();
     scoreKPIs(me);
     applyFilters();
     renderTable();
@@ -876,6 +936,8 @@
   document.getElementById("btnApply").addEventListener("click", ()=>{ phDueOverride=null; scoreAndRender(); });
   // zmiana unified scope usuwa ewentualny override
   (function(){ const s=document.getElementById('fltScopeUnified'); if(s){ s.addEventListener('change', ()=>{ phDueOverride=null; }); }})();
+  // quick chips click
+  (function(){ const box=document.getElementById('quickChips'); if(box){ box.addEventListener('click', (e)=>{ const b=e.target.closest('.quick-chip'); if(!b) return; applyChip(b.dataset.id,true); }); }})();
 
   // dropdown statusów
   const dd = document.getElementById('ddStatus');
@@ -891,6 +953,9 @@
   await loadStatusRules();
   await loadNotifyCfg();
   await loadDatasources();
+  // zastosuj ostatni chip (jeśli zapisany)
+  const savedChip = localStorage.getItem(QUICK_CHIP_KEY);
+  if(savedChip){ applyChip(savedChip, false); }
   msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e));
   setStatus("Kliknij „Zaloguj”, a potem „Odśwież”.");
 })();
