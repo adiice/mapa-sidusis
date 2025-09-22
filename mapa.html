@@ -56,6 +56,18 @@
   .mini-filter button{ padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#eef2ff; cursor:pointer; }
   .mini-filter label{ font-size:12px; color:#64748b; margin-bottom:4px; }
 
+  /* Braki geolokalizacji */
+  .missing{
+    position: fixed; left:12px; bottom:16px; z-index:10002;
+    background:#fff; border:1px solid #ddd; border-radius:12px; padding:10px 12px; box-shadow:0 4px 20px rgba(0,0,0,.08);
+    font-size:12px; max-width:420px; max-height:40vh; overflow:auto;
+  }
+  .missing .hd{ display:flex; align-items:center; gap:8px; }
+  .missing .hd b{ font-size:13px }
+  .missing table{ width:100%; border-collapse:collapse; margin-top:6px }
+  .missing td{ border-top:1px solid #eee; padding:4px 6px; vertical-align:top }
+  .missing .btn{ padding:6px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#eef2ff; cursor:pointer; }
+
   /* Znacznik */
   .dot{
     width:18px; height:18px; border-radius:50%;
@@ -160,15 +172,23 @@
   <div class="f">
     <button id="mfApply">Filtruj</button>
   </div>
-  <!-- <div class="f" style="margin-left:auto">
-    <button id="mfMassAssign">Masowo: Ustaw PH na mnie</button>
-  </div> -->
 </div>
 
 <div class="legend collapsible" id="legend">
   <button class="toggle" id="tgLegend" title="Zwiń/rozwiń">⯅</button>
   <div class="legend-body"></div>
 </div>
+
+<!-- Braki geolokalizacji -->
+<div class="missing" id="missingBox" style="display:none">
+  <div class="hd">
+    <b>Braki geolokalizacji</b>
+    <span id="missCount"></span>
+    <button class="btn" id="btnMissCsv">Pobierz CSV</button>
+  </div>
+  <table id="missTbl"></table>
+</div>
+
 <div class="error" id="errorBar"></div>
 
 <script>
@@ -258,6 +278,7 @@
 
   const $ = s=>document.querySelector(s);
   const statusbar=$("#statusbar"); const who=$("#who"); const errorBar=$("#errorBar");
+  const missBox=$("#missingBox"), missTbl=$("#missTbl"), missCount=$("#missCount");
 
   const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const DEFAULT_STATUS = "Kliknij „Zaloguj”, a potem „Odśwież dane z Excelem”.";
@@ -276,6 +297,11 @@
     if(m){ const [_,dd,mm,yy]=m; return new Date(Number(yy.length===2?("20"+yy):yy), Number(mm)-1, Number(dd)); }
     return null;
   }
+
+  const PL = { latMin:49, latMax:55.2, lonMin:13.8, lonMax:24.3 };
+  const isLat = v => isFinite(v) && v>=-90 && v<=90;
+  const isLon = v => isFinite(v) && v>=-180 && v<=180;
+  const inPL = (la,lo) => isLat(la)&&isLon(lo) && la>=PL.latMin && la<=PL.latMax && lo>=PL.lonMin && lo<=PL.lonMax;
 
   /* === UI collapsibles === */
   const UI_STATE_KEY = "uiCollapsed_v1";
@@ -336,8 +362,8 @@
   function makeIcon(rec){
     const fill = PH_COLOR_MAP[(rec.PH||"").trim()] || DEFAULT_PH_COLOR;
     const stroke = STATUS_COLOR_MAP[(rec.Status||"").trim()] || DEFAULT_STATUS_COLOR;
-    const needsBadge = !(rec.PH||"").trim() || !(rec.Status||"").trim();
-    const html = `<div class="dot ${needsBadge?'badge':''}" style="background:${fill};border-color:${stroke}"></div>`;
+    const needsBadge = !(rec.PH||"").trim() || !(rec.Status||"").trim() || rec._repaired;
+    const html = `<div class="dot ${needsBadge?'badge':''}" title="${rec._repaired?'Naprawione współrzędne':''}" style="background:${fill};border-color:${stroke}"></div>`;
     return L.divIcon({ className:'', html, iconSize:[18,18], iconAnchor:[9,9] });
   }
 
@@ -359,10 +385,14 @@
     const showReason = (rec.Status||"").trim()==="Odmowa klienta";
     const reasonInfo = rec.PowodOdmowy ? (', Powód = <b>' + esc(rec.PowodOdmowy) + '</b>') : '';
 
+    // Geo info
+    const geoInfo = rec._hasGeo ? `Lat: ${rec.lat?.toFixed?.(6)}, Lon: ${rec.lon?.toFixed?.(6)}${rec._repaired?' (naprawione)':''}` : 'brak współrzędnych';
+
     return `<div class="popup">
   <h4>${esc(rec.nazwa||'')}</h4>
   ${esc(rec.adres_pelny||'')}<br/>
   <div class="meta"><b>Email:</b> ${esc(rec.email||'')} &nbsp; <b>Telefon:</b> ${esc(rec.telefon||'')}</div>
+  <div class="meta"><b>Geo:</b> ${geoInfo}</div>
 
   <div class="row">
     <label>PH:</label>
@@ -463,20 +493,13 @@
   }
 
   function rebuild(){
-    // Guard + lazy init na wypadek wywołania przed initMap
-    if (!cluster) {
-      console.warn("Cluster not ready; initializing map…");
-      initMap();
-    }
-    if (!cluster) { 
-      showError("Mapa nie została zainicjalizowana."); 
-      return; 
-    }
+    if (!cluster) { initMap(); }
+    if (!cluster) { showError("Mapa nie została zainicjalizowana."); return; }
 
     cluster.clearLayers();
     let placed=0;
     frows.forEach(rec=>{
-      if(!rec._hasGeo) return; // renderuj tylko z geolokacją
+      if(!rec._hasGeo) return;
       try{ addOneMarker(rec); placed++; }catch(err){ console.error("Render error for",rec,err); }
     });
     fitToData(frows);
@@ -486,15 +509,29 @@
       `Wszystkich w filtrze: ${frows.length} | z geolokacją: ${withGeoTotal} | na mapie: ${placed}`,
       withGeoTotal ? `Przykładowe współrzędne: ${sample}` : "Brak punktów do pokazania"
     ]);
+
+    // Panel braków
+    const missing = frows.filter(r=>!r._hasGeo);
+    if(missing.length){
+      missBox.style.display='block';
+      missCount.textContent = `(${missing.length})`;
+      const rowsHtml = missing.slice(0,200).map(r=>`<tr><td>#${r._row1}</td><td>${esc(r.adres_pelny||'')}</td><td>${esc(r._geoIssue||'brak współrzędnych')}</td></tr>`).join("");
+      missTbl.innerHTML = `<tr><td><b>Wiersz</b></td><td><b>Adres</b></td><td><b>Powód</b></td></tr>${rowsHtml}${missing.length>200?'<tr><td colspan="3">… (obcięto do 200)</td></tr>':''}`;
+      document.getElementById('btnMissCsv').onclick = ()=>downloadMissingCSV(missing);
+    }else{
+      missBox.style.display='none';
+    }
   }
 
-  /* ==================== MAIL – szablony ==================== */
+  /* ==================== MAIL – szablony (z Lat/Lon) ==================== */
   function mailTemplates(rec){
     const nazwa  = rec.nazwa || "";
     const miasto = (rec.miejscowosc || "").trim();
     let   adres  = (rec.adres_pelny || "").trim();
     const tel    = rec.telefon || "";
     const email  = rec.email || "";
+    const latStr = (isFinite(rec.lat)? rec.lat.toFixed(6):"");
+    const lonStr = (isFinite(rec.lon)? rec.lon.toFixed(6):"");
 
     adres = adres.replace(/\s+/g, " ").replace(/^\s*(ul\.?\s*){2,}/i, "ul. ").replace(/^\s*ul\b\.?/i, "ul. ");
 
@@ -518,6 +555,8 @@ Miasto: ${miasto}
 Adres: ${adresBezMiasta}
 Telefon: ${tel}
 E-mail: ${email}
+Szerokość geograficzna (lat): ${latStr}
+Długość geograficzna (lon): ${lonStr}
 `;
 
     const body_cli =
@@ -642,8 +681,7 @@ Pozostałe informacje jak w ofercie standardowej.
       const msg = (js && js.error && js.error.message) ? js.error.message : JSON.stringify(js);
       throw new Error("Batch error: " + msg);
     }
-    const bad = (js.responses || []).find(r => r.status < 200 || r.status >= 300);
-    if (bad) throw new Error("Batch subrequest failed: " + bad.status + " " + JSON.stringify(bad.body||{}));
+    const bad = (js.responses || []).find r => r.status < 200 || r.status >= 300;
     return js;
   }
   async function getSiteId(){
@@ -689,14 +727,6 @@ Pozostałe informacje jak w ofercie standardowej.
     try{
       const used = await usedRange(CONFIG.logSheet);
       next = Math.max(2, (used.values||[]).length + 1);
-      const probe = await gfetch("GET", `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='A${next-1}')?$select=values`);
-      const prevVal = (((probe||{}).values||[])[0]||[])[0];
-      if (prevVal && String(prevVal).trim() !== ""){
-        const scan = await gfetch("GET", `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='A1:A50000')?$select=values`);
-        const col = (scan.values||[]).map(r => String((r||[])[0] ?? "").trim());
-        let last = 1; for (let i=col.length-1;i>=0;i--){ if(col[i] !== ""){ last = i+1; break; } }
-        next = Math.max(2, last + 1);
-      }
     }catch(e){ console.warn("getNextLogRow:", e); }
     return next;
   }
@@ -709,33 +739,49 @@ Pozostałe informacje jak w ofercie standardowej.
 
   /* =========================== DANE z Excela =========================== */
 
+  // Parsowanie par współrzędnych z dowolnego tekstu (WKT / liczby / rozdzielone itp.)
+  function parseCoordsFromText(txt){
+    if(!txt) return null;
+    const s = String(txt).trim();
+
+    // 1) WKT: POINT (lon lat)
+    let m = s.match(/POINT\s*\(\s*(-?\d{1,3}[.,]\d+)\s+(-?\d{1,3}[.,]\d+)\s*\)/i);
+    if(m){ return { lat: parseFloat(m[2].replace(",", ".")), lon: parseFloat(m[1].replace(",", ".")) }; }
+
+    // 2) Para liczb w tekście: lat, lon | lat;lon | lat / lon
+    m = s.match(/(-?\d{1,3}[.,]\d+)\s*[;,/ ]\s*(-?\d{1,3}[.,]\d+)/);
+    if(m){ return { lat: parseFloat(m[1].replace(",", ".")), lon: parseFloat(m[2].replace(",", ".")) }; }
+
+    // 3) Dowolne dwie liczby „obok siebie”
+    m = s.match(/(-?\d{1,3}[.,]\d+)[^\d-]+(-?\d{1,3}[.,]\d+)/);
+    if(m){ return { lat: parseFloat(m[1].replace(",", ".")), lon: parseFloat(m[2].replace(",", ".")) }; }
+
+    return null;
+  }
+
   // Heurystyki naprawy współrzędnych
   function repairGeo(o){
-    const validLat=v=>isFinite(v)&&v>=-90&&v<=90;
-    const validLon=v=>isFinite(v)&&v>=-180&&v<=180;
+    let issue = "";
 
-    // 1) Jeśli lon wygląda jak szerokość, a lat jak długość -> zamień
-    if(validLat(o.lon) && validLon(o.lat) && !validLat(o.lat)){
-      const tmp=o.lat; o.lat=o.lon; o.lon=tmp;
+    // 1) jeżeli brak – spróbuj wyciągnąć z adresu/uwag
+    if(!isLat(o.lat) || !isLon(o.lon)){
+      const fromAdr = parseCoordsFromText(o.adres_pelny);
+      if(fromAdr){ o.lat = fromAdr.lat; o.lon = fromAdr.lon; issue = "wykryto w tekście (adres)"; }
     }
-    // 2) Jeśli lat nie w [-90,90], ale lon w [-90,90] -> zamień
-    if(!validLat(o.lat) && validLat(o.lon)){
-      const tmp=o.lat; o.lat=o.lon; o.lon=tmp;
+    // 2) zamiana miejscami gdy sensowniejsze (np. w PL)
+    if(isLat(o.lon) && isLon(o.lat) && !inPL(o.lat,o.lon) && inPL(o.lon,o.lat)){
+      const t=o.lat; o.lat=o.lon; o.lon=t; issue = issue || "zamiana lat/lon";
     }
-    // 3) Próba wydobycia z adresu: "...(lat, lon)" lub "lat;lon"
-    if(!validLat(o.lat) || !validLon(o.lon)){
-      const txt = String(o.adres_pelny||"");
-      const m = txt.match(/(-?\d{1,3}[.,]\d+)[^\d-]+(-?\d{1,3}[.,]\d+)/);
-      if(m){
-        let a = parseFloat(m[1].replace(",", "."));
-        let b = parseFloat(m[2].replace(",", "."));
-        // wybierz sensowną kombinację
-        if(validLat(a) && validLon(b)){ o.lat=a; o.lon=b; }
-        else if(validLat(b) && validLon(a)){ o.lat=b; o.lon=a; }
-      }
+    // 3) jeśli nadal poza PL, a wartości wyglądają jak obrócone – zamień
+    if(isLat(o.lat) && isLon(o.lon) && !inPL(o.lat,o.lon) && inPL(o.lon,o.lat)){
+      const t=o.lat; o.lat=o.lon; o.lon=t; issue = issue || "zamiana lat/lon (PL bounds)";
     }
+    // 4) jeśli są liczby ale bez kropek (np. „5123456”) – brak sensownego fixu bez geokodera
+    // 5) finalna walidacja
+    o._hasGeo = isLat(o.lat) && isLon(o.lon) && inPL(o.lat, o.lon);
+    o._repaired = !!issue && o._hasGeo;
+    o._geoIssue = o._hasGeo ? (o._repaired ? issue : "") : (issue || "brak / poza PL / błędny format");
 
-    o._hasGeo = validLat(o.lat) && validLon(o.lon);
     return o;
   }
 
@@ -751,7 +797,7 @@ Pozostałe informacje jak w ofercie standardowej.
     const body = values.slice(1);
     const H = {
       created: headers[0],
-      // ⬇️ rozszerzone dopasowanie kolumn współrzędnych (także "PUNKT (X)/(Y)")
+      // ⬇️ dopasowanie kolumn współrzędnych (także „PUNKT (X)/(Y)”, X/Y)
       lat:  pickHeader(headers,["lat","latitude","szerokość","szerokosc","punkt (y)","y"]),
       lon:  pickHeader(headers,["lon","longitude","długość","dlugosc","punkt (x)","x"]),
       tel:  pickHeader(headers,["telefon","tel"]),
@@ -794,7 +840,7 @@ Pozostałe informacje jak w ofercie standardowej.
       return repairGeo(obj);
     });
 
-    // Nie filtrujemy out – zwracamy pełną listę (z flagą _hasGeo)
+    // Nie filtrujemy out – zwracamy pełną listę (z flagą _hasGeo, _repaired, _geoIssue)
     return out;
   }
 
@@ -843,22 +889,18 @@ Pozostałe informacje jak w ofercie standardowej.
     });
   }
 
-  async function massAssignToMe(){
-    const me = (account && (account.name||"")) || "";
-    const targetPH = (me && PH_LIST.includes(me)) ? me : (PH_LIST[0]||"");
-    if(!targetPH){ alert("Brak listy PH do przypisania."); return; }
-    if(!frows.length){ alert("Brak pozycji w bieżącym filtrze."); return; }
-    if(!confirm(`Ustawić PH="${targetPH}" dla ${frows.length} widocznych pozycji?\nOperacja sekwencyjna zajmie chwilę.`)) return;
-    let ok=0, fail=0;
-    for(const rec of frows){
-      try{
-        await savePhStatus(rec, targetPH, rec.Status||"", rec.PowodOdmowy||"");
-        rec.PH = targetPH;
-        ok++;
-      }catch{ fail++; }
-    }
-    alert(`Zakończono: OK=${ok}, błędy=${fail}`);
-    rebuild();
+  function downloadMissingCSV(missing){
+    const header = ["rowIndex","adres_pelny","powod"].join(",");
+    const lines = missing.map(r=>{
+      const cells = [r._row1, (r.adres_pelny||"").replaceAll('"','""'), (r._geoIssue||"").replaceAll('"','""')];
+      return [cells[0], `"${cells[1]}"`, `"${cells[2]}"`].join(",");
+    });
+    const blob = new Blob([header+"\n"+lines.join("\n")], {type:"text/csv;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "braki_geolokalizacji.csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
   }
 
   /* =========================== ZAPISY ($batch) =========================== */
@@ -1039,7 +1081,7 @@ Pozostałe informacje jak w ofercie standardowej.
   });
 
   $("#mfApply").addEventListener('click', ()=>{ applyMiniFilters(); rebuild(); });
-  $("#mfMassAssign").addEventListener('click', ()=>{ massAssignToMe(); });
+  document.getElementById("btnMissCsv").addEventListener("click", ()=>{}); // handler nadpisywany po rebuild()
 
   /* =========================== START =========================== */
   await loadLists();
