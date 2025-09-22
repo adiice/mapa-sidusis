@@ -488,9 +488,13 @@
   }
 
   /* ========== KPI / SLA / FILTRY / RENDER ========== */
+  // Nieprzydzielone: brak PH (puste lub warianty 'brak'/'none'/'-'); wyklucz statusy z EXCLUDED_STATUSES
   function isUnassigned(rec){
-    const ph = (rec.PH||"").trim(), st = (rec.Status||"").trim();
-    return (!ph || !PH_LIST.includes(ph)) && !EXCLUDED_STATUSES.has(st);
+    const st = (rec.Status||"").trim();
+    const ph = String(rec.PH||"").trim();
+    const phNorm = normLower(ph);
+    const empty = !ph || phNorm==="brak" || phNorm==="none" || phNorm==="unassigned" || phNorm==="nieprzydzielone" || ph==="-";
+    return empty && !EXCLUDED_STATUSES.has(st);
   }
   function inPrevBusiness(rec){ if(!rec.createdAt) return false; const {start,end} = prevBusinessRange(); return rec.createdAt >= start && rec.createdAt <= end; }
   function isDueForMe(rec, me){
@@ -595,22 +599,58 @@
       return true;
     });
 
-    // sort: 1) SLA overdue 2) due date 3) createdAt
+    // sortowanie: jeśli wskazano kolumnę – użyj jej; w przeciwnym razie domyślnie SLA -> Next -> Created
     const today = todayLocal();
-    frows.sort((a,b)=>{
-      const oa = isSLAOverdue(a)?0:1, ob = isSLAOverdue(b)?0:1;
-      if(oa!==ob) return oa-ob;
-      const da = a.NextContactAt ? (a.NextContactAt - today) : 9e15;
-      const db = b.NextContactAt ? (b.NextContactAt - today) : 9e15;
-      if(da!==db) return da - db;
-      const ca = a.createdAt ? a.createdAt.getTime() : 0;
-      const cb = b.createdAt ? b.createdAt.getTime() : 0;
-      return ca - cb;
-    });
+    if(SORT.key){
+      const key = SORT.key, dir = SORT.dir;
+      frows.sort((a,b)=>{
+        if(key==='Status'){
+          const av=String(a.Status||''), bv=String(b.Status||'');
+          const cmp = av.localeCompare(bv, 'pl', {sensitivity:'base'});
+          return cmp*dir || ((a.createdAt?.getTime?.()||0)-(b.createdAt?.getTime?.()||0));
+        }
+        const av=a[key], bv=b[key];
+        const at = av? (av.getTime? av.getTime(): new Date(av).getTime()): Infinity;
+        const bt = bv? (bv.getTime? bv.getTime(): new Date(bv).getTime()): Infinity;
+        return (at-bt)*dir || (String(a.Status||'').localeCompare(String(b.Status||'')));
+      });
+    } else {
+      frows.sort((a,b)=>{
+        const oa = isSLAOverdue(a)?0:1, ob = isSLAOverdue(b)?0:1;
+        if(oa!==ob) return oa-ob;
+        const da = a.NextContactAt ? (a.NextContactAt - today) : 9e15;
+        const db = b.NextContactAt ? (b.NextContactAt - today) : 9e15;
+        if(da!==db) return da - db;
+        const ca = a.createdAt ? a.createdAt.getTime() : 0;
+        const cb = b.createdAt ? b.createdAt.getTime() : 0;
+        return ca - cb;
+      });
+    }
   }
 
   function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function colorForStatus(st){ return STATUS_COLOR_MAP[st] || "#9E9E9E"; }
+
+  // Sortowanie
+  let SORT = { key: null, dir: 1 }; // key: 'createdAt' | 'NextContactAt' | 'Status'
+  function setSort(key){
+    if(SORT.key===key){ SORT.dir = -SORT.dir; } else { SORT.key = key; SORT.dir = 1; }
+    // strzałki w nagłówkach (bez zmiany HTML) – użyjemy dataset
+    document.querySelectorAll('#tbl thead th').forEach(th=>{
+      const k = th.dataset.sortKey; if(!k){ return; }
+      const label = th.dataset.label || th.textContent.trim();
+      const suffix = (SORT.key===k) ? (SORT.dir>0? ' ▲':' ▼') : '';
+      th.textContent = label + suffix;
+      th.dataset.label = label; th.dataset.sortKey = k; th.style.cursor='pointer';
+    });
+    applyFilters();
+    renderTable();
+  }
+  function initSortHeaders(){
+    const ths = document.querySelectorAll('#tbl thead th');
+    const map = [ {idx:0,key:'createdAt'}, {idx:3,key:'Status'}, {idx:4,key:'NextContactAt'} ];
+    map.forEach(({idx,key})=>{ const th=ths[idx]; if(!th) return; th.dataset.sortKey=key; th.dataset.label=th.textContent.trim(); th.style.cursor='pointer'; th.addEventListener('click', ()=>setSort(key)); });
+  }
 
   // szablony maili – jak wcześniej
   function mailTemplates(rec){
@@ -846,6 +886,7 @@
   document.addEventListener('click', (e)=>{ if(!dd.contains(e.target)) dd.classList.remove('open'); });
 
   // start
+  initSortHeaders();
   await loadLists();
   await loadStatusRules();
   await loadNotifyCfg();
