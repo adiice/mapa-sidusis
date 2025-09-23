@@ -278,7 +278,14 @@
   const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const DEFAULT_STATUS = "Kliknij „Zaloguj”, a potem „Odśwież dane z Excelem”.";
   function setStatus(msg, opts={}){ const {append=false,autoClearMs=0}=opts; statusbar.textContent = append ? (statusbar.textContent?(statusbar.textContent+"\n"):"") + (Array.isArray(msg)?msg.join("\n"):String(msg||"")) : (Array.isArray(msg)?msg.join("\n"):String(msg||"")); if(autoClearMs>0){ setTimeout(()=>statusbar.textContent="",autoClearMs);} }
-  function showError(msg){ console.error(msg); errorBar.textContent = String(msg||""); errorBar.style.display='block'; setTimeout(()=>{ errorBar.style.display='none'; }, 8000); }
+  function showError(msg){
+    const raw = String(msg||"");
+    const friendly = (/\b429\b/.test(raw)) ? 'Serwer poprosił o przerwę (429). Spróbuj ponownie za chwilę.' : raw;
+    console.error(raw);
+    errorBar.textContent = friendly;
+    errorBar.style.display='block';
+    setTimeout(()=>{ errorBar.style.display='none'; }, 8000);
+  }
   function toNum(v){ if(v==null) return NaN; const s=String(v).replace(",", ".").replace(/[^\d\.\-+Ee]/g,"").trim(); return parseFloat(s); }
   function colLetter(n){ let s="",x=n; while(x>0){x--; s=String.fromCharCode(65+(x%26))+s; x=Math.floor(x/26);} return s; }
   const normAddr = s => normStr(s).replace(/^\s*(ul\.?\s*){2,}/i,"ul. ").replace(/^\s*ul\b\.?/i,"ul. ");
@@ -689,6 +696,86 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
   }); }
   const graphScopes = ["openid","profile","offline_access","Files.ReadWrite.All","Sites.Read.All"];
 
+  // ================== Excel Workbook session + utilities ==================
+  let workbookSessionId = null;
+  let sessionCreatedAt = 0;
+
+  function sleep(ms){ return new Promise(res=>setTimeout(res, Math.max(0, ms|0))); }
+  function randomJitter(min=120,max=320){ return Math.floor(min + Math.random() * (max-min)); }
+
+  async function ensureWorkbookSession(){
+    const TWO_HOURS = 2 * 60 * 60 * 1000;
+    const fresh = workbookSessionId && (Date.now() - sessionCreatedAt) < TWO_HOURS;
+    if (fresh) return workbookSessionId;
+    const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
+    const token = await getToken();
+    const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/createSession`;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ persistChanges: true })
+    });
+    if(!resp.ok){
+      const t = await resp.text().catch(()=>String(resp.status));
+      throw new Error(`createSession failed ${resp.status} ${t}`);
+    }
+    const js = await resp.json();
+    workbookSessionId = js && (js.id || js.sessionId || js.value || js);
+    sessionCreatedAt = Date.now();
+    return workbookSessionId;
+  }
+
+  // 429/5xx retry with Retry-After and backoff
+  async function withGraphRetry(exec){
+    let attempt = 0; let backoff = 800;
+    while(true){
+      const resp = await exec();
+      const st = resp.status|0;
+      if (st===429 || st===503 || st===504){
+        attempt++;
+        if(attempt>=3) return resp;
+        let ra = resp.headers.get('Retry-After') || resp.headers.get('retry-after');
+        let waitMs = 0;
+        const n = parseInt(ra||'', 10);
+        if(!isNaN(n) && n>0){ waitMs = n*1000; }
+        else { waitMs = backoff; backoff = Math.min(6400, backoff*2); }
+        await sleep(waitMs + randomJitter(80,150));
+        continue;
+      }
+      return resp;
+    }
+  }
+
+  // Single-writer queue for Excel writes
+  const writeQueue = [];
+  let writeActive = false;
+  function queueWrite(fn){
+    return new Promise((resolve, reject)=>{ writeQueue.push({fn,resolve,reject}); pumpQueue(); });
+  }
+  async function pumpQueue(){
+    if(writeActive) return;
+    const job = writeQueue.shift();
+    if(!job) return;
+    writeActive = true;
+    try{ const res = await job.fn(); await sleep(randomJitter(150,320)); job.resolve(res); }
+    catch(e){ job.reject(e); }
+    finally{ writeActive=false; if(writeQueue.length) pumpQueue(); }
+  }
+
+  // ====== Sheet headers cache ======
+  const SHEET_CACHE = { dataHeaders: null, dataHeaderIndex: {}, lastUsedRangeSnapshotTs: 0 };
+  function buildHeaderIndex(headers){
+    const map = {};
+    const want = [ 'PH','Status','Powód odmowy','NextContactAt','LastTouchAt','Uwagi','ReminderTaskId','ReminderSentAt' ];
+    for(const name of want){ const i = headers.indexOf(name); if(i>=0) map[name]=i; }
+    return map;
+  }
+  function getHeaderIndex(name){
+    if(!SHEET_CACHE.dataHeaderIndex) return -1;
+    const v = SHEET_CACHE.dataHeaderIndex[name];
+    return (typeof v==='number') ? v : -1;
+  }
+
   async function ensureLogin(){
     // Lazy init MSAL if needed
     if(!msalApp){
@@ -760,11 +847,10 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
 
   async function gfetch(method, url, body){
     const token = await getToken();
-    const resp = await fetch(url, {
-      method,
-      headers: { "Authorization":"Bearer " + token, "Accept":"application/json", "Content-Type":"application/json" },
-      body: body ? JSON.stringify(body) : undefined
-    });
+    try{ await ensureWorkbookSession(); }catch(e){ console.warn('ensureWorkbookSession failed:', e?.message||e); }
+    const headers = { "Authorization":"Bearer " + token, "Accept":"application/json", "Content-Type":"application/json" };
+    if(workbookSessionId){ headers["Workbook-Session-Id"] = workbookSessionId; }
+    const resp = await withGraphRetry(()=> fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined }));
     if(!resp.ok){
       const txt=await resp.text().catch(()=>String(resp.status));
       throw new Error(`${method} ${url} -> ${resp.status} ${txt}`);
@@ -773,11 +859,10 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
   }
   async function gBatch(requests){
     const token = await getToken();
-    const resp = await fetch("https://graph.microsoft.com/v1.0/$batch", {
-      method: "POST",
-      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
-      body: JSON.stringify({ requests })
-    });
+    try{ await ensureWorkbookSession(); }catch(e){ console.warn('ensureWorkbookSession failed:', e?.message||e); }
+    const headers = { "Authorization": "Bearer " + token, "Content-Type": "application/json" };
+    if(workbookSessionId){ headers["Workbook-Session-Id"] = workbookSessionId; }
+    const resp = await withGraphRetry(()=> fetch("https://graph.microsoft.com/v1.0/$batch", { method: "POST", headers, body: JSON.stringify({ requests }) }));
     const js = await resp.json();
     if (!resp.ok) {
       const msg = (js && js.error && js.error.message) ? js.error.message : JSON.stringify(js);
@@ -809,6 +894,20 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     const wsq = wsName.replace(/'/g,"''");
     const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='${a1}')`;
     return gfetch("PATCH", url, { values: values2d });
+  }
+
+  // Ensure required data headers exist (only on explicit reload)
+  async function ensureDataHeaders(){
+    const used = await usedRange(CONFIG.dataSheet);
+    const headers = (used.values && used.values[0]) ? used.values[0].map(h=>String(h||"").trim()) : [];
+    if(!headers.length){ return; }
+    const required = [ 'PH','Status','Powód odmowy','NextContactAt','LastTouchAt','Uwagi','ReminderTaskId','ReminderSentAt' ];
+    let changed = false;
+    for(const name of required){ if(!headers.includes(name)){ headers.push(name); changed = true; } }
+    if(changed){ await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+    SHEET_CACHE.dataHeaders = headers;
+    SHEET_CACHE.dataHeaderIndex = buildHeaderIndex(headers);
+    SHEET_CACHE.lastUsedRangeSnapshotTs = Date.now();
   }
 
   /* ===== AuditLog ===== */
@@ -922,6 +1021,12 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     setStatus("Ładowanie danych z Excela (Graph)…");
     const used = await usedRange(CONFIG.dataSheet);
     const values = used.values || [];
+    if(values.length){
+      const headers = (values[0]||[]).map(h=>String(h||"").trim());
+      SHEET_CACHE.dataHeaders = headers;
+      SHEET_CACHE.dataHeaderIndex = buildHeaderIndex(headers);
+      SHEET_CACHE.lastUsedRangeSnapshotTs = Date.now();
+    }
     if(!values.length){ setStatus("Arkusz pusty."); rows=[]; frows=[]; missingRows=[]; updateMissingPanel(); return; }
 
     const parsed = parseRows(values);
@@ -987,25 +1092,14 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
       last:       pickHeader(headers,["lasttouchat","ostatni kontakt","last touch","ostatni kontakt at"])
     };
 
-    // Zapewnij kolumny wymagane do zapisu
-    let idxPH  = headers.findIndex(h=>String(h).toLowerCase().trim()==="ph");
-    if(idxPH<0){ idxPH = headers.length; headers.push("PH"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
-    let idxST  = headers.findIndex(h=>String(h).toLowerCase().trim()==="status");
-    if(idxST<0){ idxST = headers.length; headers.push("Status"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
-
+    // Indeksy kolumn z cache (bez edycji naglowkow w trakcie zapisu)
+    let idxPH  = getHeaderIndex('PH');
+    let idxST  = getHeaderIndex('Status');
     let idxRS = -1;
-    if(newStatus==="Odmowa klienta"){
-      const reasonCol = H.reason || "Powód odmowy";
-      if(!H.reason){ headers.push(reasonCol); idxRS = headers.length-1; await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
-      else idxRS = headers.indexOf(reasonCol);
-    }
-
-    // NOWE: zapewnij kolumny NextContactAt i LastTouchAt
-    let idxNEXT = headers.findIndex(h=>String(h).toLowerCase().trim()==="nextcontactat");
-    if(idxNEXT<0){ idxNEXT = headers.length; headers.push("NextContactAt"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
-    let idxLAST = headers.findIndex(h=>String(h).toLowerCase().trim()==="lasttouchat");
-    if(idxLAST<0){ idxLAST = headers.length; headers.push("LastTouchAt"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
-
+    if(newStatus==="Odmowa klienta"){ idxRS = getHeaderIndex('Pow\u00F3d odmowy'); if(idxRS<0){ setStatus('Brakuje kolumny Powod odmowy - odswiez dane (przycisk u gory).'); return; } }
+    let idxNEXT = getHeaderIndex('NextContactAt');
+    let idxLAST = getHeaderIndex('LastTouchAt');
+    if(idxPH<0 || idxST<0 || idxNEXT<0 || idxLAST<0){ const miss = [ [idxPH,'PH'],[idxST,'Status'],[idxNEXT,'NextContactAt'],[idxLAST,'LastTouchAt'] ].filter(x=>x[0]<0).map(x=>x[1]).join(', '); setStatus(`Brakuje kolumny ${miss} - odswiez dane (przycisk u gory).`); return; }
     // Znajdź wiersz rekordu i odczytaj dotychczasowe wartości
     let row1 = Number(rec._row1) || -1, oldPH="", oldST="", oldNext="";
     if(row1>0){
@@ -1088,7 +1182,7 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     const wsqLog = CONFIG.logSheet.replace(/'/g,"''");
     requests.push({ id: "log", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqLog}')/range(address='${logA1}')`, headers: { "Content-Type": "application/json" }, body: { values: [ logRow ] } });
 
-    await gBatch(requests);
+    await queueWrite(()=> gBatch(requests));
     return { lastTouchAt: nowLocal, nextContactAt: (nextCellValue!==null ? (comp.nextAt || null) : (rec.NextContactAt || null)), wroteNext: (nextCellValue!==null) };
   }
 
@@ -1109,10 +1203,8 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
       notes:      pickHeader(headers,["uwagi ph","uwagi","uwaga","notatki","note","notes"])
     };
 
-    let idxNotes = (H.notes ? headers.indexOf(H.notes) : -1);
-    if(idxNotes < 0){
-      idxNotes = headers.length; headers.push("Uwagi");
-      await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]);
+    let idxNotes = getHeaderIndex('Uwagi'); if(idxNotes < 0){ setStatus('Brakuje kolumny Uwagi - odswiez dane (przycisk u gory).'); return; }
+1`, [headers]);
     }
 
     let row1 = Number(rec._row1) || -1, oldNotes = "";
@@ -1157,7 +1249,7 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
       { id: "notes", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1NOTE}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ newNotes || "" ]] } },
       { id: "log",   method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${CONFIG.logSheet.replace(/'/g,"''")}')/range(address='${logA1}')`, headers: { "Content-Type": "application/json" }, body: { values: [ logRow ] } }
     ];
-    await gBatch(requests);
+    await queueWrite(()=> gBatch(requests));
   }
 
   /* Panel braków – odświeżanie i zwijanie */
@@ -1190,8 +1282,9 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
   $("#btnReload").addEventListener('click', async ()=>{
     try{
       await ensureLogin();
-      await loadLists();  await loadStatusRules(); renderLegend();
       await getSiteId(); await getFileItemId();
+      await ensureDataHeaders();
+      await loadLists();  await loadStatusRules(); renderLegend();
       await loadDataFromExcel(); applyMiniFilters(); rebuild();
     } catch(err){ showError(err.message||err); }
   });
