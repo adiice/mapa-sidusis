@@ -847,7 +847,8 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
 
   async function gfetch(method, url, body){
     const token = await getToken();
-    try{ await ensureWorkbookSession(); }catch(e){ console.warn('ensureWorkbookSession failed:', e?.message||e); }
+    // Avoid recursion: only ensure session for workbook endpoints here.
+    if (url && url.includes('/workbook/')){ try{ await ensureWorkbookSession(); }catch(e){ console.warn('ensureWorkbookSession failed:', e?.message||e); } }
     const headers = { "Authorization":"Bearer " + token, "Accept":"application/json", "Content-Type":"application/json" };
     if(workbookSessionId){ headers["Workbook-Session-Id"] = workbookSessionId; }
     const resp = await withGraphRetry(()=> fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined }));
@@ -859,7 +860,8 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
   }
   async function gBatch(requests){
     const token = await getToken();
-    try{ await ensureWorkbookSession(); }catch(e){ console.warn('ensureWorkbookSession failed:', e?.message||e); }
+    // Avoid recursion: only ensure session for workbook endpoints here.
+    if (url && url.includes('/workbook/')){ try{ await ensureWorkbookSession(); }catch(e){ console.warn('ensureWorkbookSession failed:', e?.message||e); } }
     const headers = { "Authorization": "Bearer " + token, "Content-Type": "application/json" };
     if(workbookSessionId){ headers["Workbook-Session-Id"] = workbookSessionId; }
     const resp = await withGraphRetry(()=> fetch("https://graph.microsoft.com/v1.0/$batch", { method: "POST", headers, body: JSON.stringify({ requests }) }));
