@@ -1044,8 +1044,12 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
   /* =========================== FILTRY =========================== */
   function fillMiniFilters(){
     const phSel=$("#mfPH"); const stSel=$("#mfStatus");
-    phSel.innerHTML = `<option value="">(wszyscy)</option>` + PH_LIST.map(ph=>`<option>${esc(ph)}</option>`).join("");
-    stSel.innerHTML = `<option value="">(wszystkie)</option>` + STATUS_LIST.map(st=>`<option>${esc(st)}</option>`).join("");
+    phSel.innerHTML = `<option value="">(wszyscy)</option>`
+                    + `<option value="__NONE__">(bez PH)</option>`
+                    + PH_LIST.map(ph=>`<option>${esc(ph)}</option>`).join("");
+    stSel.innerHTML = `<option value="">(wszystkie)</option>`
+                    + `<option value="__NONE__">(bez statusu)</option>`
+                    + STATUS_LIST.map(st=>`<option>${esc(st)}</option>`).join("");
   }
   function applyMiniFilters(){
     const wantPH = $("#mfPH").value.trim();
@@ -1055,8 +1059,10 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
     const dTo    = $("#mfTo").value   ? new Date($("#mfTo").value  +"T23:59:59") : null;
 
     frows = rows.filter(r=>{
-      if(wantPH && (r.PH||"").trim() !== wantPH) return false;
-      if(wantST && (r.Status||"").trim() !== wantST) return false;
+      if(wantPH === "__NONE__"){ if((r.PH||"").trim() !== "") return false; }
+      else if(wantPH){ if((r.PH||"").trim() !== wantPH) return false; }
+      if(wantST === "__NONE__"){ if((r.Status||"").trim() !== "") return false; }
+      else if(wantST){ if((r.Status||"").trim() !== wantST) return false; }
       if(query){
         const inCity = String(r.miejscowosc||"").toLowerCase().includes(query);
         const inAddr = String(r.adres_pelny||"").toLowerCase().includes(query);

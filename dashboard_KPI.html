@@ -86,7 +86,7 @@
       <span id="who">Nie zalogowano.</span>
       <button id="btnLogin">Zaloguj</button>
       <button id="btnLogout">Wyloguj</button>
-      <a href="mapa_test.html" class="linkbtn" style="text-decoration:none">↩︎ Mapa</a>
+      <a href="mapa_test.html" class="linkbtn" style="text-decoration:none">Mapa</a>
     </div>
   </div>
 
@@ -241,7 +241,7 @@ function normAddr(s){
 /* =========================== MSAL / GRAPH =========================== */
 await loadScriptSequential(MSAL_CDNS);
 await loadLists();
-if(typeof msal==='undefined' || !msal.PublicClientApplication){ alert('MSAL nie wstał.'); return; }
+if(typeof msal==='undefined' || !msal.PublicClientApplication){ alert('MSAL nie wsta�.'); return; }
 
 const msalApp = new msal.PublicClientApplication({
   auth:{ clientId:CONFIG.clientId, authority:"https://login.microsoftonline.com/"+CONFIG.tenantId,
@@ -653,7 +653,7 @@ const Table=(()=>{function render(kpi){const tbl=document.getElementById('tblPH'
 // UI / App
 let FROM=null,TO=null,SEL_PH=[],SEL_ST=[];function fillFilters(phList,lists){const phSel=document.getElementById('fPH');if(phSel){phSel.innerHTML="";const mk=(v,t)=>{const o=document.createElement('option');o.value=v;o.textContent=t;return o};phSel.appendChild(mk(PH_ALL,PH_ALL));for(const ph of (phList||[]).filter(x=>x))phSel.appendChild(mk(ph,ph));phSel.appendChild(mk(PH_NONE,PH_NONE));phSel.options[0].selected=true;} const stSel=document.getElementById('fStatus');if(stSel){stSel.innerHTML="";for(const st of (lists.status||[])){const o=document.createElement('option');o.value=st;o.textContent=st;stSel.appendChild(o)}} const today=new Date();const from=new Date(today);from.setDate(today.getDate()-30);const fFrom=document.getElementById('fFrom'),fTo=document.getElementById('fTo');if(fFrom)fFrom.value=from.toISOString().slice(0,10);if(fTo)fTo.value=today.toISOString().slice(0,10)}
 function readFilters(){const fFrom=document.getElementById('fFrom'),fTo=document.getElementById('fTo');FROM=(fFrom&&fFrom.value)?new Date(fFrom.value+"T00:00:00"):null;TO=(fTo&&fTo.value)?new Date(fTo.value+"T23:59:59"):null;const phSel=document.getElementById('fPH'),stSel=document.getElementById('fStatus');const sel=phSel?[...phSel.selectedOptions].map(o=>o.value):[];SEL_PH=(!sel.length||sel.includes(PH_ALL))?[]:sel;SEL_ST=stSel?[...stSel.selectedOptions].map(o=>o.value):[]} function renderTiles(kpi){const set=(id,val)=>{const el=document.getElementById(id);if(el)el.textContent=val};set('kLeads',String(kpi.counts.leads));set('kPH',`${kpi.counts.phPct}%`);set('kUnassigned',String(kpi.counts.unassigned));set('kQuotes',String(kpi.counts.quotes));set('kOffers',String(kpi.counts.offers));set('kClosed',String(kpi.counts.closed));set('kAcc',String(kpi.counts.acc));set('kRej',String(kpi.counts.rej));set('kT01',fmtDays(kpi.counts.tLeadQuote));set('kT02',fmtDays(kpi.counts.tQuoteOffer));set('kT03',fmtDays(kpi.counts.tOfferClose))}
-try{await loadScriptSequential(MSAL_CDNS);await Lists.load();try{Graph.init()}catch(e){alert('MSAL nie wstał.');return} const raw=Graph.raw();if(raw&&raw.handleRedirectPromise)raw.handleRedirectPromise().catch(()=>{});}catch(err){console.error(err);showError(err.message);return}
+try{await loadScriptSequential(MSAL_CDNS);await Lists.load();try{Graph.init()}catch(e){alert('MSAL nie wsta�.');return} const raw=Graph.raw();if(raw&&raw.handleRedirectPromise)raw.handleRedirectPromise().catch(()=>{});}catch(err){console.error(err);showError(err.message);return}
 Charts.setup();
 const btnLogin=document.getElementById('btnLogin');if(btnLogin)btnLogin.addEventListener('click',()=>Graph.ensureLogin().catch(e=>showError(e.message)));
 const btnLogout=document.getElementById('btnLogout');if(btnLogout)btnLogout.addEventListener('click',()=>Graph.logout());
