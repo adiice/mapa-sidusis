@@ -164,6 +164,9 @@
   <div class="f">
     <button id="mfApply">Filtruj</button>
   </div>
+  <div class="f">
+    <button id="mfClear">Wyczysc</button>
+  </div>
 </div>
 
 <div class="legend collapsible" id="legend">
@@ -1296,6 +1299,15 @@ W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
   });
 
   $("#mfApply").addEventListener('click', ()=>{ applyMiniFilters(); rebuild(); });
+  $("#mfClear").addEventListener('click', ()=>{
+    $("#mfPH").value = "";
+    $("#mfStatus").value = "";
+    $("#mfSearch").value = "";
+    $("#mfFrom").value = "";
+    $("#mfTo").value = "";
+    applyMiniFilters();
+    rebuild();
+  });
 
   /* =========================== START =========================== */
   await loadLists();
