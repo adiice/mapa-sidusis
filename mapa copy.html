@@ -44,7 +44,6 @@
     font-size:13px; display:none;
   }
 
-  /* Mini-filtry */
   .mini-filter{
     position: fixed; left:12px; top:12px; z-index:10001;
     display:flex; gap:6px; align-items:flex-end; flex-wrap:wrap;
@@ -56,11 +55,7 @@
   .mini-filter button{ padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#eef2ff; cursor:pointer; }
   .mini-filter label{ font-size:12px; color:#64748b; margin-bottom:4px; }
 
-  /* Znacznik */
-  .dot{
-    width:18px; height:18px; border-radius:50%;
-    border:3px solid #999; box-sizing:border-box; background:#777;
-  }
+  .dot{ width:18px; height:18px; border-radius:50%; border:3px solid #999; box-sizing:border-box; background:#777; }
   .dot.badge::after{
     content:"!"; position:absolute; top:-6px; right:-6px;
     width:14px; height:14px; font-size:10px; color:#fff; background:#ef4444;
@@ -68,7 +63,6 @@
     border:1px solid rgba(0,0,0,.2);
   }
 
-  /* Collapsibles */
   .collapsible { display: inline-block; box-sizing: border-box; }
   .collapsible .toggle{
     position:absolute; top:6px; right:6px; width:24px; height:24px;
@@ -86,7 +80,6 @@
     padding:6px 10px; font-size:12px; color:#374151;
   }
 
-  /* Panel braków geolokalizacji (tylko dla adaniel@...) */
   .missingBox{
     position: fixed; left: 12px; bottom: 12px; z-index: 10002;
     background:#fff; border:1px solid #ddd; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,.08);
@@ -94,10 +87,7 @@
   }
   .missingBox .hd{ padding:10px 12px; font-weight:600; border-bottom:1px solid #eee; }
   .missingBox .bd{ padding:8px 12px; max-height:220px; overflow:auto; font-size:12px; }
-  .missingBox .toggle{
-    position:absolute; top:6px; right:6px; width:24px; height:24px;
-    border:1px solid #cbd5e1; border-radius:999px; background:#f8fafc; cursor:pointer;
-  }
+  .missingBox .toggle{ position:absolute; top:6px; right:6px; width:24px; height:24px; border:1px solid #cbd5e1; border-radius:999px; background:#f8fafc; cursor:pointer; }
   .missingBox.collapsed .bd{ display:none; }
 </style>
 
@@ -259,7 +249,8 @@
     STATUS_COLOR_MAP = { ...DEFAULT_LISTS.statusColors, ...(LISTS.statusColors||{}) };
     REJECTION_REASONS = Array.isArray(LISTS.rejectionReasons) ? LISTS.rejectionReasons.slice() : DEFAULT_LISTS.rejectionReasons.slice();
     EXCLUDED_STATUSES = new Set(Array.isArray(LISTS.excluded) ? LISTS.excluded : DEFAULT_LISTS.excluded);
-    PH_COLOR_MAP = buildPhColorMap(PH_LIST);
+    const phColors = LISTS.phColors || {};
+    PH_COLOR_MAP = { ...buildPhColorMap(PH_LIST), ...phColors };
   }
 
   function canonStatus(s){
@@ -287,7 +278,14 @@
   const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const DEFAULT_STATUS = "Kliknij „Zaloguj”, a potem „Odśwież dane z Excelem”.";
   function setStatus(msg, opts={}){ const {append=false,autoClearMs=0}=opts; statusbar.textContent = append ? (statusbar.textContent?(statusbar.textContent+"\n"):"") + (Array.isArray(msg)?msg.join("\n"):String(msg||"")) : (Array.isArray(msg)?msg.join("\n"):String(msg||"")); if(autoClearMs>0){ setTimeout(()=>statusbar.textContent="",autoClearMs);} }
-  function showError(msg){ console.error(msg); errorBar.textContent = String(msg||""); errorBar.style.display='block'; setTimeout(()=>{ errorBar.style.display='none'; }, 8000); }
+  function showError(msg){
+    const raw = String(msg||"");
+    const friendly = (/\b429\b/.test(raw)) ? 'Serwer poprosił o przerwę (429). Spróbuj ponownie za chwilę.' : raw;
+    console.error(raw);
+    errorBar.textContent = friendly;
+    errorBar.style.display='block';
+    setTimeout(()=>{ errorBar.style.display='none'; }, 8000);
+  }
   function toNum(v){ if(v==null) return NaN; const s=String(v).replace(",", ".").replace(/[^\d\.\-+Ee]/g,"").trim(); return parseFloat(s); }
   function colLetter(n){ let s="",x=n; while(x>0){x--; s=String.fromCharCode(65+(x%26))+s; x=Math.floor(x/26);} return s; }
   const normAddr = s => normStr(s).replace(/^\s*(ul\.?\s*){2,}/i,"ul. ").replace(/^\s*ul\b\.?/i,"ul. ");
@@ -300,6 +298,45 @@
     const m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
     if(m){ const [_,dd,mm,yy]=m; return new Date(Number(yy.length===2?("20"+yy):yy), Number(mm)-1, Number(dd)); }
     return null;
+  }
+
+  // === Daty lokalne i formatowanie ===
+  function todayLocal(){ const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+  function addDays(d, days){ const base = new Date(d.getFullYear(), d.getMonth(), d.getDate()); base.setDate(base.getDate() + (Number(days)||0)); return base; }
+  function fmtYMD(d){ if(!d) return ""; const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; }
+
+  // === Reguły NextContactAt (w tle) ===
+  let STATUS_RULES = null; // { [status]: { nextDays:number, nextFrom:'createdAt'|'LastTouchAt'|'today' } }
+  async function loadStatusRules(){
+    try{
+      const resp = await fetch('assets/status_rules.json?v=' + Date.now(), { cache:'no-store' });
+      if(resp.ok){ STATUS_RULES = await resp.json(); }
+    }catch(e){ console.warn('status_rules.json – fallback na domyślne:', e); }
+  }
+
+  function computeNextContactAt(rec, newStatus){
+    const status = String(newStatus || rec?.Status || '').trim();
+    const NO_REM = new Set([ 'Odmowa klienta', 'Poza Zasięgiem', 'KPO', 'Akceptacja klienta' ]);
+    if(!status) return { nextAt: null, reasonText: 'brak statusu (bez terminu)' };
+    if(NO_REM.has(status)) return { nextAt: null, reasonText: `${status} (bez terminu)` };
+
+    const FALLBACK = {
+      'Wycena Inwestycji': { nextDays: 3, nextFrom: 'today' },
+      'Oferta wysłana':    { nextDays: 7, nextFrom: 'today' },
+      'Zapytanie o wycenę':{ nextDays: 2, nextFrom: 'today' }
+    };
+    const rule = (STATUS_RULES && STATUS_RULES[status]) || FALLBACK[status];
+    if(!rule){ return { nextAt: null, reasonText: `${status} (bez terminu)` }; }
+
+    let base;
+    switch(String(rule.nextFrom||'today')){
+      case 'createdAt':   base = rec?.createdAt || todayLocal(); break;
+      case 'LastTouchAt': base = rec?.LastTouchAt || todayLocal(); break;
+      default:            base = todayLocal();
+    }
+    const nd = Number(rule.nextDays)||0;
+    const nextAt = addDays(base, nd);
+    return { nextAt, reasonText: `${status} (+${nd}d)` };
   }
 
   /* === UI collapsibles === */
@@ -384,6 +421,7 @@
     const showReason = (rec.Status||"").trim()==="Odmowa klienta";
     const reasonInfo = rec.PowodOdmowy ? (', Powód = <b>' + esc(rec.PowodOdmowy) + '</b>') : '';
 
+    const nextInfo = rec.NextContactAt ? fmtYMD(rec.NextContactAt) : '—';
     return `<div class="popup">
   <h4>${esc(rec.nazwa||'')}</h4>
   ${esc(rec.adres_pelny||'')}<br/>
@@ -403,6 +441,7 @@
   </div>
 
   <div class="meta"><b>Aktualnie:</b> PH = <b>${esc(rec.PH||'-')}</b>, Status = <b>${esc(rec.Status||'-')}</b>${reasonInfo}</div>
+  <div class="meta"><b>Nast. kontakt:</b> ${nextInfo}</div>
   <div class="row" id="notesRow">
     <label style="align-self:flex-start;">Uwagi PH:</label>
     <textarea id="noteText" rows="3" style="flex:1;min-width:280px">${esc(rec.Uwagi||"")}</textarea>
@@ -436,12 +475,15 @@
         if(st === "Odmowa klienta" && !reason){ alert("Wybierz Powód odmowy."); return; }
         try{
           setStatus("Zapis do Excela…");
-          await savePhStatus(rec, ph, st, reason);
+          const res = await savePhStatus(rec, ph, st, reason);
           rec.PH = ph; rec.Status = st; rec.PowodOdmowy = reason;
+          rec.LastTouchAt = res?.lastTouchAt || todayLocal();
+          rec.NextContactAt = res?.nextContactAt || null;
           m.setIcon(makeIcon(rec));
           m.setPopupContent(buildPopup(rec));
           m.openPopup();
-          setStatus("Zapisano.", { autoClearMs: 2500 });
+          const hasNext = !!rec.NextContactAt;
+          setStatus("Zapisano." + (hasNext ? " (+ NextContactAt)" : ""), { autoClearMs: 2500 });
         }catch(err){ showError("Błąd zapisu: " + (err.message||err)); setStatus("Błąd zapisu."); }
       });
 
@@ -476,10 +518,10 @@
         a.addEventListener('click', ev=>{
           ev.preventDefault();
           const key = a.getAttribute('data-mail');
-		  const t = mailTemplates(rec)[key];
-			if (!t) { alert("Nie mogę przygotować tego maila."); return; }
-			if (!t.to) { alert("Brak adresu e-mail odbiorcy."); return; }
-			composeAndSend(t.to, t.subject, t.body);
+          const t = mailTemplates(rec)[key];
+          if (!t) { alert("Nie mogę przygotować tego maila."); return; }
+          if (!t.to) { alert("Brak adresu e-mail odbiorcy."); return; }
+          composeAndSend(t.to, t.subject, t.body);
         });
       });
     });
@@ -515,7 +557,7 @@
 
     const adresBezMiasta = hasCityAtEnd ? adres.replace(reCityAtEnd,"").replace(/,\s*$/,"").trim() : adres;
     const adresZMiastem  = hasCityAtEnd ? adres : (miasto ? `${adres}, ${miasto}` : adres);
-	const cityPartForSubject = miasto ? `, ${miasto}` : "";
+    const cityPartForSubject = miasto ? `, ${miasto}` : "";
 
     const subj_inv = `Zapytanie o wycenę - ${adresZMiastem} - SIDUSIS`;
     const subj_cli = `Internet światłowodowy - The Network - ${adresZMiastem}`;
@@ -523,97 +565,97 @@
     const subj_dev = subj_cli;
 
     const body_inv =
-	`Proszę o wycenę podłączenia klienta:
-	Nazwa: ${nazwa}
-	Miasto: ${miasto}
-	Adres: ${adresBezMiasta}
-	Telefon: ${tel}
-	E-mail: ${email}
-	Szerokość geograficzna: ${isFinite(rec.lat)?rec.lat:""}
-	Długość geograficzna: ${isFinite(rec.lon)?rec.lon:""}
-	`;
+`Proszę o wycenę podłączenia klienta:
+Nazwa: ${nazwa}
+Miasto: ${miasto}
+Adres: ${adresBezMiasta}
+Telefon: ${tel}
+E-mail: ${email}
+Szerokość geograficzna: ${isFinite(rec.lat)?rec.lat:""}
+Długość geograficzna: ${isFinite(rec.lon)?rec.lon:""}
+`;
 
     const body_cli =
-	`Dzień dobry ${nazwa},
+`Dzień dobry ${nazwa},
 
-	Serdecznie dziękujemy za przesłanie zgłoszenia za pośrednictwem platformy SIDUSIS.
-	Informujemy, że zapytanie dotyczące możliwości podłączenia Internetu w lokalizacji ${adresBezMiasta}${cityPartForSubject} zostało przekazane do Działu Inwestycji celem przygotowania indywidualnej wyceny.
-	Odpowiedź prześlę nie później niż w ciągu 3 dni roboczych.
+Serdecznie dziękujemy za przesłanie zgłoszenia za pośrednictwem platformy SIDUSIS.
+Informujemy, że zapytanie dotyczące możliwości podłączenia Internetu w lokalizacji ${adresBezMiasta}${cityPartForSubject} zostało przekazane do Działu Inwestycji celem przygotowania indywidualnej wyceny.
+Odpowiedź prześlę nie później niż w ciągu 3 dni roboczych.
 
-	W przypadku jakichkolwiek pytań – pozostaję do dyspozycji.
-	`;
+W przypadku jakichkolwiek pytań – pozostaję do dyspozycji.
+`;
 
     const body_std =
-	`Dzień dobry,
+`Dzień dobry,
 
-	W odpowiedzi na przesłane zapytanie poniżej przesyłam ofertę na podłączenie Prywatnego Światłowodu The Network:
+W odpowiedzi na przesłane zapytanie poniżej przesyłam ofertę na podłączenie Prywatnego Światłowodu The Network:
 
-	Jednorazowy koszt instalacji wynosi 2500 zł (możliwość rozłożenia na 10 równych płatności po 250 zł)- Płatność po uruchomieniu usługi - Brak zaliczki / przedpłaty.
-	Abonament miesięczny zależny jest od prędkości łącza:
-	300/300Mbs - 125 zł
-	1000/1000Mbs - 150 zł
-	TV 82 - 10 zł
-	TV 177 – 69 zł
-	lista kanałów: https://thenetwork.pl/telewizja/
+Jednorazowy koszt instalacji wynosi 2500 zł (możliwość rozłożenia na 10 równych płatności po 250 zł)- Płatność po uruchomieniu usługi - Brak zaliczki / przedpłaty.
+Abonament miesięczny zależny jest od prędkości łącza:
+300/300Mbs - 125 zł
+1000/1000Mbs - 150 zł
+TV 82 - 10 zł
+TV 177 – 69 zł
+lista kanałów: https://thenetwork.pl/telewizja/
 
-	- Światłowód wprowadzany jest do pierwszego możliwego punktu w domu,
-	- W miejscu, do którego zostanie doprowadzony światłowód niezbędne jest zasilanie dla urządzenia optycznego ONU.
-	- Infrastruktura wewnętrzna pozostaje w gestii właściciela posesji (sieć LAN oraz wifi).
-	Umowa zawierana jest na 24 miesiące.
+- Światłowód wprowadzany jest do pierwszego możliwego punktu w domu,
+- W miejscu, do którego zostanie doprowadzony światłowód niezbędne jest zasilanie dla urządzenia optycznego ONU.
+- Infrastruktura wewnętrzna pozostaje w gestii właściciela posesji (sieć LAN oraz wifi).
+Umowa zawierana jest na 24 miesiące.
 
-	Celem przygotowania umowy proszę o przesłanie poniższych danych:
+Celem przygotowania umowy proszę o przesłanie poniższych danych:
 
-	Nazwisko i Imie ..............................
-	adres...........................
-	PESEL: .................
-	mail......................
-	TEL................................
-	Pakiet TV: ............................
-	Prędkość: ................................
+Nazwisko i Imie ..............................
+adres...........................
+PESEL: .................
+mail......................
+TEL................................
+Pakiet TV: ............................
+Prędkość: ................................
 
-	Jakie są następne kroki?
-	Po otrzymaniu danych przygotujemy umowę on-line, która zostanie wysłana w oddzielnej wiadomości.
-	Następnie po zaakceptowaniu umowy Zostaną Państwo wpisani na listę do realizacji dla wykonawcy. Po wykonaniu przyłącza domowego oraz połączeniu go z główną magistralą Biuro Obsługi Klienta kontaktuje się z Państwem celem ustalenia dogodnego terminu uruchomienia usługi.
-	Ostatni etap to wizyta technika, podczas której zostaje uruchomiona usługa. Po tej wizycie w Panelu Klienta pojawi się pierwsza faktura.
+Jakie są następne kroki?
+Po otrzymaniu danych przygotujemy umowę on-line, która zostanie wysłana w oddzielnej wiadomości.
+Następnie po zaakceptowaniu umowy Zostaną Państwo wpisani na listę do realizacji dla wykonawcy. Po wykonaniu przyłącza domowego oraz połączeniu go z główną magistralą Biuro Obsługi Klienta kontaktuje się z Państwem celem ustalenia dogodnego terminu uruchomienia usługi.
+Ostatni etap to wizyta technika, podczas której zostaje uruchomiona usługa. Po tej wizycie w Panelu Klienta pojawi się pierwsza faktura.
 
-	W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
-	`;
+W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
+`;
 
     const body_dev =
-	`Dzień dobry,
+`Dzień dobry,
 
-	W odpowiedzi na przesłane zapytanie poniżej przesyłam ofertę na podłączenie Prywatnego Światłowodu The Network:
-	Jednorazowy koszt instalacji wynosi 1 zł
-	Abonament miesięczny zależny jest od prędkości łącza:
-	300/300Mbs - 89 zł
-	1000/1000Mbs - 114 zł
-	TV 82 - 10 zł (Telewizja po łączu internetowym)
-	TV 177 – 69 zł (Telewizja po łączu internetowym)
-	lista kanałów: 
-	https://thenetwork.pl/telewizja/
+W odpowiedzi na przesłane zapytanie poniżej przesyłam ofertę na podłączenie Prywatnego Światłowodu The Network:
+Jednorazowy koszt instalacji wynosi 1 zł
+Abonament miesięczny zależny jest od prędkości łącza:
+300/300Mbs - 89 zł
+1000/1000Mbs - 114 zł
+TV 82 - 10 zł (Telewizja po łączu internetowym)
+TV 177 – 69 zł (Telewizja po łączu internetowym)
+lista kanałów: 
+https://thenetwork.pl/telewizja/
 
-	- Światłowód wprowadzany jest do pierwszego możliwego punktu w domu,
-	- W miejscu, do którego zostanie doprowadzony światłowód niezbędne jest zasilanie dla urządzenia optycznego ONU.
-	- Infrastruktura wewnętrzna pozostaje w gestii właściciela posesji (sieć LAN oraz wifi).
-	Umowa zawierana jest na 24 miesiące.
+- Światłowód wprowadzany jest do pierwszego możliwego punktu w domu,
+- W miejscu, do którego zostanie doprowadzony światłowód niezbędne jest zasilanie dla urządzenia optycznego ONU.
+- Infrastruktura wewnętrzna pozostaje w gestii właściciela posesji (sieć LAN oraz wifi).
+Umowa zawierana jest na 24 miesiące.
 
-	Celem przygotowania umowy proszę o przesłanie poniższych danych:
+Celem przygotowania umowy proszę o przesłanie poniższych danych:
 
-	Nazwisko i Imie ..............................
-	adres...........................
-	PESEL: .................
-	mail......................
-	TEL................................
-	Pakiet TV: ............................
-	Prędkość: ................................
+Nazwisko i Imie ..............................
+adres...........................
+PESEL: .................
+mail......................
+TEL................................
+Pakiet TV: ............................
+Prędkość: ................................
 
-	Jakie są następne kroki?
-	Biuro Obsługi Klienta przygotowuje umowę on-line, która zostanie wysłana w oddzielnej wiadomości.
-	Następnie po zaakceptowaniu umowy Biuro Obsługi Klienta kontaktuje się z Państwem celem ustalenia dogodnego terminu uruchomienia usługi.
-	Ostatni etap to wizyta technika, podczas której zostaje uruchomiona usługa. Po tej wizycie w Panelu Klienta pojawi się pierwsza faktura.
+Jakie są następne kroki?
+Biuro Obsługi Klienta przygotowuje umowę on-line, która zostanie wysłana w oddzielnej wiadomości.
+Następnie po zaakceptowaniu umowy Biuro Obsługi Klienta kontaktuje się z Państwem celem ustalenia dogodnego terminu uruchomienia usługi.
+Ostatni etap to wizyta technika, podczas której zostaje uruchomiona usługa. Po tej wizycie w Panelu Klienta pojawi się pierwsza faktura.
 
-	W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
-	`;
+W przypadku dodatkowych pytań bądź wątpliwości proszę o kontakt.
+`;
 
     return {
       INV: { to: "inwestycje@internetunion.pl", subject: subj_inv, body: body_inv },
@@ -637,12 +679,13 @@
 
   /* =========================== ZAŁADUJ MSAL =========================== */
   try { await loadScriptSequential(MSAL_CDNS); }
-  catch(e){ alert('Nie udało się załadować msal-browser (alcdn/jsDelivr/unpkg).'); console.error(e); return; }
-  if (typeof msal === 'undefined' || !msal.PublicClientApplication){ alert('MSAL nie jest dostępny.'); return; }
+  catch(e){ console.warn('MSAL script load failed (alcdn/jsDelivr/unpkg).', e); }
+  if (typeof msal === 'undefined' || !msal.PublicClientApplication){ console.warn('MSAL not available at startup.'); }
 
   /* =========================== MSAL / GRAPH =========================== */
   let authInProgress = false;
-  const msalApp = new msal.PublicClientApplication({
+  let msalApp = null;
+  if (typeof msal !== 'undefined' && msal.PublicClientApplication){ msalApp = new msal.PublicClientApplication({
     auth: {
       clientId: CONFIG.clientId,
       authority: "https://login.microsoftonline.com/" + CONFIG.tenantId,
@@ -650,68 +693,165 @@
     },
     cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false },
     system: { loggerOptions: { loggerCallback: (l, m)=>console.log("[MSAL]", m) } }
-  });
+  }); }
   const graphScopes = ["openid","profile","offline_access","Files.ReadWrite.All","Sites.Read.All"];
 
+  // ================== Excel Workbook session + utilities ==================
+  let workbookSessionId = null;
+  let sessionCreatedAt = 0;
+
+  function sleep(ms){ return new Promise(res=>setTimeout(res, Math.max(0, ms|0))); }
+  function randomJitter(min=120,max=320){ return Math.floor(min + Math.random() * (max-min)); }
+
+  async function ensureWorkbookSession(){
+    const TWO_HOURS = 2 * 60 * 60 * 1000;
+    const fresh = workbookSessionId && (Date.now() - sessionCreatedAt) < TWO_HOURS;
+    if (fresh) return workbookSessionId;
+    const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
+    const token = await getToken();
+    const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/createSession`;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ persistChanges: true })
+    });
+    if(!resp.ok){
+      const t = await resp.text().catch(()=>String(resp.status));
+      throw new Error(`createSession failed ${resp.status} ${t}`);
+    }
+    const js = await resp.json();
+    workbookSessionId = js && (js.id || js.sessionId || js.value || js);
+    sessionCreatedAt = Date.now();
+    return workbookSessionId;
+  }
+
+  // 429/5xx retry with Retry-After and backoff
+  async function withGraphRetry(exec){
+    let attempt = 0; let backoff = 800;
+    while(true){
+      const resp = await exec();
+      const st = resp.status|0;
+      if (st===429 || st===503 || st===504){
+        attempt++;
+        if(attempt>=3) return resp;
+        let ra = resp.headers.get('Retry-After') || resp.headers.get('retry-after');
+        let waitMs = 0;
+        const n = parseInt(ra||'', 10);
+        if(!isNaN(n) && n>0){ waitMs = n*1000; }
+        else { waitMs = backoff; backoff = Math.min(6400, backoff*2); }
+        await sleep(waitMs + randomJitter(80,150));
+        continue;
+      }
+      return resp;
+    }
+  }
+
+  // Single-writer queue for Excel writes
+  const writeQueue = [];
+  let writeActive = false;
+  function queueWrite(fn){
+    return new Promise((resolve, reject)=>{ writeQueue.push({fn,resolve,reject}); pumpQueue(); });
+  }
+  async function pumpQueue(){
+    if(writeActive) return;
+    const job = writeQueue.shift();
+    if(!job) return;
+    writeActive = true;
+    try{ const res = await job.fn(); await sleep(randomJitter(150,320)); job.resolve(res); }
+    catch(e){ job.reject(e); }
+    finally{ writeActive=false; if(writeQueue.length) pumpQueue(); }
+  }
+
+  // ====== Sheet headers cache ======
+  const SHEET_CACHE = { dataHeaders: null, dataHeaderIndex: {}, lastUsedRangeSnapshotTs: 0 };
+  function buildHeaderIndex(headers){
+    const map = {};
+    const want = [ 'PH','Status','Powód odmowy','NextContactAt','LastTouchAt','Uwagi','ReminderTaskId','ReminderSentAt' ];
+    for(const name of want){ const i = headers.indexOf(name); if(i>=0) map[name]=i; }
+    return map;
+  }
+  function getHeaderIndex(name){
+    if(!SHEET_CACHE.dataHeaderIndex) return -1;
+    const v = SHEET_CACHE.dataHeaderIndex[name];
+    return (typeof v==='number') ? v : -1;
+  }
+
   async function ensureLogin(){
-  // jeśli już mamy konto – nic nie rób
-  const accs = msalApp.getAllAccounts();
-  if (accs.length) {
-    account = accs[0];
-    who.textContent = "Zalogowano: " + (account.username || account.homeAccountId);
-    updateMissingPanel();
-    return;
-  }
+    // Lazy init MSAL if needed
+    if(!msalApp){
+      try { await loadScriptSequential(MSAL_CDNS); } catch(e){ console.warn('MSAL retry load failed:', e); }
+      if (typeof msal !== 'undefined' && msal.PublicClientApplication){
+        try{
+          msalApp = new msal.PublicClientApplication({
+            auth: { clientId: CONFIG.clientId, authority: "https://login.microsoftonline.com/" + CONFIG.tenantId, redirectUri: "https://adiice.github.io/mapa-sidusis/mapa.html" },
+            cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false },
+            system: { loggerOptions: { loggerCallback: (l, m)=>console.log("[MSAL]", m) } }
+          });
+        }catch(e){ console.warn('MSAL init retry failed:', e); }
+      }
+      if(!msalApp){ showError('MSAL niedostępny. Sprawdź połączenie i spróbuj ponownie.'); return; }
+    }
+    // jeśli już mamy konto – nic nie rób
+    const accs = msalApp.getAllAccounts();
+    if (accs.length) {
+      account = accs[0];
+      who.textContent = "Zalogowano: " + (account.username || account.homeAccountId);
+      updateMissingPanel();
+      return;
+    }
 
-  // nie otwieraj 2-giego popupu naraz
-  if (authInProgress) return;
-  authInProgress = true;
-  try {
-    const r = await msalApp.loginPopup({ scopes: graphScopes, prompt: "select_account" });
-    account = r.account;
-    who.textContent = "Zalogowano: " + (account.username || account.homeAccountId);
-    updateMissingPanel();
-  } finally {
-    authInProgress = false;
-  }
-}
-
-async function getToken(){
-  // spróbuj cicho, jeśli nie wyjdzie – popup tylko, gdy faktycznie wymagany
-  const acc = msalApp.getAllAccounts()[0] || account;
-  if (acc) account = acc;
-
-  try {
-    const r = await msalApp.acquireTokenSilent({ scopes: graphScopes, account });
-    return r.accessToken;
-  } catch (e) {
-    // tylko wtedy próbuj popup
-    const needPopup =
-      (e && (e.errorCode === "no_account_error" ||
-             e.errorCode === "no_tokens_found" ||
-             (e.errorCode && String(e.errorCode).includes("interaction_required"))));
-
-    if (!needPopup) throw e;
-
-    if (authInProgress) throw e; // poczekaj na trwającą interakcję
-
+    // nie otwieraj 2-giego popupu naraz
+    if (authInProgress) return;
     authInProgress = true;
     try {
-      const r = await msalApp.acquireTokenPopup({ scopes: graphScopes });
-      account = r.account || account;
-      return r.accessToken;
+      const r = await msalApp.loginPopup({ scopes: graphScopes, prompt: "select_account" });
+      account = r.account;
+      who.textContent = "Zalogowano: " + (account.username || account.homeAccountId);
+      updateMissingPanel();
     } finally {
       authInProgress = false;
     }
   }
-}
+
+  async function getToken(){
+    if(!msalApp){ await ensureLogin(); }
+    if(!msalApp){ throw new Error('MSAL niedostępny'); }
+    // spróbuj cicho, jeśli nie wyjdzie – popup tylko, gdy faktycznie wymagany
+    const acc = msalApp.getAllAccounts()[0] || account;
+    if (acc) account = acc;
+
+    try {
+      const r = await msalApp.acquireTokenSilent({ scopes: graphScopes, account });
+      return r.accessToken;
+    } catch (e) {
+      // tylko wtedy próbuj popup
+      const needPopup =
+        (e && (e.errorCode === "no_account_error" ||
+               e.errorCode === "no_tokens_found" ||
+               (e.errorCode && String(e.errorCode).includes("interaction_required"))));
+
+      if (!needPopup) throw e;
+
+      if (authInProgress) throw e; // poczekaj na trwającą interakcję
+
+      authInProgress = true;
+      try {
+        const r = await msalApp.acquireTokenPopup({ scopes: graphScopes });
+        account = r.account || account;
+        return r.accessToken;
+      } finally {
+        authInProgress = false;
+      }
+    }
+  }
+
   async function gfetch(method, url, body){
     const token = await getToken();
-    const resp = await fetch(url, {
-      method,
-      headers: { "Authorization":"Bearer " + token, "Accept":"application/json", "Content-Type":"application/json" },
-      body: body ? JSON.stringify(body) : undefined
-    });
+    // Avoid recursion: only ensure session for workbook endpoints here.
+    if (url && url.includes('/workbook/')){ try{ await ensureWorkbookSession(); }catch(e){ console.warn('ensureWorkbookSession failed:', e?.message||e); } }
+    const headers = { "Authorization":"Bearer " + token, "Accept":"application/json", "Content-Type":"application/json" };
+    if(workbookSessionId){ headers["Workbook-Session-Id"] = workbookSessionId; }
+    const resp = await withGraphRetry(()=> fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined }));
     if(!resp.ok){
       const txt=await resp.text().catch(()=>String(resp.status));
       throw new Error(`${method} ${url} -> ${resp.status} ${txt}`);
@@ -720,17 +860,17 @@ async function getToken(){
   }
   async function gBatch(requests){
     const token = await getToken();
-    const resp = await fetch("https://graph.microsoft.com/v1.0/$batch", {
-      method: "POST",
-      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
-      body: JSON.stringify({ requests })
-    });
+    // Ensure workbook session for batch operations
+    try{ await ensureWorkbookSession(); }catch(e){ console.warn('ensureWorkbookSession failed:', e?.message||e); }
+    const headers = { "Authorization": "Bearer " + token, "Content-Type": "application/json" };
+    if(workbookSessionId){ headers["Workbook-Session-Id"] = workbookSessionId; }
+    const resp = await withGraphRetry(()=> fetch("https://graph.microsoft.com/v1.0/$batch", { method: "POST", headers, body: JSON.stringify({ requests }) }));
     const js = await resp.json();
     if (!resp.ok) {
       const msg = (js && js.error && js.error.message) ? js.error.message : JSON.stringify(js);
       throw new Error("Batch error: " + msg);
     }
-    const bad = (js.responses || []).find(r => r.status < 200 || r.status >= 300);  /* <-- FIX */
+    const bad = (js.responses || []).find(r => r.status < 200 || r.status >= 300);
     if (bad) throw new Error("Batch subrequest failed: " + bad.status + " " + JSON.stringify(bad.body||{}));
     return js;
   }
@@ -756,6 +896,20 @@ async function getToken(){
     const wsq = wsName.replace(/'/g,"''");
     const url = `https://graph.microsoft.com/v1.0/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsq}')/range(address='${a1}')`;
     return gfetch("PATCH", url, { values: values2d });
+  }
+
+  // Ensure required data headers exist (only on explicit reload)
+  async function ensureDataHeaders(){
+    const used = await usedRange(CONFIG.dataSheet);
+    const headers = (used.values && used.values[0]) ? used.values[0].map(h=>String(h||"").trim()) : [];
+    if(!headers.length){ return; }
+    const required = [ 'PH','Status','Powód odmowy','NextContactAt','LastTouchAt','Uwagi','ReminderTaskId','ReminderSentAt' ];
+    let changed = false;
+    for(const name of required){ if(!headers.includes(name)){ headers.push(name); changed = true; } }
+    if(changed){ await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+    SHEET_CACHE.dataHeaders = headers;
+    SHEET_CACHE.dataHeaderIndex = buildHeaderIndex(headers);
+    SHEET_CACHE.lastUsedRangeSnapshotTs = Date.now();
   }
 
   /* ===== AuditLog ===== */
@@ -821,7 +975,9 @@ async function getToken(){
       nazwa:pickHeader(headers,["zgłaszający","zglaszajacy","nazwa","imię","imie","nazwisko","klient","firma"]),
       adresPelny: pickHeader(headers,["adres_pelny","adres pełny","adres pelny"]),
       powod: pickHeader(headers,["powód","powod","reason","powód odmowy","powod odmowy"]),
-      notes: pickHeader(headers,["uwagi ph","uwagi","uwaga","notatki","note","notes"])
+      notes: pickHeader(headers,["uwagi ph","uwagi","uwaga","notatki","note","notes"]),
+      next:  pickHeader(headers,["nextcontactat","następny kontakt","nastepny kontakt","nast. kontakt","nast kontakt"]),
+      last:  pickHeader(headers,["lasttouchat","ostatni kontakt","last touch","ostatni kontakt at"])
     };
     const get = (r, col) => { const idx=headers.indexOf(col); return idx>=0 ? r[idx] : ""; };
 
@@ -846,7 +1002,9 @@ async function getToken(){
         nazwa: String(get(r,H.nazwa)||""),
         miejscowosc: String(get(r,H.msc)||""),
         PowodOdmowy: String(get(r,H.powod)||""),
-        Uwagi: String(get(r,H.notes)||"")
+        Uwagi: String(get(r,H.notes)||""),
+        NextContactAt: toDate(get(r,H.next)) || null,
+        LastTouchAt: toDate(get(r,H.last)) || null
       };
     });
 
@@ -865,6 +1023,12 @@ async function getToken(){
     setStatus("Ładowanie danych z Excela (Graph)…");
     const used = await usedRange(CONFIG.dataSheet);
     const values = used.values || [];
+    if(values.length){
+      const headers = (values[0]||[]).map(h=>String(h||"").trim());
+      SHEET_CACHE.dataHeaders = headers;
+      SHEET_CACHE.dataHeaderIndex = buildHeaderIndex(headers);
+      SHEET_CACHE.lastUsedRangeSnapshotTs = Date.now();
+    }
     if(!values.length){ setStatus("Arkusz pusty."); rows=[]; frows=[]; missingRows=[]; updateMissingPanel(); return; }
 
     const parsed = parseRows(values);
@@ -925,25 +1089,26 @@ async function getToken(){
       lon:        pickHeader(headers,["lon","longitude","długość","dlugosc","punkt (x)","x"]),
       ph:         pickHeader(headers,["ph"]),
       st:         pickHeader(headers,["status"]),
-      reason:     pickHeader(headers,["powód","powod","reason","powód odmowy","powod odmowy"])
+      reason:     pickHeader(headers,["powód","powod","reason","powód odmowy","powod odmowy"]),
+      next:       pickHeader(headers,["nextcontactat","następny kontakt","nastepny kontakt","nast. kontakt","nast kontakt"]),
+      last:       pickHeader(headers,["lasttouchat","ostatni kontakt","last touch","ostatni kontakt at"])
     };
 
-    let idxPH = headers.findIndex(h=>String(h).toLowerCase().trim()==="ph");
-    if(idxPH<0){ idxPH = headers.length; headers.push("PH"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
-    let idxST = headers.findIndex(h=>String(h).toLowerCase().trim()==="status");
-    if(idxST<0){ idxST = headers.length; headers.push("Status"); await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
+    // Indeksy kolumn z cache (bez edycji naglowkow w trakcie zapisu)
+    let idxPH  = getHeaderIndex('PH');
+    let idxST  = getHeaderIndex('Status');
     let idxRS = -1;
-    if(newStatus==="Odmowa klienta"){
-      const reasonCol = H.reason || "Powód odmowy";
-      if(!H.reason){ headers.push(reasonCol); idxRS = headers.length-1; await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]); }
-      else idxRS = headers.indexOf(reasonCol);
-    }
-
-    let row1 = Number(rec._row1) || -1, oldPH="", oldST="";
+    if(newStatus==="Odmowa klienta"){ idxRS = getHeaderIndex('Pow\u00F3d odmowy'); if(idxRS<0){ setStatus('Brakuje kolumny Powod odmowy - odswiez dane (przycisk u gory).'); return; } }
+    let idxNEXT = getHeaderIndex('NextContactAt');
+    let idxLAST = getHeaderIndex('LastTouchAt');
+    if(idxPH<0 || idxST<0 || idxNEXT<0 || idxLAST<0){ const miss = [ [idxPH,'PH'],[idxST,'Status'],[idxNEXT,'NextContactAt'],[idxLAST,'LastTouchAt'] ].filter(x=>x[0]<0).map(x=>x[1]).join(', '); setStatus(`Brakuje kolumny ${miss} - odswiez dane (przycisk u gory).`); return; }
+    // Znajdź wiersz rekordu i odczytaj dotychczasowe wartości
+    let row1 = Number(rec._row1) || -1, oldPH="", oldST="", oldNext="";
     if(row1>0){
       const row = body[row1-2] || [];
       oldPH = idxPH>=0 ? String(row[idxPH]||"") : "";
       oldST = idxST>=0 ? String(row[idxST]||"") : "";
+      oldNext = idxNEXT>=0 ? String(row[idxNEXT]||"") : "";
     }else{
       const wantAddr = normAddr(rec.adres_pelny||"");
       for(let r=0; r<body.length; r++){
@@ -966,6 +1131,7 @@ async function getToken(){
         if(row1>0){
           oldPH = idxPH>=0 ? String(row[idxPH]||"") : "";
           oldST = idxST>=0 ? String(row[idxST]||"") : "";
+          oldNext = idxNEXT>=0 ? String(row[idxNEXT]||"") : "";
           break;
         }
       }
@@ -973,20 +1139,35 @@ async function getToken(){
       rec._row1 = row1;
     }
 
+    // Przygotuj adresy A1 do zapisu
     const [sid, iid] = await Promise.all([getSiteId(), getFileItemId()]);
     const wsqData = CONFIG.dataSheet.replace(/'/g,"''");
 
     const a1PH     = `${colLetter(idxPH+1)}${row1}`;
     const a1ST     = `${colLetter(idxST+1)}${row1}`;
     const a1REASON = (idxRS>=0) ? `${colLetter(idxRS+1)}${row1}` : null;
+    const a1NEXT   = `${colLetter(idxNEXT+1)}${row1}`;
+    const a1LAST   = `${colLetter(idxLAST+1)}${row1}`;
 
+    // Audit row
     await ensureAuditHeaders();
     const nextLog = await getNextLogRow();
     const logA1   = `A${nextLog}:${colLetter(AUDIT_HEADERS.length)}${nextLog}`;
     const now     = new Date().toISOString();
     const upn     = (account && (account.username||account.homeAccountId)) || "";
-    const logRow  = [ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}|${newReason||""}`, "" ];
+    const nowLocal = todayLocal();
 
+    // Wylicz NextContactAt wg reguł
+    const comp = computeNextContactAt(rec, newStatus);
+    const statusChanged = String(oldST||"").trim() !== String(newStatus||"").trim();
+    const hadNextBefore = !!String(oldNext||"").trim();
+    const willWriteNext = statusChanged || !hadNextBefore;
+    const nextCellValue = willWriteNext ? (comp.nextAt ? fmtYMD(comp.nextAt) : "") : null; // null => bez zmian
+    const noteNextText  = willWriteNext ? (nextCellValue||'—') : (hadNextBefore ? oldNext : '—');
+
+    const logRow  = [ now, upn, "UpdatePHStatus", "", rec.adres_pelny||"", `${oldPH}|${oldST}`, `${newPH}|${newStatus}|${newReason||""}`, `NextContactAt=${noteNextText}; LastTouchAt=${fmtYMD(nowLocal)}; rule: ${comp.reasonText}` ];
+
+    // Batch PATCH
     const requests = [
       { id: "ph", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1PH}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ newPH || "" ]] } },
       { id: "st", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1ST}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ newStatus || "" ]] } }
@@ -994,10 +1175,17 @@ async function getToken(){
     if (a1REASON){
       requests.push({ id: "reason", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1REASON}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ newReason || "" ]] } });
     }
+    // LastTouchAt zawsze dziś
+    requests.push({ id: "last", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1LAST}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ fmtYMD(nowLocal) ]] } });
+    // NextContactAt wg reguł (tylko gdy zmiana statusu lub było puste)
+    if(nextCellValue!==null){
+      requests.push({ id: "next", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1NEXT}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ nextCellValue ]] } });
+    }
     const wsqLog = CONFIG.logSheet.replace(/'/g,"''");
     requests.push({ id: "log", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqLog}')/range(address='${logA1}')`, headers: { "Content-Type": "application/json" }, body: { values: [ logRow ] } });
 
-    await gBatch(requests);
+    await queueWrite(()=> gBatch(requests));
+    return { lastTouchAt: nowLocal, nextContactAt: (nextCellValue!==null ? (comp.nextAt || null) : (rec.NextContactAt || null)), wroteNext: (nextCellValue!==null) };
   }
 
   async function saveUwagi(rec, newNotes){
@@ -1017,11 +1205,7 @@ async function getToken(){
       notes:      pickHeader(headers,["uwagi ph","uwagi","uwaga","notatki","note","notes"])
     };
 
-    let idxNotes = (H.notes ? headers.indexOf(H.notes) : -1);
-    if(idxNotes < 0){
-      idxNotes = headers.length; headers.push("Uwagi");
-      await patchRange(CONFIG.dataSheet, `A1:${colLetter(headers.length)}1`, [headers]);
-    }
+    let idxNotes = getHeaderIndex('Uwagi'); if(idxNotes < 0){ setStatus('Brakuje kolumny Uwagi - odswiez dane (przycisk u gory).'); return; }
 
     let row1 = Number(rec._row1) || -1, oldNotes = "";
     if(row1 > 0){
@@ -1065,7 +1249,7 @@ async function getToken(){
       { id: "notes", method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${wsqData}')/range(address='${a1NOTE}')`, headers: { "Content-Type": "application/json" }, body: { values: [[ newNotes || "" ]] } },
       { id: "log",   method: "PATCH", url: `/sites/${sid}/drive/items/${iid}/workbook/worksheets('${CONFIG.logSheet.replace(/'/g,"''")}')/range(address='${logA1}')`, headers: { "Content-Type": "application/json" }, body: { values: [ logRow ] } }
     ];
-    await gBatch(requests);
+    await queueWrite(()=> gBatch(requests));
   }
 
   /* Panel braków – odświeżanie i zwijanie */
@@ -1092,14 +1276,15 @@ async function getToken(){
   /* =========================== UI =========================== */
   $("#btnLogin").addEventListener('click', async ()=>{ try{ await ensureLogin(); setStatus("Zalogowano."); updateMissingPanel(); }catch(err){ showError("Logowanie nieudane: " + (err.message||err)); } });
   $("#btnLogout").addEventListener('click', async ()=>{
-    try{ const acc = msalApp.getAllAccounts()[0]; if(acc){ await msalApp.logoutPopup({ account: acc }); }
+    try{ const acc = msalApp ? msalApp.getAllAccounts()[0] : null; if(acc){ await msalApp.logoutPopup({ account: acc }); }
       account=null; who.textContent=""; setStatus("Wylogowano."); updateMissingPanel(); }catch(err){ showError("Wylogowanie nieudane: " + (err.message||err)); }
   });
   $("#btnReload").addEventListener('click', async ()=>{
     try{
       await ensureLogin();
-      await loadLists();  renderLegend();
       await getSiteId(); await getFileItemId();
+      await ensureDataHeaders();
+      await loadLists();  await loadStatusRules(); renderLegend();
       await loadDataFromExcel(); applyMiniFilters(); rebuild();
     } catch(err){ showError(err.message||err); }
   });
@@ -1108,6 +1293,7 @@ async function getToken(){
 
   /* =========================== START =========================== */
   await loadLists();
+  await loadStatusRules();
   initMap();
   renderLegend();
   attachToggle("toolbarBox","tgToolbar","toolbar");
@@ -1115,7 +1301,7 @@ async function getToken(){
   attachToggle("legend","tgLegend","legend");
   setStatus(DEFAULT_STATUS);
   window.addEventListener('unhandledrejection', e=>showError(e.reason?.message||e.reason||"Błąd"));
-  msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e));
+  (msalApp && msalApp.handleRedirectPromise ? msalApp.handleRedirectPromise().catch(e=>console.warn('MSAL redirect:', e)) : void 0);
 })();
 </script>
 <div class="credit">Autor: Adrian Daniel</div>
